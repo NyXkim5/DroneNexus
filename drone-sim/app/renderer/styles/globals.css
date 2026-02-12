@@ -1,0 +1,282 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    overflow: hidden;
+    user-select: none;
+    -webkit-app-region: no-drag;
+    background-color: #0c0c0c;
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.008) 2px,
+      rgba(255, 255, 255, 0.008) 4px
+    );
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #4ade80;
+  }
+}
+
+@layer components {
+  /* ── PANELS ───────────────────────────────────────── */
+  .panel {
+    @apply bg-nexus-panel border border-nexus-border border-l-2 border-l-nexus-accent;
+    clip-path: polygon(12px 0, 100% 0, 100% 100%, 0 100%, 0 12px);
+  }
+
+  .panel-header {
+    @apply px-4 py-2 text-[10px] font-mono font-semibold text-nexus-accent uppercase tracking-[0.2em]
+           border-b border-nexus-border border-l-2 border-l-nexus-accent;
+  }
+
+  .panel-header::after {
+    content: '';
+    display: block;
+    margin-top: 6px;
+    height: 1px;
+    background: linear-gradient(90deg, #4ade80 0%, transparent 100%);
+  }
+
+  /* ── STAT VALUES ──────────────────────────────────── */
+  .stat-value {
+    @apply text-2xl font-bold font-mono text-nexus-accent;
+    text-shadow: 0 0 8px rgba(74, 222, 128, 0.4), 0 0 20px rgba(74, 222, 128, 0.15);
+  }
+
+  .stat-label {
+    @apply text-[9px] text-nexus-muted uppercase tracking-[0.25em] mt-1;
+  }
+
+  /* ── BUTTONS ──────────────────────────────────────── */
+  .btn {
+    @apply px-4 py-2 text-xs font-mono font-medium uppercase tracking-[0.15em] transition-all duration-150;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  }
+
+  .btn-primary {
+    @apply btn border border-nexus-accent text-nexus-accent bg-transparent;
+  }
+
+  .btn-primary:hover {
+    @apply bg-nexus-accent/20;
+  }
+
+  .btn-danger {
+    @apply btn border border-nexus-danger text-nexus-danger bg-transparent;
+  }
+
+  .btn-danger:hover {
+    @apply bg-nexus-danger/20;
+  }
+
+  .btn-ghost {
+    @apply btn text-nexus-muted bg-transparent border-none;
+    clip-path: none;
+  }
+
+  .btn-ghost:hover {
+    @apply text-nexus-text bg-white/5;
+  }
+
+  /* ── INPUTS ───────────────────────────────────────── */
+  .input-field {
+    @apply w-full bg-nexus-bg border border-nexus-border rounded-none px-3 py-1.5 text-sm text-nexus-text
+           focus:outline-none focus:border-nexus-accent focus:ring-0
+           font-mono;
+  }
+
+  /* ── SENSOR CARDS ─────────────────────────────────── */
+  .sensor-card {
+    @apply bg-nexus-panel border border-nexus-border border-l-2 border-l-nexus-accent p-4 cursor-pointer transition-all duration-200;
+  }
+
+  .sensor-card.active {
+    @apply border-nexus-accent/50 shadow-[0_0_12px_rgba(74,222,128,0.1)];
+  }
+
+  .sensor-card.disabled {
+    @apply opacity-40 border-l-nexus-muted;
+  }
+
+  .sensor-card .status-ready {
+    @apply inline-block w-1.5 h-1.5 bg-nexus-accent rounded-full;
+  }
+
+  /* ── GAUGE ────────────────────────────────────────── */
+  .gauge {
+    @apply relative flex flex-col items-center;
+  }
+
+  .gauge::before {
+    content: '[';
+    @apply text-nexus-muted text-xs font-mono absolute -left-2 top-1/2 -translate-y-1/2;
+  }
+
+  .gauge::after {
+    content: ']';
+    @apply text-nexus-muted text-xs font-mono absolute -right-2 top-1/2 -translate-y-1/2;
+  }
+
+  /* ── SLIDERS ──────────────────────────────────────── */
+  .slider-track {
+    @apply w-full h-1.5 bg-nexus-border rounded-none;
+  }
+
+  .slider-fill {
+    @apply h-full rounded-none transition-all duration-100;
+  }
+
+  /* ── BADGES ───────────────────────────────────────── */
+  .warning-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-medium uppercase tracking-wider;
+    clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+  }
+
+  .warning-badge.error {
+    @apply bg-nexus-danger/20 text-nexus-danger;
+  }
+
+  .warning-badge.warning {
+    @apply bg-nexus-warn/20 text-nexus-warn;
+  }
+
+  .warning-badge.info {
+    @apply bg-nexus-info/20 text-nexus-info;
+  }
+
+  /* ── TOOLTIP ──────────────────────────────────────── */
+  .tooltip {
+    @apply absolute z-50 px-3 py-2 bg-nexus-bg text-xs text-nexus-text shadow-xl
+           border border-nexus-border border-l-2 border-l-nexus-accent max-w-xs font-mono;
+  }
+
+  /* ── NAVIGATION ───────────────────────────────────── */
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 text-xs font-mono uppercase tracking-wider text-nexus-muted
+           border-l-2 border-l-transparent
+           hover:text-nexus-text hover:bg-white/[0.03] transition-colors cursor-pointer;
+  }
+
+  .nav-item.active {
+    @apply text-nexus-accent bg-nexus-accent/[0.06] border-l-nexus-accent;
+  }
+
+  /* ── TACTICAL BANNER ──────────────────────────────── */
+  .tactical-banner {
+    @apply w-full py-1 bg-nexus-accent text-nexus-bg text-center text-[10px]
+           font-mono font-bold uppercase tracking-[0.3em];
+  }
+
+  /* ── HUD BRACKET ──────────────────────────────────── */
+  .hud-bracket {
+    @apply relative inline-block px-2 font-mono;
+  }
+
+  .hud-bracket::before {
+    content: '[';
+    @apply text-nexus-muted mr-1;
+  }
+
+  .hud-bracket::after {
+    content: ']';
+    @apply text-nexus-muted ml-1;
+  }
+
+  /* ── SCANLINE OVERLAY ─────────────────────────────── */
+  .scanline {
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.012) 2px,
+      rgba(255, 255, 255, 0.012) 4px
+    );
+  }
+
+  /* ── MIL HEADER / SECTION DIVIDER ─────────────────── */
+  .mil-header {
+    @apply flex items-center gap-3 text-[10px] font-mono uppercase tracking-[0.2em] text-nexus-muted py-2;
+  }
+
+  .mil-header::before,
+  .mil-header::after {
+    content: '';
+    @apply flex-1 h-px bg-nexus-border;
+  }
+
+  /* ── STATUS INDICATOR ─────────────────────────────── */
+  .status-indicator {
+    @apply inline-block w-1.5 h-1.5 rounded-full;
+  }
+
+  .status-indicator.active {
+    @apply bg-nexus-accent;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .status-indicator.inactive {
+    @apply bg-nexus-muted;
+  }
+
+  .status-indicator.warning {
+    @apply bg-nexus-warn;
+    animation: pulse-glow-warn 1.5s ease-in-out infinite;
+  }
+
+  .status-indicator.critical {
+    @apply bg-nexus-danger;
+    animation: pulse-glow-danger 1s ease-in-out infinite;
+  }
+
+  /* ── CLASSIFICATION BANNER ────────────────────────── */
+  .classification-banner {
+    @apply w-full py-1 bg-nexus-accent/90 text-nexus-bg text-center text-[10px]
+           font-mono font-bold uppercase tracking-[0.35em] flex-shrink-0;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px rgba(74, 222, 128, 0.6); }
+    50% { opacity: 0.5; box-shadow: 0 0 8px rgba(74, 222, 128, 0.3); }
+  }
+
+  @keyframes pulse-glow-warn {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px rgba(245, 158, 11, 0.6); }
+    50% { opacity: 0.5; box-shadow: 0 0 8px rgba(245, 158, 11, 0.3); }
+  }
+
+  @keyframes pulse-glow-danger {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px rgba(239, 68, 68, 0.6); }
+    50% { opacity: 0.5; box-shadow: 0 0 8px rgba(239, 68, 68, 0.3); }
+  }
+}

@@ -1,0 +1,353 @@
+# =============================================================================
+# 3-Inch Cinewhoop Airframe Preset
+# =============================================================================
+# A compact ducted/guarded quadcopter designed for smooth indoor cinematic
+# footage. Prop guards allow safe proximity flying near people and objects.
+# Optimized for stability and smooth video over raw performance.
+# =============================================================================
+
+name: "3-Inch Cinewhoop"
+description: >
+  Indoor-optimized cinewhoop with fully ducted propellers for safe proximity
+  flying. Designed for ultra-smooth cinematic footage in confined spaces like
+  real estate tours, event coverage, and indoor inspections. DJI O3 Air Unit
+  provides HD low-latency video. Low KV motors on 4S for efficiency and
+  reduced prop wash. No GPS -- relies on pilot skill or optical flow for
+  indoor positioning. Tuned for Betaflight with cinematic rate profiles.
+
+category: cinewhoop
+icon: quad_x_ducted
+
+# -----------------------------------------------------------------------------
+# Frame Configuration
+# -----------------------------------------------------------------------------
+frame:
+  type: quad_x
+  manufacturer: "GEPRC"
+  model: "CineLog35 V2 HD"
+  material: "injection-molded PA12 nylon + carbon fiber"
+  arm_thickness_mm: 3.5
+  top_plate_thickness_mm: 1.5
+  bottom_plate_thickness_mm: 2.0
+  standoff_height_mm: 20.0
+  wheelbase_mm: 155
+  weight_g: 62
+  motor_mount_pattern_mm: "9x9"
+  stack_mount_mm: "25.5x25.5"
+  camera_mount: "DJI O3 integrated"
+  antenna_mount: "rear_sma"
+  arm_angle_deg: 45.0
+  deadcat: false
+  unibody: true
+  prop_guard: true
+  duct_type: "full_surround"
+  duct_lip_mm: 4.0
+  duct_inner_diameter_mm: 82
+
+# -----------------------------------------------------------------------------
+# Motor Configuration (x4)
+# -----------------------------------------------------------------------------
+motors:
+  count: 4
+  manufacturer: "GEPRC"
+  model: "GR1404 4500KV"
+  kv: 4500
+  stator_diameter_mm: 14
+  stator_height_mm: 4
+  shaft_diameter_mm: 1.5 # M1.5 with adapter
+  weight_g: 9.8
+  max_current_a: 14.2
+  idle_current_a: 0.3
+  resistance_mohm: 110
+  kt_nm_per_a: 0.00212
+  max_rpm: 74250 # 4500 KV * 16.5V (4S nominal)
+  efficiency_peak_percent: 78.5
+  bearing_type: "NSK steel"
+  magnet_count: 12
+  pole_pairs: 6
+  mounting_pattern_mm: "9x9"
+  rotation_directions: ["CW", "CCW", "CW", "CCW"]
+  motor_timing_deg: 18.0
+  thermal_limit_c: 110
+
+# -----------------------------------------------------------------------------
+# Propeller Configuration
+# -----------------------------------------------------------------------------
+propellers:
+  count: 4
+  manufacturer: "GEPRC"
+  model: "G3045 3-Blade"
+  diameter_in: 3.0
+  pitch_in: 4.5
+  blades: 3
+  material: "polycarbonate"
+  weight_g: 2.1
+  hub_bore_mm: 1.5
+  max_rpm: 60000
+  static_thrust_g_per_motor: 260 # at full throttle 4S
+  efficiency_g_per_w: 4.8 # at hover
+  noise_db_at_1m: 68 # ducted reduces noise ~6dB vs open
+
+# -----------------------------------------------------------------------------
+# Battery Configuration
+# -----------------------------------------------------------------------------
+battery:
+  chemistry: "LiPo"
+  manufacturer: "GNB"
+  model: "850mAh 4S 100C"
+  cells_series: 4
+  cells_parallel: 1
+  capacity_mah: 850
+  voltage_nominal_v: 14.8
+  voltage_full_v: 16.8
+  voltage_empty_v: 13.2
+  max_continuous_discharge_c: 100
+  max_burst_discharge_c: 200
+  internal_resistance_mohm: 6.5 # per cell
+  weight_g: 98
+  dimensions_mm: [62, 30, 28]
+  connector: "XT30"
+  balance_connector: "JST-XH 5-pin"
+
+# -----------------------------------------------------------------------------
+# Electronics Configuration
+# -----------------------------------------------------------------------------
+electronics:
+  flight_controller:
+    manufacturer: "GEPRC"
+    model: "TAKER F411 BLS"
+    mcu: "STM32F411CEU6"
+    clock_mhz: 100
+    flash_kb: 512
+    firmware: "Betaflight"
+    firmware_version: "4.5.1"
+    gyro_bus: "SPI"
+    osd_chip: "AT7456E"
+    barometer: true
+    blackbox: "8MB onboard flash"
+    uart_count: 3
+    mounting_pattern_mm: "25.5x25.5"
+    weight_g: 5.8
+    current_sensor: true
+    voltage_sensor: true
+    sd_card_slot: false
+    usb_type: "USB-C"
+    beeper_pad: true
+    led_pad: true
+
+  esc:
+    manufacturer: "GEPRC"
+    model: "BLS 25A 4-in-1"
+    type: "4-in-1"
+    protocol: "DShot300"
+    continuous_current_a: 25
+    burst_current_a: 30
+    voltage_range: "2S-4S"
+    mcu: "BL32 ARM"
+    firmware: "BlueJay"
+    firmware_version: "0.20.0"
+    current_sensor: true
+    telemetry: "bidirectional DShot"
+    mounting_pattern_mm: "25.5x25.5"
+    weight_g: 6.2
+    mosfet_type: "NMOS"
+    pwm_frequency_khz: 48
+    rpm_telemetry: true
+
+  receiver:
+    manufacturer: "HappyModel"
+    model: "EP1 ELRS 2.4GHz"
+    protocol: "ExpressLRS"
+    frequency_ghz: 2.4
+    max_power_mw: 25
+    antenna_type: "ceramic chip"
+    channels: 16
+    latency_ms: 2
+    packet_rate_hz: 500
+    weight_g: 0.9
+    firmware_version: "3.4.2"
+
+  vtx:
+    manufacturer: "DJI"
+    model: "O3 Air Unit"
+    type: "digital_hd"
+    power_levels_mw: [25, 200, 500, 1200]
+    frequency: "5.8GHz"
+    resolution: "1080p"
+    framerate: 100
+    latency_ms: 30
+    recording: "4K 60fps onboard"
+    antenna_count: 2
+    antenna_type: "LHCP"
+    weight_g: 36.1
+    dimensions_mm: [30.5, 30.5, 16.8]
+    input_voltage: "7-26V"
+
+  camera:
+    manufacturer: "DJI"
+    model: "O3 Camera Module"
+    sensor: "1/2 inch CMOS"
+    fov_deg: 155
+    resolution: "4K"
+    framerate_max: 120
+    lens_mm: 2.1
+    weight_g: 0 # included in O3 weight
+    stabilization: "electronic (Rocksteady)"
+    wdr: true
+
+# -----------------------------------------------------------------------------
+# Sensor Configuration
+# -----------------------------------------------------------------------------
+sensors:
+  imu:
+    manufacturer: "Bosch"
+    model: "BMI270"
+    gyro_range_dps: 2000
+    accel_range_g: 16
+    gyro_noise_density_dps_hz: 0.007
+    accel_noise_density_ug_hz: 160
+    sample_rate_hz: 6400
+    bus: "SPI"
+    temperature_compensation: true
+
+  barometer:
+    manufacturer: "Bosch"
+    model: "BMP280"
+    pressure_range_pa: [30000, 110000]
+    pressure_resolution_pa: 0.16
+    altitude_noise_m: 0.25
+    sample_rate_hz: 157
+    bus: "I2C"
+    temperature_sensor: true
+
+  gps:
+    present: false
+    reason: "Indoor-only platform; GPS not needed"
+
+  magnetometer:
+    present: false
+    reason: "No GPS module; compass unnecessary for indoor ops"
+
+  optical_flow:
+    manufacturer: "Mateksys"
+    model: "3901-L0X"
+    sensor_type: "PMW3901 + VL53L0X"
+    flow_resolution: "35x35 pixels"
+    height_range_m: [0.02, 2.0]
+    sample_rate_hz: 80
+    bus: "UART"
+    weight_g: 3.5
+    note: "Optional; used for position hold indoors"
+
+# -----------------------------------------------------------------------------
+# Thermal Model
+# -----------------------------------------------------------------------------
+thermal:
+  motor_thermal_resistance_c_per_w: 18.0
+  motor_thermal_capacitance_j_per_c: 5.0
+  esc_thermal_resistance_c_per_w: 22.0
+  battery_thermal_resistance_c_per_w: 8.0
+  ambient_temp_range_c: [5, 45]
+  motor_max_temp_c: 110
+  esc_max_temp_c: 80
+  battery_max_temp_c: 55
+  derating_start_temp_c: 90
+  duct_airflow_reduction_percent: 15 # ducts reduce cooling airflow to motors
+
+# -----------------------------------------------------------------------------
+# Electrical Model
+# -----------------------------------------------------------------------------
+electrical:
+  wiring_resistance_mohm: 18
+  connector_resistance_mohm: 5
+  total_system_resistance_mohm: 23
+  voltage_sag_model:
+    method: "linear_resistance"
+    internal_resistance_mohm: 26.0 # 4 cells * 6.5 mohm
+  power_distribution:
+    type: "esc_integrated"
+    main_bus_current_a: 80
+    bec_5v_current_a: 2.5
+    bec_9v_current_a: 2.0
+  quiescent_draw_ma:
+    flight_controller: 220
+    receiver: 30
+    vtx_idle: 450
+    vtx_transmit: 2800
+    optical_flow: 50
+    total_idle: 750
+
+# -----------------------------------------------------------------------------
+# Compatibility Constraints
+# -----------------------------------------------------------------------------
+compatibility:
+  firmware:
+    - "Betaflight >= 4.4"
+    - "Betaflight >= 4.5 (recommended)"
+  propeller_clearance_mm: 1.5 # tight within ducts
+  max_prop_diameter_in: 3.1
+  min_battery_cells: 3
+  max_battery_cells: 4
+  max_battery_weight_g: 120
+  max_auw_g: 300
+  regulations:
+    faa_class: "sub-250g"
+    requires_registration: false # at 250g exactly, border case
+    requires_remote_id: false
+    indoor_approved: true
+
+# -----------------------------------------------------------------------------
+# Mechanical Properties
+# -----------------------------------------------------------------------------
+mechanical:
+  center_of_gravity_mm: [0, 0, -5]
+  moments_of_inertia_kg_m2:
+    Ixx: 0.00082
+    Iyy: 0.00082
+    Izz: 0.00135
+  drag_coefficient:
+    frontal: 0.65 # higher due to ducts
+    lateral: 0.70
+    vertical: 1.30
+  frontal_area_m2: 0.015 # larger frontal due to ducts
+  prop_wash_factor: 0.20 # ducts increase recirculation
+  vibration_damping:
+    fc_mount: "TPU soft mount"
+    gyro_notch_filters: [200, 400]
+  build_notes: >
+    Press-fit motors into duct mounts. FC and ESC stack on soft TPU mounting
+    grommets inside the unibody frame. Route DJI O3 antenna cables through
+    the rear channel -- one antenna up, one antenna angled 90 degrees for
+    diversity. Battery mounts on top with rubberized velcro strap. Keep
+    battery CG centered. Prop rotation must match duct airflow direction.
+    Apply thread-lock on motor screws since vibration in ducts is higher.
+    Optional: mount PMW3901 optical flow sensor facing straight down on the
+    bottom plate for GPS-free position hold. Tune with low D gains and
+    aggressive filtering for smooth cinematic footage. Recommended camera
+    angle: 10-15 degrees for smooth proximity flying.
+
+# -----------------------------------------------------------------------------
+# Computed / Derived Values
+# -----------------------------------------------------------------------------
+computed:
+  dry_weight_g: 152 # frame(62)+motors(39.2)+props(8.4)+electronics(12)+O3(36.1)+rx(0.9)+wiring(6)+hardware(5)+optical_flow(3.5)
+  all_up_weight_g: 250 # dry(152) + battery(98)
+  all_up_weight_kg: 0.250
+  wing_loading: null
+  total_static_thrust_g: 1040 # 4 * 260g
+  thrust_to_weight_ratio: 4.16
+  hover_throttle_percent: 24.0
+  max_tilt_angle_deg: 55
+  max_speed_ms: 18 # ~65 km/h
+  max_vertical_speed_ms: 8
+  estimated_flight_time_min: 5.0 # moderate indoor flying
+  estimated_hover_time_min: 7.2
+  hover_current_a: 5.4
+  max_current_a: 45
+  hover_power_w: 79.9
+  max_power_w: 666
+  power_loading_w_per_kg: 319.6
+  disc_loading_g_per_cm2: 2.74
+  pid_loop_rate_khz: 4
+  motor_response_time_ms: 18
+  settling_time_ms: 55

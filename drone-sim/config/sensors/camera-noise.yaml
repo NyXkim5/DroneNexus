@@ -1,0 +1,432 @@
+# =============================================================================
+# Camera Sensor Noise Model Configuration
+# =============================================================================
+# Defines noise characteristics for camera sensors including exposure noise,
+# motion blur, lens distortion, rolling shutter, and environmental effects.
+# Applicable to both FPV cameras and mapping/survey cameras.
+# =============================================================================
+
+sensor_type: camera
+description: >
+  Camera sensor noise model for visual simulation, photogrammetry accuracy
+  estimation, and computer vision algorithm testing. Covers photon shot noise,
+  read noise, dark current, motion blur from platform vibration and movement,
+  lens distortion (radial and tangential), rolling shutter effects, and
+  environmental degradation (fog, rain, sun glare). Uses the Brown-Conrady
+  distortion model for lens parameters.
+
+output_units:
+  noise: "DN (digital numbers, 8-bit or 16-bit)"
+  distortion: "normalized pixel coordinates"
+  blur: "pixels"
+
+# =============================================================================
+# Presets
+# =============================================================================
+
+presets:
+  # ---------------------------------------------------------------------------
+  # PERFECT: No noise -- ideal camera
+  # ---------------------------------------------------------------------------
+  perfect:
+    label: "Perfect (No Noise)"
+    description: "Ideal camera with zero noise and distortion for baseline testing"
+
+    sensor_noise:
+      read_noise_e: 0.0
+      dark_current_e_per_s: 0.0
+      photon_shot_noise: false
+      fixed_pattern_noise_percent: 0.0
+      quantization_bits: 16
+      full_well_capacity_e: 100000
+      gain_e_per_dn: 1.0
+      hot_pixels:
+        enabled: false
+      column_noise:
+        enabled: false
+
+    exposure:
+      auto_exposure_noise_ev: 0.0
+      exposure_lag_frames: 0
+      flicker_rejection: true
+      shutter_type: "global"
+      rolling_shutter_time_ms: 0.0
+
+    motion_blur:
+      enabled: false
+      platform_vibration_blur_px: 0.0
+      motion_blur_model: null
+
+    lens_distortion:
+      model: "brown_conrady"
+      # Radial distortion coefficients
+      k1: 0.0
+      k2: 0.0
+      k3: 0.0
+      # Tangential distortion coefficients
+      p1: 0.0
+      p2: 0.0
+      # Focal length variation
+      fx_error_percent: 0.0
+      fy_error_percent: 0.0
+      # Principal point offset
+      cx_error_px: 0.0
+      cy_error_px: 0.0
+
+    chromatic_aberration:
+      enabled: false
+
+    vignetting:
+      enabled: false
+
+    environment:
+      fog_effect: false
+      rain_effect: false
+      sun_glare_effect: false
+      condensation_effect: false
+
+  # ---------------------------------------------------------------------------
+  # TYPICAL: Realistic camera (DJI O3, Sony A7R IV, typical FPV cam)
+  # ---------------------------------------------------------------------------
+  typical:
+    label: "Typical Digital Camera"
+    description: "Realistic noise for a modern digital camera sensor"
+
+    sensor_noise:
+      read_noise_e: 3.2 # electrons RMS
+      dark_current_e_per_s: 0.5 # at 25C
+      dark_current_doubling_temp_c: 6.0 # doubles every 6C
+      photon_shot_noise: true # sqrt(signal) Poisson noise
+      fixed_pattern_noise_percent: 0.5
+      quantization_bits: 12
+      full_well_capacity_e: 42000
+      gain_e_per_dn: 10.25 # at ISO 100
+      snr_at_18_percent_gray_db: 38
+      dynamic_range_db: 72
+      hot_pixels:
+        enabled: true
+        density_per_megapixel: 5
+        intensity_range_dn: [200, 255]
+      column_noise:
+        enabled: true
+        amplitude_dn: 0.5
+
+    exposure:
+      auto_exposure_noise_ev: 0.15
+      auto_exposure_response_time_ms: 50
+      exposure_lag_frames: 1
+      flicker_rejection: true
+      flicker_frequency_hz: [50, 60] # detects both
+      shutter_type: "rolling"
+      rolling_shutter_time_ms: 8.0 # time to read full frame
+      min_shutter_speed_s: 0.000125 # 1/8000
+      max_shutter_speed_s: 1.0
+
+    motion_blur:
+      enabled: true
+      platform_vibration_blur_px: 0.5 # from motor vibration
+      vibration_frequency_hz: [100, 200]
+      motion_blur_model:
+        # Blur kernel size proportional to angular rate * exposure time
+        sensitivity_px_per_dps_per_ms: 0.008
+        max_blur_px: 15
+      jello_effect:
+        enabled: true # rolling shutter + vibration = jello
+        amplitude_px: 1.0
+        frequency_hz: 150
+
+    lens_distortion:
+      model: "brown_conrady"
+      k1: -0.28 # typical wide-angle barrel distortion
+      k2: 0.08
+      k3: -0.01
+      p1: 0.0005
+      p2: -0.0003
+      fx_error_percent: 0.1
+      fy_error_percent: 0.1
+      cx_error_px: 1.5
+      cy_error_px: -1.0
+      distortion_temperature_sensitivity:
+        dk1_per_c: 0.0001
+        dk2_per_c: 0.00005
+
+    chromatic_aberration:
+      enabled: true
+      lateral_shift_px:
+        red: 0.8
+        blue: -1.2
+      longitudinal_um:
+        red: 5
+        blue: -8
+
+    vignetting:
+      enabled: true
+      model: "cos4" # cos^4(theta) natural vignetting
+      corner_falloff_percent: 25 # 25% darker at corners
+      mechanical_vignetting_start_deg: 70
+
+    environment:
+      fog_effect: true
+      fog_model:
+        contrast_reduction_percent: 15
+        color_shift_warm: true
+        distance_dependent: true
+      rain_effect: true
+      rain_model:
+        droplet_probability_per_frame: 0.02
+        droplet_blur_radius_px: 8
+        streak_length_px: 30
+      sun_glare_effect: true
+      sun_glare_model:
+        flare_probability: 0.05
+        bloom_radius_px: 50
+        ghost_count: 3
+      condensation_effect: true
+      condensation_model:
+        probability_at_high_humidity: 0.01
+        opacity_percent: 30
+        clearing_time_s: 30
+
+  # ---------------------------------------------------------------------------
+  # NOISY: Low-quality or high-ISO camera
+  # ---------------------------------------------------------------------------
+  noisy:
+    label: "Noisy / Low-Light / High ISO"
+    description: "Camera operating at high ISO or with degraded sensor quality"
+
+    sensor_noise:
+      read_noise_e: 12.0
+      dark_current_e_per_s: 5.0
+      dark_current_doubling_temp_c: 6.0
+      photon_shot_noise: true
+      fixed_pattern_noise_percent: 2.0
+      quantization_bits: 10
+      full_well_capacity_e: 15000
+      gain_e_per_dn: 3.66 # at ISO 3200
+      snr_at_18_percent_gray_db: 22
+      dynamic_range_db: 52
+      hot_pixels:
+        enabled: true
+        density_per_megapixel: 50
+        intensity_range_dn: [180, 255]
+      column_noise:
+        enabled: true
+        amplitude_dn: 3.0
+      banding_noise:
+        enabled: true
+        horizontal_amplitude_dn: 2.0
+        frequency: "random"
+
+    exposure:
+      auto_exposure_noise_ev: 0.5
+      auto_exposure_response_time_ms: 150
+      exposure_lag_frames: 3
+      flicker_rejection: false
+      shutter_type: "rolling"
+      rolling_shutter_time_ms: 15.0
+      min_shutter_speed_s: 0.001
+      max_shutter_speed_s: 1.0
+
+    motion_blur:
+      enabled: true
+      platform_vibration_blur_px: 2.0
+      vibration_frequency_hz: [80, 250]
+      motion_blur_model:
+        sensitivity_px_per_dps_per_ms: 0.015
+        max_blur_px: 30
+      jello_effect:
+        enabled: true
+        amplitude_px: 4.0
+        frequency_hz: 120
+
+    lens_distortion:
+      model: "brown_conrady"
+      k1: -0.42
+      k2: 0.18
+      k3: -0.04
+      p1: 0.002
+      p2: -0.001
+      fx_error_percent: 0.5
+      fy_error_percent: 0.5
+      cx_error_px: 5.0
+      cy_error_px: -4.0
+      distortion_temperature_sensitivity:
+        dk1_per_c: 0.0005
+        dk2_per_c: 0.0002
+
+    chromatic_aberration:
+      enabled: true
+      lateral_shift_px:
+        red: 3.0
+        blue: -4.5
+      longitudinal_um:
+        red: 15
+        blue: -20
+
+    vignetting:
+      enabled: true
+      model: "cos4"
+      corner_falloff_percent: 45
+      mechanical_vignetting_start_deg: 55
+
+    environment:
+      fog_effect: true
+      fog_model:
+        contrast_reduction_percent: 40
+        color_shift_warm: true
+        distance_dependent: true
+      rain_effect: true
+      rain_model:
+        droplet_probability_per_frame: 0.10
+        droplet_blur_radius_px: 12
+        streak_length_px: 50
+      sun_glare_effect: true
+      sun_glare_model:
+        flare_probability: 0.15
+        bloom_radius_px: 100
+        ghost_count: 6
+      condensation_effect: true
+      condensation_model:
+        probability_at_high_humidity: 0.05
+        opacity_percent: 60
+        clearing_time_s: 120
+
+  # ---------------------------------------------------------------------------
+  # FAILING: Camera with severe hardware degradation
+  # ---------------------------------------------------------------------------
+  failing:
+    label: "Failing / Damaged Sensor"
+    description: >
+      Simulates a camera with damaged sensor, cracked lens, failing
+      electronics. Tests visual odometry robustness.
+
+    sensor_noise:
+      read_noise_e: 50.0
+      dark_current_e_per_s: 30.0
+      dark_current_doubling_temp_c: 6.0
+      photon_shot_noise: true
+      fixed_pattern_noise_percent: 8.0
+      quantization_bits: 8
+      full_well_capacity_e: 8000
+      gain_e_per_dn: 31.25
+      snr_at_18_percent_gray_db: 12
+      dynamic_range_db: 36
+      hot_pixels:
+        enabled: true
+        density_per_megapixel: 500
+        intensity_range_dn: [150, 255]
+        hot_pixel_clusters: true
+        cluster_size: 5
+      column_noise:
+        enabled: true
+        amplitude_dn: 10.0
+      banding_noise:
+        enabled: true
+        horizontal_amplitude_dn: 8.0
+        frequency: "periodic"
+        period_lines: 32
+      dead_pixels:
+        enabled: true
+        density_per_megapixel: 100
+        dead_rows: [120, 456, 789]
+        dead_columns: [234, 567]
+
+    exposure:
+      auto_exposure_noise_ev: 2.0
+      auto_exposure_response_time_ms: 500
+      exposure_lag_frames: 5
+      flicker_rejection: false
+      shutter_type: "rolling"
+      rolling_shutter_time_ms: 25.0
+      shutter_malfunction:
+        enabled: true
+        stuck_probability_per_frame: 0.005
+        partial_exposure_probability: 0.01
+
+    motion_blur:
+      enabled: true
+      platform_vibration_blur_px: 8.0
+      vibration_frequency_hz: [50, 300]
+      motion_blur_model:
+        sensitivity_px_per_dps_per_ms: 0.03
+        max_blur_px: 50
+      jello_effect:
+        enabled: true
+        amplitude_px: 12.0
+        frequency_hz: 100
+
+    lens_distortion:
+      model: "brown_conrady"
+      k1: -0.55
+      k2: 0.30
+      k3: -0.10
+      p1: 0.008
+      p2: -0.006
+      fx_error_percent: 2.0
+      fy_error_percent: 2.5
+      cx_error_px: 15.0
+      cy_error_px: -12.0
+      lens_crack:
+        enabled: true
+        crack_position_normalized: [0.3, 0.7]
+        crack_blur_radius_px: 20
+        crack_opacity: 0.3
+      dust_on_lens:
+        enabled: true
+        spot_count: 8
+        spot_radius_px: [5, 25]
+        spot_opacity: [0.2, 0.6]
+
+    chromatic_aberration:
+      enabled: true
+      lateral_shift_px:
+        red: 8.0
+        blue: -12.0
+      longitudinal_um:
+        red: 40
+        blue: -50
+
+    vignetting:
+      enabled: true
+      model: "cos4"
+      corner_falloff_percent: 70
+      mechanical_vignetting_start_deg: 40
+      asymmetric: true # damaged lens mount
+      asymmetry_direction_deg: 135
+
+    environment:
+      fog_effect: true
+      fog_model:
+        contrast_reduction_percent: 70
+        color_shift_warm: true
+        distance_dependent: true
+      rain_effect: true
+      rain_model:
+        droplet_probability_per_frame: 0.30
+        droplet_blur_radius_px: 20
+        streak_length_px: 80
+      sun_glare_effect: true
+      sun_glare_model:
+        flare_probability: 0.40
+        bloom_radius_px: 200
+        ghost_count: 12
+      condensation_effect: true
+      condensation_model:
+        probability_at_high_humidity: 0.20
+        opacity_percent: 80
+        clearing_time_s: 300
+
+    failure_modes:
+      intermittent_blackout:
+        enabled: true
+        probability_per_frame: 0.02
+        duration_frames: [1, 10]
+      color_channel_failure:
+        enabled: true
+        affected_channel: "blue"
+        probability_per_second: 0.005
+        duration_s: [1, 30]
+      image_freeze:
+        enabled: true
+        probability_per_second: 0.003
+        duration_s: [0.5, 5.0]

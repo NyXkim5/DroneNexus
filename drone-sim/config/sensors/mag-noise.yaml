@@ -1,0 +1,237 @@
+# =============================================================================
+# Magnetometer Sensor Noise Model Configuration
+# =============================================================================
+# Defines noise characteristics for magnetometer/compass sensors including
+# hard iron offsets, soft iron distortion, noise, motor interference, and
+# environmental magnetic anomalies. Based on HMC5883L, QMC5883L, IST8310,
+# and RM3100 specifications.
+# =============================================================================
+
+sensor_type: magnetometer
+description: >
+  Magnetometer noise model for heading estimation and compass fusion. Covers
+  hard iron bias, soft iron distortion matrix, white noise, motor current
+  interference, external magnetic anomalies, and temperature effects. The
+  Earth's magnetic field is approximately 25-65 uT depending on location,
+  so small disturbances can cause significant heading errors.
+
+update_rate_hz: 100
+axes: ["x", "y", "z"]
+output_units: "milligauss"
+earth_field_reference_ut: 50.0 # typical mid-latitude
+
+# =============================================================================
+# Presets
+# =============================================================================
+
+presets:
+  # ---------------------------------------------------------------------------
+  # PERFECT: No noise -- ideal magnetometer
+  # ---------------------------------------------------------------------------
+  perfect:
+    label: "Perfect (No Noise)"
+    description: "Ideal magnetometer with zero distortion for algorithm validation"
+
+    noise:
+      white_noise_std_mgauss: 0.0
+      quantization_mgauss: 0.0
+      bandwidth_hz: 200
+
+    hard_iron:
+      offset_mgauss: [0.0, 0.0, 0.0]
+      offset_drift_mgauss_per_hour: [0.0, 0.0, 0.0]
+      temperature_sensitivity_mgauss_per_c: [0.0, 0.0, 0.0]
+
+    soft_iron:
+      # Identity matrix = no distortion
+      distortion_matrix:
+        - [1.0, 0.0, 0.0]
+        - [0.0, 1.0, 0.0]
+        - [0.0, 0.0, 1.0]
+      scale_factor_error_ppm: [0, 0, 0]
+
+    interference:
+      motor_coupling_enabled: false
+      external_anomaly_enabled: false
+
+    calibration:
+      calibration_age_effect: false
+
+  # ---------------------------------------------------------------------------
+  # TYPICAL: Realistic consumer magnetometer (QMC5883L, IST8310)
+  # ---------------------------------------------------------------------------
+  typical:
+    label: "Typical Consumer Magnetometer"
+    description: "Realistic noise for a magnetometer on a well-calibrated drone"
+
+    noise:
+      white_noise_std_mgauss: 2.0
+      quantization_mgauss: 0.3
+      bandwidth_hz: 75
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 10.0
+        amplitude_mgauss: 1.5
+
+    hard_iron:
+      offset_mgauss: [120.0, -85.0, 65.0] # after calibration, residual
+      offset_drift_mgauss_per_hour: [0.5, -0.3, 0.2]
+      temperature_sensitivity_mgauss_per_c: [0.8, 0.5, 0.3]
+      calibration_residual_mgauss: [8.0, -5.0, 4.0] # post-cal residual
+
+    soft_iron:
+      distortion_matrix:
+        - [1.02, 0.01, -0.005]
+        - [0.01, 0.98, 0.008]
+        - [-0.005, 0.008, 1.01]
+      scale_factor_error_ppm: [200, 300, 250]
+      calibration_residual_percent: 1.5
+
+    interference:
+      motor_coupling_enabled: true
+      motor_coupling_model:
+        # Magnetic field from motor current: B = k * I
+        coupling_coefficient_mgauss_per_a: [1.2, -0.8, 2.5]
+        frequency_coupling: true # varies with motor RPM
+        fundamental_harmonic_mgauss: 3.0
+        per_motor_variation_percent: 15
+      external_anomaly_enabled: true
+      external_anomaly_model:
+        probability_per_second: 0.01
+        magnitude_range_mgauss: [10, 50]
+        duration_s: [2, 10]
+        spatial_gradient_mgauss_per_m: 5.0
+
+    calibration:
+      calibration_age_effect: true
+      degradation_rate_percent_per_day: 0.2
+      recalibration_interval_flights: 50
+
+  # ---------------------------------------------------------------------------
+  # NOISY: Poorly calibrated or interference-heavy environment
+  # ---------------------------------------------------------------------------
+  noisy:
+    label: "Noisy / Poor Calibration"
+    description: "Magnetometer with poor calibration, nearby metal, or high motor interference"
+
+    noise:
+      white_noise_std_mgauss: 8.0
+      quantization_mgauss: 2.0
+      bandwidth_hz: 50
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 30.0
+        amplitude_mgauss: 10.0
+
+    hard_iron:
+      offset_mgauss: [450.0, -320.0, 280.0]
+      offset_drift_mgauss_per_hour: [5.0, -3.0, 2.0]
+      temperature_sensitivity_mgauss_per_c: [4.0, 3.0, 2.5]
+      calibration_residual_mgauss: [50.0, -35.0, 30.0]
+
+    soft_iron:
+      distortion_matrix:
+        - [1.15, 0.08, -0.04]
+        - [0.08, 0.88, 0.06]
+        - [-0.04, 0.06, 1.10]
+      scale_factor_error_ppm: [1500, 2000, 1800]
+      calibration_residual_percent: 8.0
+
+    interference:
+      motor_coupling_enabled: true
+      motor_coupling_model:
+        coupling_coefficient_mgauss_per_a: [5.0, -3.5, 10.0]
+        frequency_coupling: true
+        fundamental_harmonic_mgauss: 15.0
+        per_motor_variation_percent: 30
+      power_line_interference:
+        enabled: true
+        frequency_hz: 60 # or 50 for non-US
+        amplitude_mgauss: 8.0
+      external_anomaly_enabled: true
+      external_anomaly_model:
+        probability_per_second: 0.05
+        magnitude_range_mgauss: [30, 200]
+        duration_s: [5, 30]
+        spatial_gradient_mgauss_per_m: 25.0
+
+    calibration:
+      calibration_age_effect: true
+      degradation_rate_percent_per_day: 2.0
+      recalibration_interval_flights: 5
+
+  # ---------------------------------------------------------------------------
+  # FAILING: Magnetometer with severe hardware or environmental issues
+  # ---------------------------------------------------------------------------
+  failing:
+    label: "Failing / Severe Interference"
+    description: >
+      Simulates a magnetometer with extreme interference, possibly near
+      large ferrous structures, damaged sensor, or severe calibration
+      degradation. Tests EKF compass rejection logic.
+
+    noise:
+      white_noise_std_mgauss: 30.0
+      quantization_mgauss: 5.0
+      bandwidth_hz: 25
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 60.0
+        amplitude_mgauss: 40.0
+
+    hard_iron:
+      offset_mgauss: [1200.0, -900.0, 800.0]
+      offset_drift_mgauss_per_hour: [30.0, -25.0, 20.0]
+      temperature_sensitivity_mgauss_per_c: [15.0, 12.0, 10.0]
+      calibration_residual_mgauss: [200.0, -150.0, 120.0]
+      time_varying_offset:
+        enabled: true
+        variation_amplitude_mgauss: 100.0
+        variation_period_s: 30.0
+
+    soft_iron:
+      distortion_matrix:
+        - [1.40, 0.20, -0.15]
+        - [0.20, 0.65, 0.18]
+        - [-0.15, 0.18, 1.30]
+      scale_factor_error_ppm: [8000, 10000, 9000]
+      calibration_residual_percent: 25.0
+
+    interference:
+      motor_coupling_enabled: true
+      motor_coupling_model:
+        coupling_coefficient_mgauss_per_a: [20.0, -15.0, 35.0]
+        frequency_coupling: true
+        fundamental_harmonic_mgauss: 50.0
+        per_motor_variation_percent: 50
+        saturation_at_current_a: 30 # sensor saturates under high throttle
+      power_line_interference:
+        enabled: true
+        frequency_hz: 60
+        amplitude_mgauss: 40.0
+      external_anomaly_enabled: true
+      external_anomaly_model:
+        probability_per_second: 0.15
+        magnitude_range_mgauss: [100, 500]
+        duration_s: [10, 120]
+        spatial_gradient_mgauss_per_m: 80.0
+        nearby_ferrous_objects: true
+        permanent_distortion_mgauss: [300, -200, 150]
+
+    calibration:
+      calibration_age_effect: true
+      degradation_rate_percent_per_day: 10.0
+      calibration_invalid: true
+      heading_error_deg: 45 # systematic heading error
+
+    failure_modes:
+      axis_failure:
+        enabled: true
+        affected_axis: "z"
+        stuck_value_mgauss: -150.0
+        probability_per_second: 0.01
+        duration_s: [5, 60]
+      saturation:
+        enabled: true
+        saturation_threshold_mgauss: 800
+        probability_per_second: 0.02

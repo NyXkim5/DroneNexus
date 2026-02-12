@@ -1,0 +1,360 @@
+# =============================================================================
+# 7-Inch Long Range Cruiser Airframe Preset
+# =============================================================================
+# Efficient 7" quadcopter designed for long-range FPV cruising and exploration.
+# Lower KV motors with large props prioritize efficiency over agility.
+# GPS navigation with iNav firmware for autonomous return-to-home and failsafe.
+# =============================================================================
+
+name: "7-Inch Long Range Cruiser"
+description: >
+  Endurance-focused 7-inch long-range quadcopter optimized for efficient cruise
+  flight, scenic exploration, and long-distance FPV. Uses 2806.5 1300KV motors
+  on 6S for optimal efficiency at cruise throttle. iNav firmware provides GPS
+  navigation, return-to-home, and mission planning. ELRS 900MHz link for
+  extended range exceeding 30km. Analog video with Rush Tank VTX for reliable
+  long-range video. Designed for 15+ minute flights with conservative flying.
+
+category: long_range
+icon: quad_x_lr
+
+# -----------------------------------------------------------------------------
+# Frame Configuration
+# -----------------------------------------------------------------------------
+frame:
+  type: quad_x
+  manufacturer: "iFlight"
+  model: "Chimera7 Pro V2"
+  material: "T700 carbon fiber"
+  arm_thickness_mm: 5.5
+  top_plate_thickness_mm: 2.0
+  bottom_plate_thickness_mm: 2.5
+  standoff_height_mm: 28.0
+  wheelbase_mm: 316
+  weight_g: 148
+  motor_mount_pattern_mm: "16x19"
+  stack_mount_mm: "30.5x30.5"
+  camera_mount: "standard_fpv_19mm"
+  antenna_mount: "sma_rear"
+  arm_angle_deg: 45.0
+  deadcat: false
+  unibody: false
+  prop_guard: false
+
+# -----------------------------------------------------------------------------
+# Motor Configuration (x4)
+# -----------------------------------------------------------------------------
+motors:
+  count: 4
+  manufacturer: "T-Motor"
+  model: "F60 Pro IV 2806.5 1300KV"
+  kv: 1300
+  stator_diameter_mm: 28
+  stator_height_mm: 6.5
+  shaft_diameter_mm: 5.0
+  weight_g: 42.0
+  max_current_a: 46.5
+  idle_current_a: 0.6
+  resistance_mohm: 38
+  kt_nm_per_a: 0.00735
+  max_rpm: 28860 # 1300 KV * 22.2V (6S nominal)
+  efficiency_peak_percent: 86.2
+  bearing_type: "EZO Japanese"
+  magnet_count: 14
+  pole_pairs: 7
+  mounting_pattern_mm: "16x19"
+  rotation_directions: ["CW", "CCW", "CW", "CCW"]
+  motor_timing_deg: 20.0
+  thermal_limit_c: 130
+
+# -----------------------------------------------------------------------------
+# Propeller Configuration
+# -----------------------------------------------------------------------------
+propellers:
+  count: 4
+  manufacturer: "HQProp"
+  model: "MacroQuad 7x3.5x3"
+  diameter_in: 7.0
+  pitch_in: 3.5
+  blades: 3
+  material: "polycarbonate"
+  weight_g: 9.2
+  hub_bore_mm: 5.0
+  max_rpm: 32000
+  static_thrust_g_per_motor: 1050 # at full throttle 6S
+  efficiency_g_per_w: 7.8 # at hover -- significantly better than 5"
+  noise_db_at_1m: 78
+
+# -----------------------------------------------------------------------------
+# Battery Configuration
+# -----------------------------------------------------------------------------
+battery:
+  chemistry: "LiPo"
+  manufacturer: "Tattu"
+  model: "R-Line Version 4.0 3000mAh 6S 120C"
+  cells_series: 6
+  cells_parallel: 1
+  capacity_mah: 3000
+  voltage_nominal_v: 22.2
+  voltage_full_v: 25.2
+  voltage_empty_v: 19.8
+  max_continuous_discharge_c: 120
+  max_burst_discharge_c: 240
+  internal_resistance_mohm: 2.2 # per cell
+  weight_g: 438
+  dimensions_mm: [138, 45, 42]
+  connector: "XT60"
+  balance_connector: "JST-XH 7-pin"
+
+# -----------------------------------------------------------------------------
+# Electronics Configuration
+# -----------------------------------------------------------------------------
+electronics:
+  flight_controller:
+    manufacturer: "Matek"
+    model: "F405-WMN"
+    mcu: "STM32F405RGT6"
+    clock_mhz: 168
+    flash_kb: 1024
+    firmware: "iNav"
+    firmware_version: "7.1.2"
+    gyro_bus: "SPI"
+    osd_chip: "AT7456E"
+    barometer: true
+    blackbox: "microSD slot"
+    uart_count: 7
+    mounting_pattern_mm: "30.5x30.5"
+    weight_g: 10.5
+    current_sensor: true
+    voltage_sensor: true
+    sd_card_slot: true
+    usb_type: "USB-C"
+    beeper_pad: true
+    led_pad: true
+
+  esc:
+    manufacturer: "T-Motor"
+    model: "F55A Pro II 4-in-1"
+    type: "4-in-1"
+    protocol: "DShot600"
+    continuous_current_a: 55
+    burst_current_a: 65
+    voltage_range: "3S-6S"
+    mcu: "BL32 ARM"
+    firmware: "BlHeli_32"
+    firmware_version: "32.10"
+    current_sensor: true
+    telemetry: "bidirectional DShot"
+    mounting_pattern_mm: "30.5x30.5"
+    weight_g: 14.8
+    mosfet_type: "NMOS"
+    pwm_frequency_khz: 48
+    rpm_telemetry: true
+
+  receiver:
+    manufacturer: "RadioMaster"
+    model: "RP3 ELRS 900MHz"
+    protocol: "ExpressLRS"
+    frequency_mhz: 900
+    max_power_mw: 250
+    antenna_type: "T-antenna dipole"
+    channels: 16
+    latency_ms: 4 # at 200Hz
+    packet_rate_hz: 200
+    weight_g: 3.2
+    firmware_version: "3.4.2"
+    range_km: 40 # theoretical with 1W TX
+
+  vtx:
+    manufacturer: "Rush"
+    model: "Tank Ultimate Plus V2"
+    type: "analog"
+    power_levels_mw: [25, 200, 500, 800]
+    frequency: "5.8GHz"
+    channels: 48
+    smart_audio: true
+    antenna_connector: "MMCX"
+    weight_g: 8.5
+    dimensions_mm: [36, 22, 6.5]
+    input_voltage: "7-36V"
+
+  camera:
+    manufacturer: "Foxeer"
+    model: "Razer Mini"
+    sensor: "1/3 inch CMOS"
+    fov_deg: 145
+    resolution: "1200TVL"
+    lens_mm: 1.8
+    weight_g: 5.5
+    wdr: true
+    latency_ms: 7
+    voltage: "5-40V"
+
+# -----------------------------------------------------------------------------
+# Sensor Configuration
+# -----------------------------------------------------------------------------
+sensors:
+  imu:
+    manufacturer: "Bosch"
+    model: "BMI270"
+    gyro_range_dps: 2000
+    accel_range_g: 16
+    gyro_noise_density_dps_hz: 0.007
+    accel_noise_density_ug_hz: 160
+    sample_rate_hz: 6400
+    bus: "SPI"
+    temperature_compensation: true
+
+  barometer:
+    manufacturer: "Bosch"
+    model: "BMP388"
+    pressure_range_pa: [30000, 110000]
+    pressure_resolution_pa: 0.016
+    altitude_noise_m: 0.12
+    sample_rate_hz: 200
+    bus: "I2C"
+    temperature_sensor: true
+
+  gps:
+    manufacturer: "BN"
+    model: "BN-880Q"
+    chipset: "u-blox M10"
+    constellation: ["GPS", "GLONASS", "Galileo", "BeiDou"]
+    channels: 72
+    update_rate_hz: 10
+    horizontal_accuracy_m: 1.5
+    vertical_accuracy_m: 2.8
+    ttff_cold_s: 24
+    ttff_hot_s: 1
+    compass: true
+    compass_model: "QMC5883L"
+    weight_g: 10.8
+    antenna: "ceramic patch"
+
+  magnetometer:
+    manufacturer: "QST"
+    model: "QMC5883L"
+    range_gauss: 8.0
+    resolution_mgauss: 2.0
+    sample_rate_hz: 200
+    bus: "I2C"
+    integrated_in: "GPS module"
+
+# -----------------------------------------------------------------------------
+# Thermal Model
+# -----------------------------------------------------------------------------
+thermal:
+  motor_thermal_resistance_c_per_w: 6.5
+  motor_thermal_capacitance_j_per_c: 18.0
+  esc_thermal_resistance_c_per_w: 14.0
+  battery_thermal_resistance_c_per_w: 5.0
+  ambient_temp_range_c: [-15, 50]
+  motor_max_temp_c: 130
+  esc_max_temp_c: 85
+  battery_max_temp_c: 60
+  derating_start_temp_c: 110
+
+# -----------------------------------------------------------------------------
+# Electrical Model
+# -----------------------------------------------------------------------------
+electrical:
+  wiring_resistance_mohm: 10
+  connector_resistance_mohm: 3
+  total_system_resistance_mohm: 13
+  voltage_sag_model:
+    method: "linear_resistance"
+    internal_resistance_mohm: 13.2 # 6 cells * 2.2 mohm
+  power_distribution:
+    type: "esc_integrated"
+    main_bus_current_a: 150
+    bec_5v_current_a: 3.0
+    bec_9v_current_a: 2.5
+  quiescent_draw_ma:
+    flight_controller: 280
+    receiver: 55
+    gps: 70
+    vtx_idle: 120
+    vtx_transmit: 650 # at 800mW analog
+    camera: 180
+    total_idle: 705
+
+# -----------------------------------------------------------------------------
+# Compatibility Constraints
+# -----------------------------------------------------------------------------
+compatibility:
+  firmware:
+    - "iNav >= 6.0"
+    - "iNav >= 7.1 (recommended)"
+    - "Betaflight >= 4.4 (without nav features)"
+  propeller_clearance_mm: 5.0
+  max_prop_diameter_in: 7.2
+  min_battery_cells: 4
+  max_battery_cells: 6
+  max_battery_weight_g: 500
+  max_auw_g: 1000
+  regulations:
+    faa_class: "standard"
+    requires_registration: true
+    requires_remote_id: true
+    bvlos_capable: true # with proper waivers
+
+# -----------------------------------------------------------------------------
+# Mechanical Properties
+# -----------------------------------------------------------------------------
+mechanical:
+  center_of_gravity_mm: [0, 2, -10] # battery shifts CG slightly rear
+  moments_of_inertia_kg_m2:
+    Ixx: 0.0068
+    Iyy: 0.0072
+    Izz: 0.0115
+  drag_coefficient:
+    frontal: 0.40
+    lateral: 0.45
+    vertical: 1.05
+  frontal_area_m2: 0.018
+  prop_wash_factor: 0.12
+  vibration_damping:
+    fc_mount: "silicone grommets"
+    gyro_notch_filters: [95, 190]
+  build_notes: >
+    Use XT60 pigtail soldered directly to ESC for minimal resistance on this
+    high-efficiency build. Mount GPS on a raised mast (30mm+) to clear
+    magnetometer interference from the power wiring. Route the ELRS 900MHz
+    T-antenna vertically out the rear -- orientation matters significantly at
+    900MHz for range. Use a capacitor (1000uF 35V low-ESR) across the battery
+    input to suppress voltage spikes. Mount the Rush Tank VTX on the rear
+    standoffs with thermal pad for heat dissipation. Configure iNav with
+    conservative failsafe: return-to-home at 50m altitude. Set cruise speed
+    to 12 m/s for optimal efficiency. Enable navigation modes: PosHold, RTH,
+    WP mission. Calibrate compass away from metal objects. Program low-voltage
+    RTH trigger at 3.5V/cell. Use buzzer for lost model alarm.
+
+# -----------------------------------------------------------------------------
+# Computed / Derived Values
+# -----------------------------------------------------------------------------
+computed:
+  dry_weight_g: 412 # frame(148)+motors(168)+props(36.8)+FC(10.5)+ESC(14.8)+rx(3.2)+vtx(8.5)+cam(5.5)+GPS(10.8)+wiring(12)+hardware(8)+antenna(2)+capacitor(5)
+  all_up_weight_g: 850 # dry(412) + battery(438)
+  all_up_weight_kg: 0.850
+  wing_loading: null
+  total_static_thrust_g: 4200 # 4 * 1050g
+  thrust_to_weight_ratio: 4.94
+  hover_throttle_percent: 20.2
+  max_tilt_angle_deg: 65
+  max_speed_ms: 35 # ~126 km/h
+  max_vertical_speed_ms: 18
+  estimated_flight_time_min: 15.0 # at cruise ~12 m/s
+  estimated_hover_time_min: 18.5
+  hover_current_a: 7.2
+  max_current_a: 120
+  hover_power_w: 159.8
+  max_power_w: 2664
+  power_loading_w_per_kg: 188.0
+  disc_loading_g_per_cm2: 0.86
+  cruise_speed_ms: 12.0
+  cruise_power_w: 110
+  cruise_current_a: 5.0
+  max_range_km: 18.5 # at cruise speed with 80% battery
+  pid_loop_rate_khz: 4
+  motor_response_time_ms: 20
+  settling_time_ms: 65

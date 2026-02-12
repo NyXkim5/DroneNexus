@@ -1,0 +1,450 @@
+# =============================================================================
+# Commercial Mapping Quadcopter Airframe Preset
+# =============================================================================
+# Professional-grade mapping and surveying platform with high-resolution
+# camera, LiDAR, and RTK GPS. Designed for photogrammetry, orthomosaic
+# generation, and 3D point cloud creation in commercial survey operations.
+# =============================================================================
+
+name: "Commercial Mapping Quadcopter"
+description: >
+  Professional surveying and mapping quadcopter built on a large X-frame with
+  13-inch propellers. Powered by ArduPilot on a Pixhawk 6X flight controller
+  for reliable autonomous mission execution. HERE3 RTK GPS provides centimeter-
+  level positioning accuracy for geo-referenced mapping. Downward-facing Sony
+  mapping camera and LiDAR altimeter enable high-resolution orthomosaics and
+  3D terrain models. Designed for commercial survey operators requiring
+  repeatable, accurate, and long-endurance mapping flights up to 35 minutes.
+
+category: commercial_mapping
+icon: quad_x_mapping
+
+# -----------------------------------------------------------------------------
+# Frame Configuration
+# -----------------------------------------------------------------------------
+frame:
+  type: quad_x
+  manufacturer: "Tarot"
+  model: "T960 Hexacopter Frame (used as quad)"
+  material: "3K carbon fiber tube arms, G10 center plates"
+  arm_thickness_mm: 25.0 # tube diameter
+  arm_wall_mm: 1.5
+  top_plate_thickness_mm: 3.0
+  bottom_plate_thickness_mm: 3.0
+  standoff_height_mm: 40.0
+  wheelbase_mm: 550
+  weight_g: 480
+  motor_mount_pattern_mm: "19x25"
+  stack_mount_mm: "45.5x45.5" # Pixhawk standard
+  camera_mount: "gimbal_plate_bottom"
+  antenna_mount: "top_mast"
+  arm_angle_deg: 45.0
+  deadcat: false
+  unibody: false
+  prop_guard: false
+  folding_arms: true
+  folded_dimensions_mm: [400, 200, 180]
+
+# -----------------------------------------------------------------------------
+# Motor Configuration (x4)
+# -----------------------------------------------------------------------------
+motors:
+  count: 4
+  manufacturer: "T-Motor"
+  model: "U3508 580KV"
+  kv: 580
+  stator_diameter_mm: 35
+  stator_height_mm: 8
+  shaft_diameter_mm: 6.0
+  weight_g: 102
+  max_current_a: 28
+  idle_current_a: 0.5
+  resistance_mohm: 68
+  kt_nm_per_a: 0.0165
+  max_rpm: 12876 # 580 KV * 22.2V
+  efficiency_peak_percent: 89.5
+  bearing_type: "NSK Japan"
+  magnet_count: 14
+  pole_pairs: 7
+  mounting_pattern_mm: "19x25"
+  rotation_directions: ["CW", "CCW", "CW", "CCW"]
+  motor_timing_deg: 15.0
+  thermal_limit_c: 140
+
+# -----------------------------------------------------------------------------
+# Propeller Configuration
+# -----------------------------------------------------------------------------
+propellers:
+  count: 4
+  manufacturer: "T-Motor"
+  model: "T1355 Carbon Fiber"
+  diameter_in: 13.0
+  pitch_in: 5.5
+  blades: 2
+  material: "carbon fiber reinforced nylon"
+  weight_g: 22.0
+  hub_bore_mm: 6.0
+  max_rpm: 14000
+  static_thrust_g_per_motor: 2800 # at full throttle 6S
+  efficiency_g_per_w: 10.5 # at hover -- very efficient large prop
+  noise_db_at_1m: 75
+
+# -----------------------------------------------------------------------------
+# Battery Configuration
+# -----------------------------------------------------------------------------
+battery:
+  chemistry: "LiPo"
+  manufacturer: "Tattu"
+  model: "Plus 10000mAh 6S 25C"
+  cells_series: 6
+  cells_parallel: 1
+  capacity_mah: 10000
+  voltage_nominal_v: 22.2
+  voltage_full_v: 25.2
+  voltage_empty_v: 19.8
+  max_continuous_discharge_c: 25
+  max_burst_discharge_c: 50
+  internal_resistance_mohm: 1.8 # per cell
+  weight_g: 1250
+  dimensions_mm: [185, 75, 58]
+  connector: "XT90-S" # anti-spark
+  balance_connector: "JST-XH 7-pin"
+
+# -----------------------------------------------------------------------------
+# Electronics Configuration
+# -----------------------------------------------------------------------------
+electronics:
+  flight_controller:
+    manufacturer: "Holybro"
+    model: "Pixhawk 6X"
+    mcu: "STM32H753IIK6"
+    clock_mhz: 480
+    flash_kb: 2048
+    ram_kb: 1024
+    firmware: "ArduPilot"
+    firmware_version: "ArduCopter 4.5.7"
+    gyro_bus: "SPI"
+    osd_chip: null
+    barometer: true
+    barometer_model: "ICP-20100 (x2)"
+    blackbox: "microSD slot (32GB included)"
+    uart_count: 8
+    can_bus: 2
+    mounting_pattern_mm: "45.5x45.5"
+    weight_g: 64
+    current_sensor: true
+    voltage_sensor: true
+    sd_card_slot: true
+    usb_type: "USB-C"
+    beeper_pad: true
+    led_pad: true
+    redundant_imu: true
+    imu_heating: true
+
+  power_module:
+    manufacturer: "Holybro"
+    model: "PM02D"
+    voltage_range: "6S-12S"
+    max_current_a: 120
+    current_sensor_resolution: 0.1
+    voltage_sensor_resolution: 0.01
+    weight_g: 28
+
+  esc:
+    manufacturer: "Holybro"
+    model: "Kotleta20 FOC ESC"
+    type: "individual"
+    count: 4
+    protocol: "DroneCAN"
+    continuous_current_a: 20
+    burst_current_a: 40
+    voltage_range: "3S-8S"
+    mcu: "STM32G474"
+    firmware: "AM32 FOC"
+    firmware_version: "2.1"
+    current_sensor: true
+    telemetry: "DroneCAN telemetry"
+    weight_g: 12
+    mosfet_type: "NMOS"
+    pwm_frequency_khz: 24
+    rpm_telemetry: true
+    foc: true
+
+  receiver:
+    manufacturer: "TBS"
+    model: "Crossfire Nano Diversity RX"
+    protocol: "CRSF"
+    frequency_mhz: 900
+    max_power_mw: 500
+    antenna_type: "dual immortal-T"
+    channels: 16
+    latency_ms: 4
+    packet_rate_hz: 150
+    weight_g: 5.0
+    firmware_version: "6.37"
+    range_km: 40
+
+  telemetry_radio:
+    manufacturer: "Holybro"
+    model: "SiK V3 900MHz"
+    frequency_mhz: 900
+    power_mw: 100
+    range_km: 3
+    protocol: "MAVLink 2"
+    weight_g: 12
+    antenna: "SMA dipole"
+
+  mapping_camera:
+    manufacturer: "Sony"
+    model: "A7R IV"
+    sensor: "35mm full-frame BSI CMOS"
+    resolution_mp: 61
+    pixel_pitch_um: 3.73
+    shutter_type: "mechanical + electronic"
+    min_shutter_speed: "1/8000"
+    iso_range: [100, 32000]
+    lens: "Sony FE 35mm f/2.8"
+    lens_fov_deg: 63
+    trigger: "MAVLink hot-shoe + GPIO"
+    interval_min_ms: 500
+    weight_g: 665 # body + lens
+    mount: "vibration-isolated nadir bracket"
+    geotagging: true
+
+  lidar:
+    manufacturer: "Lightware"
+    model: "SF45/B"
+    type: "scanning rangefinder"
+    max_range_m: 50
+    min_range_m: 0.2
+    range_resolution_m: 0.01
+    update_rate_hz: 400
+    scan_angle_deg: 320
+    scan_rate_hz: 20
+    wavelength_nm: 905
+    eye_safe: true
+    bus: "serial UART"
+    weight_g: 59
+    power_w: 2.5
+
+# -----------------------------------------------------------------------------
+# Sensor Configuration
+# -----------------------------------------------------------------------------
+sensors:
+  imu:
+    primary:
+      manufacturer: "InvenSense"
+      model: "ICM-42688-P"
+      gyro_range_dps: 2000
+      accel_range_g: 16
+      gyro_noise_density_dps_hz: 0.0028
+      accel_noise_density_ug_hz: 70
+      sample_rate_hz: 32000
+      bus: "SPI"
+      temperature_compensation: true
+    secondary:
+      manufacturer: "InvenSense"
+      model: "IIM-42652"
+      gyro_range_dps: 2000
+      accel_range_g: 16
+      gyro_noise_density_dps_hz: 0.0030
+      accel_noise_density_ug_hz: 75
+      sample_rate_hz: 32000
+      bus: "SPI"
+      temperature_compensation: true
+
+  barometer:
+    primary:
+      manufacturer: "TDK"
+      model: "ICP-20100"
+      pressure_range_pa: [30000, 110000]
+      pressure_resolution_pa: 0.004
+      altitude_noise_m: 0.02
+      sample_rate_hz: 400
+      bus: "I2C"
+      temperature_sensor: true
+    secondary:
+      manufacturer: "TDK"
+      model: "ICP-20100"
+      pressure_range_pa: [30000, 110000]
+      pressure_resolution_pa: 0.004
+      altitude_noise_m: 0.02
+      sample_rate_hz: 400
+      bus: "I2C"
+
+  gps:
+    manufacturer: "Holybro"
+    model: "H-RTK F9P Rover"
+    chipset: "u-blox F9P"
+    constellation: ["GPS", "GLONASS", "Galileo", "BeiDou"]
+    channels: 184
+    update_rate_hz: 20
+    horizontal_accuracy_m: 0.01 # with RTK fix
+    vertical_accuracy_m: 0.02
+    horizontal_accuracy_standalone_m: 1.5
+    rtk_capable: true
+    rtk_convergence_time_s: 60
+    ttff_cold_s: 25
+    ttff_hot_s: 2
+    compass: true
+    compass_model: "IST8310"
+    weight_g: 52
+    antenna: "helical survey-grade"
+    sbas: true
+
+  magnetometer:
+    primary:
+      manufacturer: "iSentek"
+      model: "IST8310"
+      range_gauss: 16.0
+      resolution_mgauss: 0.3
+      sample_rate_hz: 200
+      bus: "I2C"
+      integrated_in: "GPS module"
+    secondary:
+      manufacturer: "Bosch"
+      model: "BMM150"
+      range_gauss: 25.0
+      resolution_mgauss: 0.3
+      sample_rate_hz: 300
+      bus: "I2C"
+      integrated_in: "Pixhawk 6X"
+
+# -----------------------------------------------------------------------------
+# Thermal Model
+# -----------------------------------------------------------------------------
+thermal:
+  motor_thermal_resistance_c_per_w: 4.0
+  motor_thermal_capacitance_j_per_c: 45.0
+  esc_thermal_resistance_c_per_w: 12.0
+  battery_thermal_resistance_c_per_w: 3.5
+  ambient_temp_range_c: [-20, 50]
+  motor_max_temp_c: 140
+  esc_max_temp_c: 90
+  battery_max_temp_c: 55
+  derating_start_temp_c: 120
+
+# -----------------------------------------------------------------------------
+# Electrical Model
+# -----------------------------------------------------------------------------
+electrical:
+  wiring_resistance_mohm: 6
+  connector_resistance_mohm: 2
+  total_system_resistance_mohm: 8
+  voltage_sag_model:
+    method: "linear_resistance"
+    internal_resistance_mohm: 10.8 # 6 cells * 1.8 mohm
+  power_distribution:
+    type: "power_module"
+    model: "Holybro PM02D"
+    main_bus_current_a: 120
+    bec_5v_current_a: 6.0
+    bec_12v_current_a: 3.0
+  quiescent_draw_ma:
+    flight_controller: 520
+    receiver: 65
+    telemetry_radio: 200
+    gps: 180
+    lidar: 500
+    camera: 800
+    camera_trigger: 10
+    total_idle: 2275
+
+# -----------------------------------------------------------------------------
+# Compatibility Constraints
+# -----------------------------------------------------------------------------
+compatibility:
+  firmware:
+    - "ArduCopter >= 4.3"
+    - "ArduCopter >= 4.5 (recommended)"
+    - "PX4 >= 1.14"
+  propeller_clearance_mm: 8.0
+  max_prop_diameter_in: 14.0
+  min_battery_cells: 6
+  max_battery_cells: 6
+  max_battery_weight_g: 1400
+  max_auw_g: 4500
+  max_payload_g: 800
+  regulations:
+    faa_class: "standard Part 107"
+    requires_registration: true
+    requires_remote_id: true
+    requires_part_107: true
+    bvlos_capable: true
+    night_operations: true
+
+# -----------------------------------------------------------------------------
+# Mechanical Properties
+# -----------------------------------------------------------------------------
+mechanical:
+  center_of_gravity_mm: [0, 0, -15]
+  moments_of_inertia_kg_m2:
+    Ixx: 0.0520
+    Iyy: 0.0545
+    Izz: 0.0880
+  drag_coefficient:
+    frontal: 0.50
+    lateral: 0.55
+    vertical: 1.15
+  frontal_area_m2: 0.045
+  prop_wash_factor: 0.10
+  vibration_damping:
+    fc_mount: "Holybro vibration isolation mount"
+    camera_mount: "3-axis vibration-isolated plate"
+    gyro_notch_filters: [52, 104]
+  landing_gear:
+    type: "retractable"
+    height_mm: 180
+    material: "carbon fiber tube"
+    weight_g: 120
+    retract_servo: "Tarot servo"
+  payload_mount:
+    type: "quick_release_plate"
+    max_payload_g: 800
+    vibration_isolated: true
+    power_output_v: [5, 12]
+    signal_interface: "MAVLink serial"
+  build_notes: >
+    Assemble folding arms with thread-lock and verify free rotation. Install
+    Pixhawk 6X on the anti-vibration mount with the arrow pointing forward.
+    Route GPS mast at least 100mm above the top plate to minimize magnetic
+    interference. Connect all ESCs via DroneCAN for clean wiring and telemetry.
+    Install the Sony A7R IV on the nadir vibration-isolated bracket -- verify
+    camera trigger via MAVLink hot-shoe feedback. Mount LiDAR SF45/B on a
+    forward-facing bracket with clear 320-degree scan FOV. Calibrate compass
+    with motors powered on to capture motor interference. Set up RTK base
+    station correction link via MAVLink injection over telemetry radio.
+    Configure terrain following with LiDAR at survey altitude. Set battery
+    failsafe RTL at 20% remaining. Pre-arm checks: GPS 3D Fix + HDOP < 1.5
+    + EKF healthy + compass consistent. Verify camera interval matches ground
+    speed for 70% forward overlap at survey altitude.
+
+# -----------------------------------------------------------------------------
+# Computed / Derived Values
+# -----------------------------------------------------------------------------
+computed:
+  dry_weight_g: 2250 # frame(480)+motors(408)+props(88)+FC(64)+PM(28)+ESCs(48)+rx(5)+telem(12)+GPS(52)+camera(665)+lidar(59)+landing_gear(120)+wiring(60)+hardware(45)+mast(20)+camera_bracket(35)+misc(61)
+  all_up_weight_g: 3500 # dry(2250) + battery(1250)
+  all_up_weight_kg: 3.500
+  wing_loading: null
+  total_static_thrust_g: 11200 # 4 * 2800g
+  thrust_to_weight_ratio: 3.20
+  hover_throttle_percent: 31.3
+  max_tilt_angle_deg: 45
+  max_speed_ms: 18 # ~65 km/h
+  max_vertical_speed_ms: 6
+  estimated_flight_time_min: 35.0 # at survey cruise ~8 m/s
+  estimated_hover_time_min: 28.0
+  hover_current_a: 22.5
+  max_current_a: 80
+  hover_power_w: 499.5
+  max_power_w: 1776
+  power_loading_w_per_kg: 142.7
+  disc_loading_g_per_cm2: 1.02
+  survey_speed_ms: 8.0
+  survey_altitude_m: 80
+  gsd_cm_per_pixel: 0.95 # at 80m with 61MP + 35mm lens
+  max_coverage_ha_per_flight: 45
+  pid_loop_rate_khz: 1
+  motor_response_time_ms: 35
+  settling_time_ms: 120

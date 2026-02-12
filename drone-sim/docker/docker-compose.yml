@@ -1,0 +1,262 @@
+###############################################################################
+# NEXUS Drone Simulator - Docker Compose
+# Launch everything: docker compose up
+# Launch specific stack: docker compose --profile px4 up
+#                        docker compose --profile ardupilot up
+###############################################################################
+
+version: "3.9"
+
+x-ros-env: &ros-env
+  ROS_DOMAIN_ID: "0"
+  ROS_LOCALHOST_ONLY: "0"
+  RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+  CYCLONEDDS_URI: file:///config/cyclonedds.xml
+
+x-shared-volumes: &shared-volumes
+  - ros2_ws:/ros2_ws
+  - ./config:/config:ro
+  - gazebo_logs:/var/log/gazebo
+  - mavlink_logs:/var/log/mavlink
+
+networks:
+  drone-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+volumes:
+  ros2_ws:
+  gazebo_logs:
+  mavlink_logs:
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────
+  # ROS 2 Humble base - workspace builder and core nodes
+  # ─────────────────────────────────────────────────────────────────────────
+  ros2-base:
+    build:
+      context: ..
+      dockerfile: docker/ros2/Dockerfile
+    image: nexus/ros2-base:humble
+    container_name: nexus-ros2-base
+    hostname: ros2-base
+    environment:
+      <<: *ros-env
+    volumes:
+      - ../ros2_ws/src:/ros2_ws/src:rw
+      - ../config:/config:ro
+    networks:
+      drone-net:
+        ipv4_address: 172.20.0.10
+    command: >
+      bash -c "
+        source /opt/ros/humble/setup.bash &&
+        cd /ros2_ws &&
+        colcon build --symlink-install &&
+        source install/setup.bash &&
+        echo '[ros2-base] Workspace built. Keeping container alive.' &&
+        tail -f /dev/null
+      "
+    healthcheck:
+      test: ["CMD", "bash", "-c", "source /opt/ros/humble/setup.bash && ros2 topic list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Gazebo Garden simulation server with GUI forwarding
+  # ─────────────────────────────────────────────────────────────────────────
+  gazebo:
+    build:
+      context: ..
+      dockerfile: docker/gazebo/Dockerfile
+    image: nexus/gazebo:garden
+    container_name: nexus-gazebo
+    hostname: gazebo
+    environment:
+      <<: *ros-env
+      DISPLAY: ${DISPLAY:-:0}
+      QT_X11_NO_MITSHM: "1"
+      LIBGL_ALWAYS_SOFTWARE: "${LIBGL_ALWAYS_SOFTWARE:-0}"
+      GZ_SIM_RESOURCE_PATH: /gazebo/models:/gazebo/worlds
+      WORLD_FILE: ${WORLD_FILE:-empty_field.sdf}
+    volumes:
+      - ../gazebo/worlds:/gazebo/worlds:ro
+      - ../gazebo/models:/gazebo/models:ro
+      - ../gazebo/plugins:/gazebo/plugins:ro
+      - ../ros2_ws/src:/ros2_ws/src:ro
+      - ../config:/config:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - gazebo_logs:/var/log/gazebo
+    networks:
+      drone-net:
+        ipv4_address: 172.20.0.20
+    ports:
+      - "11345:11345"     # Gazebo transport
+    depends_on:
+      ros2-base:
+        condition: service_healthy
+    command: >
+      bash -c "
+        source /opt/ros/humble/setup.bash &&
+        gz sim -v4 -r /gazebo/worlds/$${WORLD_FILE}
+      "
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PX4 SITL with Gazebo Garden bridge
+  # ─────────────────────────────────────────────────────────────────────────
+  px4-sitl:
+    build:
+      context: ..
+      dockerfile: docker/px4-sitl/Dockerfile
+    image: nexus/px4-sitl:latest
+    container_name: nexus-px4-sitl
+    hostname: px4-sitl
+    profiles:
+      - px4
+      - full
+    environment:
+      <<: *ros-env
+      PX4_SIM_MODEL: gz_x500
+      PX4_GZ_WORLD: ${WORLD_FILE:-empty_field}
+      PX4_SYS_AUTOSTART: "4001"
+      HEADLESS: "1"
+    volumes:
+      - ../config:/config:ro
+      - mavlink_logs:/var/log/mavlink
+    networks:
+      drone-net:
+        ipv4_address: 172.20.0.30
+    ports:
+      - "14540:14540/udp"   # MAVLink offboard
+      - "14550:14550/udp"   # QGC
+      - "14560:14560/udp"   # Gazebo bridge
+    depends_on:
+      - gazebo
+    command: >
+      bash -c "
+        cd /PX4-Autopilot &&
+        make px4_sitl gz_x500
+      "
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # ArduPilot SITL with MAVProxy
+  # ─────────────────────────────────────────────────────────────────────────
+  ardupilot-sitl:
+    build:
+      context: ..
+      dockerfile: docker/ardupilot-sitl/Dockerfile
+    image: nexus/ardupilot-sitl:latest
+    container_name: nexus-ardupilot-sitl
+    hostname: ardupilot-sitl
+    profiles:
+      - ardupilot
+      - full
+    environment:
+      <<: *ros-env
+      VEHICLE: copter
+      FRAME: quad
+      SPEEDUP: "1"
+      SYSID: "1"
+      DEFAULTS_PATH: /ardupilot/Tools/autotest/default_params/copter.parm
+      CUSTOM_PARAMS: ${CUSTOM_PARAMS:-}
+    volumes:
+      - ../config:/config:ro
+      - mavlink_logs:/var/log/mavlink
+    networks:
+      drone-net:
+        ipv4_address: 172.20.0.40
+    ports:
+      - "5760:5760/tcp"     # MAVProxy console
+      - "14550:14550/udp"   # MAVLink GCS
+      - "14551:14551/udp"   # MAVLink API
+      - "14570:14570/udp"   # Extra
+    depends_on:
+      - gazebo
+    command: >
+      bash -c "
+        cd /ardupilot &&
+        Tools/autotest/sim_vehicle.py \
+          -v ArduCopter \
+          --frame $${FRAME} \
+          -I0 \
+          --speedup $${SPEEDUP} \
+          --sysid $${SYSID} \
+          --out 172.20.0.50:14540 \
+          --out 172.20.0.60:14550 \
+          --no-rebuild \
+          --no-mavproxy
+      "
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # MAVROS bridge for MAVLink <-> ROS2 communication
+  # ─────────────────────────────────────────────────────────────────────────
+  mavros-bridge:
+    build:
+      context: ..
+      dockerfile: docker/ros2/Dockerfile
+    image: nexus/ros2-base:humble
+    container_name: nexus-mavros-bridge
+    hostname: mavros-bridge
+    environment:
+      <<: *ros-env
+      AUTOPILOT: ${AUTOPILOT:-px4}
+      MAVROS_FCU_URL: ${MAVROS_FCU_URL:-udp://:14540@172.20.0.30:14540}
+      MAVROS_GCS_URL: ""
+      MAVROS_TGT_SYSTEM: "1"
+      MAVROS_TGT_COMPONENT: "1"
+    volumes:
+      - ../ros2_ws/src:/ros2_ws/src:ro
+      - ../config:/config:ro
+    networks:
+      drone-net:
+        ipv4_address: 172.20.0.50
+    depends_on:
+      ros2-base:
+        condition: service_healthy
+    command: >
+      bash -c "
+        source /opt/ros/humble/setup.bash &&
+        cd /ros2_ws && source install/setup.bash 2>/dev/null;
+        ros2 launch mavros mavros.launch.py \
+          fcu_url:=$${MAVROS_FCU_URL} \
+          gcs_url:=$${MAVROS_GCS_URL} \
+          tgt_system:=$${MAVROS_TGT_SYSTEM} \
+          tgt_component:=$${MAVROS_TGT_COMPONENT}
+      "
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # App backend - Python WebSocket server bridging sim to Electron
+  # ─────────────────────────────────────────────────────────────────────────
+  app-backend:
+    build:
+      context: ..
+      dockerfile: docker/ros2/Dockerfile
+    image: nexus/ros2-base:humble
+    container_name: nexus-app-backend
+    hostname: app-backend
+    environment:
+      <<: *ros-env
+      WEBSOCKET_HOST: "0.0.0.0"
+      WEBSOCKET_PORT: "9090"
+      ROSBRIDGE_PORT: "9091"
+    volumes:
+      - ../ros2_ws/src:/ros2_ws/src:ro
+      - ../config:/config:ro
+    networks:
+      drone-net:
+        ipv4_address: 172.20.0.60
+    ports:
+      - "9090:9090"    # WebSocket for Electron app
+      - "9091:9091"    # rosbridge WebSocket
+    depends_on:
+      ros2-base:
+        condition: service_healthy
+    command: >
+      bash -c "
+        source /opt/ros/humble/setup.bash &&
+        cd /ros2_ws && source install/setup.bash 2>/dev/null;
+        python3 /ros2_ws/src/drone_control/drone_control/websocket_bridge.py
+      "

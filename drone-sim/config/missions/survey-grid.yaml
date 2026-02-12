@@ -1,0 +1,368 @@
+# =============================================================================
+# Survey Grid (Lawn-Mower) Mission
+# =============================================================================
+# Systematic lawn-mower survey pattern for photogrammetry and mapping.
+# Parallel flight lines with consistent overlap ensure complete coverage.
+# Designed for the mapping-quad airframe with downward-facing camera.
+# =============================================================================
+
+mission:
+  name: "Survey Grid"
+  description: >
+    Lawn-mower (boustrophedon) survey pattern for aerial photogrammetry and
+    orthomosaic generation. Flies parallel lines at constant altitude with
+    consistent forward and lateral overlap for the mapping camera. Alternating
+    flight direction on each line minimizes turn radius and time. Optimized
+    for 70% forward overlap and 65% side overlap at 80m AGL with a 61MP
+    camera and 35mm lens (GSD approximately 0.95 cm/pixel).
+  version: "1.0"
+  author: "NEXUS Drone Sim"
+  created: "2025-10-01"
+
+# -----------------------------------------------------------------------------
+# Mission Parameters
+# -----------------------------------------------------------------------------
+parameters:
+  coordinate_frame: "local_ENU"
+  home_position:
+    latitude_deg: 37.7749
+    longitude_deg: -122.4194
+    altitude_msl_m: 10.0
+    heading_deg: 0.0
+
+  survey:
+    altitude_agl_m: 80.0
+    ground_speed_ms: 8.0
+    forward_overlap_percent: 70
+    side_overlap_percent: 65
+    camera_trigger_mode: "distance" # trigger by distance along track
+    camera_trigger_distance_m: 12.0 # = GSD * image_width * (1 - overlap)
+    camera_trigger_shutter_ms: 2 # shutter pulse duration
+    flight_line_direction_deg: 90.0 # East-West lines
+    flight_line_spacing_m: 18.0 # based on side overlap at altitude
+    survey_area:
+      type: "rectangle"
+      origin_m: [0, 0] # SW corner relative to home
+      width_m: 200.0 # East-West extent
+      height_m: 150.0 # North-South extent
+    line_overshoot_m: 20.0 # fly past survey boundary for turns
+    entry_point: "SW" # start from southwest corner
+
+  defaults:
+    speed_ms: 8.0
+    acceptance_radius_m: 3.0
+    yaw_behavior: "fixed_heading" # maintain survey heading
+    loiter_time_s: 0.0
+
+  safety:
+    max_altitude_m: 120.0
+    geofence_margin_m: 50.0
+    geofence_action: "RTL"
+    min_battery_percent: 25
+    failsafe_action: "RTL"
+    wind_abort_speed_ms: 10.0
+
+# -----------------------------------------------------------------------------
+# Waypoints
+# -----------------------------------------------------------------------------
+# Flight lines run East-West. 9 parallel lines with 18m spacing cover 150m N-S.
+# Alternating direction (boustrophedon) for efficiency.
+# Line overshoot of 20m on each end for turn stabilization.
+
+waypoints:
+  - id: 1
+    name: "Takeoff"
+    type: "takeoff"
+    position:
+      x_m: 0.0
+      y_m: 0.0
+      z_m: 80.0
+    speed_ms: 3.0
+    heading_deg: 0.0
+    hold_time_s: 5.0
+    notes: "Climb to survey altitude, stabilize"
+
+  - id: 2
+    name: "Transit to Survey Start"
+    type: "waypoint"
+    position:
+      x_m: -20.0 # 20m overshoot west of survey area
+      y_m: 0.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0 # facing east
+    hold_time_s: 0.0
+
+  # --- Flight Line 1: West to East, Y=0m ---
+  - id: 3
+    name: "Line 1 Start"
+    type: "survey_start"
+    position:
+      x_m: -20.0
+      y_m: 0.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0
+    camera_trigger: "start"
+
+  - id: 4
+    name: "Line 1 End"
+    type: "survey_end"
+    position:
+      x_m: 220.0
+      y_m: 0.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0
+    camera_trigger: "stop"
+
+  # --- Flight Line 2: East to West, Y=18m ---
+  - id: 5
+    name: "Line 2 Start"
+    type: "survey_start"
+    position:
+      x_m: 220.0
+      y_m: 18.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 270.0
+    camera_trigger: "start"
+
+  - id: 6
+    name: "Line 2 End"
+    type: "survey_end"
+    position:
+      x_m: -20.0
+      y_m: 18.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 270.0
+    camera_trigger: "stop"
+
+  # --- Flight Line 3: West to East, Y=36m ---
+  - id: 7
+    name: "Line 3 Start"
+    type: "survey_start"
+    position:
+      x_m: -20.0
+      y_m: 36.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0
+    camera_trigger: "start"
+
+  - id: 8
+    name: "Line 3 End"
+    type: "survey_end"
+    position:
+      x_m: 220.0
+      y_m: 36.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0
+    camera_trigger: "stop"
+
+  # --- Flight Line 4: East to West, Y=54m ---
+  - id: 9
+    name: "Line 4 Start"
+    type: "survey_start"
+    position:
+      x_m: 220.0
+      y_m: 54.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 270.0
+    camera_trigger: "start"
+
+  - id: 10
+    name: "Line 4 End"
+    type: "survey_end"
+    position:
+      x_m: -20.0
+      y_m: 54.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 270.0
+    camera_trigger: "stop"
+
+  # --- Flight Line 5: West to East, Y=72m ---
+  - id: 11
+    name: "Line 5 Start"
+    type: "survey_start"
+    position:
+      x_m: -20.0
+      y_m: 72.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0
+    camera_trigger: "start"
+
+  - id: 12
+    name: "Line 5 End"
+    type: "survey_end"
+    position:
+      x_m: 220.0
+      y_m: 72.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0
+    camera_trigger: "stop"
+
+  # --- Flight Line 6: East to West, Y=90m ---
+  - id: 13
+    name: "Line 6 Start"
+    type: "survey_start"
+    position:
+      x_m: 220.0
+      y_m: 90.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 270.0
+    camera_trigger: "start"
+
+  - id: 14
+    name: "Line 6 End"
+    type: "survey_end"
+    position:
+      x_m: -20.0
+      y_m: 90.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 270.0
+    camera_trigger: "stop"
+
+  # --- Flight Line 7: West to East, Y=108m ---
+  - id: 15
+    name: "Line 7 Start"
+    type: "survey_start"
+    position:
+      x_m: -20.0
+      y_m: 108.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0
+    camera_trigger: "start"
+
+  - id: 16
+    name: "Line 7 End"
+    type: "survey_end"
+    position:
+      x_m: 220.0
+      y_m: 108.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0
+    camera_trigger: "stop"
+
+  # --- Flight Line 8: East to West, Y=126m ---
+  - id: 17
+    name: "Line 8 Start"
+    type: "survey_start"
+    position:
+      x_m: 220.0
+      y_m: 126.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 270.0
+    camera_trigger: "start"
+
+  - id: 18
+    name: "Line 8 End"
+    type: "survey_end"
+    position:
+      x_m: -20.0
+      y_m: 126.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 270.0
+    camera_trigger: "stop"
+
+  # --- Flight Line 9: West to East, Y=144m ---
+  - id: 19
+    name: "Line 9 Start"
+    type: "survey_start"
+    position:
+      x_m: -20.0
+      y_m: 144.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0
+    camera_trigger: "start"
+
+  - id: 20
+    name: "Line 9 End"
+    type: "survey_end"
+    position:
+      x_m: 220.0
+      y_m: 144.0
+      z_m: 80.0
+    speed_ms: 8.0
+    heading_deg: 90.0
+    camera_trigger: "stop"
+
+  # --- Return and Land ---
+  - id: 21
+    name: "Return to Launch"
+    type: "waypoint"
+    position:
+      x_m: 0.0
+      y_m: 0.0
+      z_m: 80.0
+    speed_ms: 10.0
+    heading_deg: 0.0
+    hold_time_s: 3.0
+
+  - id: 22
+    name: "Land"
+    type: "land"
+    position:
+      x_m: 0.0
+      y_m: 0.0
+      z_m: 0.0
+    speed_ms: 1.5
+    heading_deg: 0.0
+    precision_land: true
+
+# -----------------------------------------------------------------------------
+# Mission Geometry Summary
+# -----------------------------------------------------------------------------
+geometry:
+  pattern: "lawn_mower_boustrophedon"
+  survey_area_m2: 30000.0 # 200m x 150m
+  survey_area_ha: 3.0
+  flight_line_count: 9
+  flight_line_length_m: 240.0 # including overshoot
+  flight_line_spacing_m: 18.0
+  total_survey_distance_m: 2160.0 # 9 lines * 240m
+  total_distance_with_turns_m: 2460.0 # + turns + transit
+  estimated_duration_s: 380.0 # ~6.3 min
+  estimated_photo_count: 162 # 9 lines * 18 photos per line
+  ground_sample_distance_cm: 0.95
+
+# -----------------------------------------------------------------------------
+# Camera Configuration (for trigger calculations)
+# -----------------------------------------------------------------------------
+camera_config:
+  sensor_width_mm: 35.7
+  sensor_height_mm: 23.8
+  focal_length_mm: 35.0
+  image_width_px: 9504
+  image_height_px: 6336
+  trigger_type: "distance"
+  trigger_distance_m: 12.0
+
+# -----------------------------------------------------------------------------
+# Expected Performance
+# -----------------------------------------------------------------------------
+expected_performance:
+  position_accuracy_m: 0.02 # with RTK
+  track_following_accuracy_m: 1.0
+  altitude_accuracy_m: 0.3
+  speed_consistency_percent: 95
+  image_overlap_achieved_percent:
+    forward: 70
+    side: 65
+  total_energy_wh: 35.0
+  compatible_airframes:
+    - "mapping-quad"
+    - "hex-heavy-lift"

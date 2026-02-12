@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  nexus-gcs:
+    build: .
+    ports:
+      - "8765:8765"
+    volumes:
+      - nexus-data:/data
+    environment:
+      - NEXUS_SIMULATION_MODE=true
+      - NEXUS_TELEMETRY_RATE_HZ=10
+      - NEXUS_SITL_DRONE_COUNT=6
+    restart: unless-stopped
+
+volumes:
+  nexus-data:

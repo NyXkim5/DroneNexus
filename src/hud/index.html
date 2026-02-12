@@ -1,0 +1,3368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS // Drone Swarm Telemetry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #050810;
+  --panel: #0a0f18;
+  --border: #1a2535;
+  --border-light: #243348;
+  --text: #c8d6e5;
+  --text-dim: #5a6d82;
+  --text-bright: #e8f0f8;
+  --green: #00ff88;
+  --blue: #3388ff;
+  --amber: #ffaa00;
+  --red: #ff3355;
+  --cyan: #00ccff;
+  --purple: #aa55ff;
+  --sky: #1a3a5c;
+  --ground: #5c3a1a;
+  --font-data: 'JetBrains Mono', monospace;
+  --font-ui: 'Outfit', sans-serif;
+  --font-label: 'IBM Plex Mono', monospace;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-data);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   LAYOUT GRID
+   ============================================================ */
+#app {
+  display: flex;
+  flex-direction: column;
+  width: 100%; height: 100%;
+}
+
+#top-bar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 1000;
+  gap: 16px;
+}
+
+#main-area {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+#left-panel {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+#map-container {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+#right-panel {
+  width: 320px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  backdrop-filter: blur(10px);
+}
+
+#bottom-panel {
+  height: 140px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  display: flex;
+  z-index: 1000;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+.brand {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--green);
+  letter-spacing: 4px;
+  text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+  margin-right: 8px;
+}
+
+.brand-sub {
+  font-family: var(--font-label);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-right: auto;
+}
+
+.mode-switch {
+  display: flex;
+  gap: 2px;
+  background: rgba(26, 37, 53, 0.8);
+  border-radius: 20px;
+  padding: 3px;
+}
+
+.mode-btn {
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 17px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+
+.mode-btn.active {
+  background: var(--green);
+  color: #050810;
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
+}
+
+.mode-btn:hover:not(.active) {
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+}
+
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.6; }
+}
+
+.live-label {
+  font-family: var(--font-label);
+  font-size: 11px;
+  color: var(--green);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.utc-clock {
+  font-family: var(--font-data);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  letter-spacing: 1px;
+  margin-left: 16px;
+  min-width: 80px;
+  text-align: right;
+}
+
+/* ============================================================
+   LEFT PANEL — DRONE LIST
+   ============================================================ */
+.panel-header {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.drone-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.drone-card {
+  background: rgba(10, 15, 24, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.drone-card:hover {
+  border-color: var(--border-light);
+  background: rgba(26, 37, 53, 0.3);
+}
+
+.drone-card.selected {
+  border-color: var(--card-color, var(--green));
+  box-shadow: 0 0 12px rgba(var(--card-rgb, 0,255,136), 0.15), inset 0 0 20px rgba(var(--card-rgb, 0,255,136), 0.03);
+}
+
+.drone-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.drone-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.drone-name {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  flex: 1;
+}
+
+.drone-role {
+  font-family: var(--font-label);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-dim);
+}
+
+.drone-status-badge {
+  font-family: var(--font-label);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
+.drone-status-badge.active {
+  background: rgba(0,255,136,0.12);
+  color: var(--green);
+}
+
+.drone-status-badge.low_batt {
+  background: rgba(255,170,0,0.15);
+  color: var(--amber);
+}
+
+.drone-status-badge.weak_signal {
+  background: rgba(255,51,85,0.15);
+  color: var(--red);
+}
+
+.drone-card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+}
+
+.drone-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.drone-stat-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.drone-stat-value {
+  font-family: var(--font-data);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-bright);
+}
+
+.battery-bar-container {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.battery-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s, background 0.5s;
+}
+
+/* ============================================================
+   MAP OVERLAY
+   ============================================================ */
+.map-overlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 500;
+  background: rgba(10, 15, 24, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  backdrop-filter: blur(10px);
+}
+
+.formation-label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cyan);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.cohesion-value {
+  font-family: var(--font-data);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.cohesion-unit {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-left: 2px;
+}
+
+/* ============================================================
+   RIGHT PANEL — DETAIL
+   ============================================================ */
+#right-panel .panel-header {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  z-index: 10;
+}
+
+.detail-section {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-section-title {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.no-selection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  font-family: var(--font-label);
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Attitude indicator */
+.attitude-container {
+  width: 180px;
+  height: 180px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--border-light);
+  position: relative;
+  background: #111;
+}
+
+.attitude-ball {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  left: 50%;
+  top: 50%;
+  transform-origin: center center;
+}
+
+.attitude-sky {
+  position: absolute;
+  width: 100%;
+  height: 50%;
+  top: 0;
+  background: var(--sky);
+}
+
+.attitude-ground {
+  position: absolute;
+  width: 100%;
+  height: 50%;
+  bottom: 0;
+  background: var(--ground);
+}
+
+.attitude-horizon {
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  top: 50%;
+  background: #fff;
+  opacity: 0.6;
+}
+
+.attitude-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.reticle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px rgba(0,255,136,0.5);
+}
+
+.reticle-wing-left, .reticle-wing-right {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  width: 30px;
+  background: var(--green);
+  transform: translateY(-50%);
+}
+
+.reticle-wing-left {
+  right: calc(50% + 12px);
+}
+
+.reticle-wing-right {
+  left: calc(50% + 12px);
+}
+
+.reticle-stem {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 6px);
+  width: 2px;
+  height: 14px;
+  background: var(--green);
+  transform: translateX(-50%);
+}
+
+.attitude-values {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 4px;
+}
+
+.attitude-val {
+  text-align: center;
+}
+
+.attitude-val-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.attitude-val-num {
+  font-family: var(--font-data);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Telemetry grid */
+.telem-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.telem-cell {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(26,37,53,0.6);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.telem-cell-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+
+.telem-cell-value {
+  font-family: var(--font-data);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.telem-cell-unit {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-left: 2px;
+}
+
+/* Battery detail */
+.battery-detail {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.battery-big-num {
+  font-family: var(--font-data);
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.battery-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.battery-meta-row {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.battery-meta-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.battery-detail-bar {
+  margin-top: 10px;
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.battery-detail-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s, background 0.5s;
+}
+
+/* GPS section */
+.gps-fix-badge {
+  display: inline-block;
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 3px 10px;
+  border-radius: 3px;
+  background: rgba(0,255,136,0.1);
+  color: var(--green);
+  margin-bottom: 10px;
+}
+
+.gps-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.gps-cell {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(26,37,53,0.6);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+.gps-cell-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gps-cell-value {
+  font-family: var(--font-data);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-bright);
+}
+
+/* Link section */
+.link-cards {
+  display: flex;
+  gap: 8px;
+}
+
+.link-card {
+  flex: 1;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(26,37,53,0.6);
+  border-radius: 4px;
+  padding: 10px;
+  text-align: center;
+}
+
+.link-card-value {
+  font-family: var(--font-data);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.link-card-unit {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.link-card-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* ============================================================
+   BOTTOM PANEL
+   ============================================================ */
+.bottom-metric {
+  flex: 1;
+  padding: 14px 18px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.bottom-metric:last-child {
+  border-right: none;
+}
+
+.bottom-metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.bottom-metric-title {
+  font-family: var(--font-label);
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.bottom-metric-value {
+  font-family: var(--font-data);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.bottom-metric-unit {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: 2px;
+}
+
+.bottom-metric-sub {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.mesh-badge {
+  display: inline-block;
+  font-family: var(--font-label);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(0,255,136,0.1);
+  color: var(--green);
+}
+
+.sparkline-canvas {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Event log */
+.event-log-section {
+  flex: 1.4;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.event-log-list {
+  flex: 1;
+  overflow-y: auto;
+  font-family: var(--font-data);
+  font-size: 11px;
+}
+
+.event-item {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(26,37,53,0.3);
+  align-items: baseline;
+}
+
+.event-time {
+  color: var(--text-dim);
+  font-size: 10px;
+  flex-shrink: 0;
+  min-width: 58px;
+}
+
+.event-source {
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 70px;
+  letter-spacing: 0.5px;
+}
+
+.event-msg {
+  color: var(--text);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.severity-info { color: var(--cyan); }
+.severity-warn { color: var(--amber); }
+.severity-ok { color: var(--green); }
+.severity-alert { color: var(--red); }
+
+/* ============================================================
+   LEAFLET OVERRIDES
+   ============================================================ */
+.leaflet-container {
+  background: var(--bg) !important;
+  font-family: var(--font-data) !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(10,15,24,0.8) !important;
+  color: var(--text-dim) !important;
+  font-size: 9px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--text-dim) !important;
+}
+
+.leaflet-control-zoom a {
+  background: rgba(10,15,24,0.9) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+.leaflet-tooltip {
+  background: rgba(10,15,24,0.9) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-bright) !important;
+  font-family: var(--font-label) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 1px !important;
+  padding: 2px 8px !important;
+  border-radius: 3px !important;
+}
+
+.leaflet-tooltip-top::before {
+  border-top-color: var(--border) !important;
+}
+
+/* Marker pulse ring for selected drone */
+@keyframes marker-pulse {
+  0% { r: 12; opacity: 0.8; }
+  100% { r: 24; opacity: 0; }
+}
+
+/* ============================================================
+   MODE VISIBILITY
+   ============================================================ */
+body[data-mode="MONITOR"] .command-only,
+body[data-mode="MONITOR"] .replay-only { display: none !important; }
+body[data-mode="COMMAND"] .monitor-only,
+body[data-mode="COMMAND"] .replay-only { display: none !important; }
+body[data-mode="REPLAY"] .monitor-only,
+body[data-mode="REPLAY"] .command-only { display: none !important; }
+body[data-mode="SOLO"] .monitor-only,
+body[data-mode="SOLO"] .command-only,
+body[data-mode="SOLO"] .replay-only { display: none !important; }
+body[data-mode="SOLO"] #left-panel { width: 0; overflow: hidden; border: none; padding: 0; }
+body[data-mode="SOLO"] #right-panel { width: 260px; }
+body[data-mode="SOLO"] #bottom-panel { height: 48px; }
+
+/* ============================================================
+   CONNECTION BADGE
+   ============================================================ */
+.connection-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 12px;
+  font-family: var(--font-label); font-size: 10px;
+  font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+}
+.connection-badge:hover { filter: brightness(1.2); }
+.connection-badge.sim { background: rgba(170,85,255,0.15); color: var(--purple); }
+.connection-badge.live { background: rgba(0,255,136,0.15); color: var(--green); }
+.connection-badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+.connection-badge.sim .connection-badge-dot { background: var(--purple); }
+.connection-badge.live .connection-badge-dot { background: var(--green); animation: pulse-dot 1.5s ease-in-out infinite; }
+
+/* ============================================================
+   COMMAND PANEL
+   ============================================================ */
+.cmd-panel { padding: 0; }
+.cmd-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.cmd-section-title {
+  font-family: var(--font-label); font-size: 10px; font-weight: 600;
+  color: var(--text-dim); letter-spacing: 1.5px; text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.cmd-target-label {
+  font-family: var(--font-label); font-size: 9px; color: var(--cyan);
+  letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px;
+}
+.cmd-target-name { font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--text-bright); }
+.cmd-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cmd-btn {
+  font-family: var(--font-label); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.5px; padding: 10px 8px; border: 1px solid var(--border);
+  border-radius: 4px; background: rgba(255,255,255,0.03); color: var(--text);
+  cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.cmd-btn:hover { border-color: var(--border-light); background: rgba(255,255,255,0.06); }
+.cmd-btn:active { transform: scale(0.97); }
+.cmd-btn.armed { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.08); }
+.cmd-btn.danger {
+  grid-column: 1 / -1; border-color: var(--red); color: var(--red);
+  background: rgba(255,51,85,0.08); font-size: 13px; padding: 14px;
+  margin-top: 6px;
+}
+.cmd-btn.danger:hover { background: rgba(255,51,85,0.2); box-shadow: 0 0 20px rgba(255,51,85,0.2); }
+
+/* Sliders */
+.cmd-slider-group { margin: 8px 0; }
+.cmd-slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.cmd-slider-label { font-family: var(--font-label); font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.cmd-slider-value { font-family: var(--font-data); font-size: 13px; font-weight: 600; color: var(--text-bright); }
+.cmd-slider {
+  -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px;
+  background: var(--border); outline: none;
+}
+.cmd-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--cyan); cursor: pointer; box-shadow: 0 0 8px rgba(0,204,255,0.4);
+}
+.cmd-select {
+  width: 100%; padding: 8px 10px; font-family: var(--font-data); font-size: 12px;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text-bright); outline: none;
+}
+.cmd-select option { background: var(--panel); color: var(--text); }
+
+/* ============================================================
+   WAYPOINT TOOLBAR
+   ============================================================ */
+.waypoint-toolbar {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 500; display: flex; gap: 8px; padding: 8px 14px; align-items: center;
+  background: rgba(10,15,24,0.9); border: 1px solid var(--border);
+  border-radius: 8px; backdrop-filter: blur(10px);
+}
+.wp-btn {
+  font-family: var(--font-label); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.5px; padding: 6px 14px; border: 1px solid var(--border);
+  border-radius: 4px; background: transparent; color: var(--text); cursor: pointer;
+  transition: all 0.15s;
+}
+.wp-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.wp-btn.active { background: var(--cyan); color: #050810; border-color: var(--cyan); }
+.wp-btn.execute { border-color: var(--green); color: var(--green); }
+.wp-btn.execute:hover { background: rgba(0,255,136,0.15); }
+.wp-btn.clear { border-color: var(--red); color: var(--red); }
+.wp-btn.clear:hover { background: rgba(255,51,85,0.15); }
+.waypoint-marker {
+  width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--cyan);
+  background: rgba(0,204,255,0.2); color: var(--cyan); font-family: var(--font-data);
+  font-size: 11px; font-weight: 700; display: flex; align-items: center;
+  justify-content: center; box-shadow: 0 0 10px rgba(0,204,255,0.3);
+}
+
+/* ============================================================
+   REPLAY BAR
+   ============================================================ */
+.replay-bar {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 500; display: flex; align-items: center; gap: 12px; padding: 10px 18px;
+  background: rgba(10,15,24,0.9); border: 1px solid var(--border);
+  border-radius: 8px; backdrop-filter: blur(10px); min-width: 500px;
+}
+.replay-timeline {
+  flex: 1; -webkit-appearance: none; height: 4px; border-radius: 2px;
+  background: var(--border); outline: none;
+}
+.replay-timeline::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--amber); cursor: pointer;
+}
+.replay-timestamp { font-family: var(--font-data); font-size: 12px; color: var(--text-bright); min-width: 50px; }
+.replay-speed-btn {
+  font-family: var(--font-label); font-size: 10px; padding: 4px 8px;
+  border: 1px solid var(--border); border-radius: 3px; background: transparent;
+  color: var(--text-dim); cursor: pointer;
+}
+.replay-speed-btn.active, .replay-speed-btn:hover { color: var(--amber); border-color: var(--amber); }
+
+/* ============================================================
+   COMMAND TOAST
+   ============================================================ */
+.cmd-toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 3000;
+  padding: 10px 18px; border-radius: 6px; font-family: var(--font-label);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+  animation: toast-in 0.3s ease-out; border: 1px solid;
+  pointer-events: none;
+}
+.cmd-toast.success { background: rgba(0,255,136,0.12); border-color: rgba(0,255,136,0.3); color: var(--green); }
+.cmd-toast.warning { background: rgba(255,170,0,0.12); border-color: rgba(255,170,0,0.3); color: var(--amber); }
+.cmd-toast.error { background: rgba(255,51,85,0.12); border-color: rgba(255,51,85,0.3); color: var(--red); }
+@keyframes toast-in { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ============================================================
+   CONNECTION MODAL
+   ============================================================ */
+.connection-panel-backdrop { position: fixed; inset: 0; z-index: 1999; background: rgba(0,0,0,0.5); }
+.connection-panel {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 2000; width: 420px; background: var(--panel);
+  border: 1px solid var(--border-light); border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6); padding: 24px;
+}
+.conn-input {
+  width: 100%; padding: 8px 10px; font-family: var(--font-data); font-size: 12px;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text-bright); outline: none; margin-bottom: 8px; box-sizing: border-box;
+}
+.conn-input:focus { border-color: var(--cyan); }
+.conn-input:disabled { opacity: 0.4; }
+
+/* Extra drone status badges */
+.drone-status-badge.armed { background: rgba(0,204,255,0.12); color: var(--cyan); }
+.drone-status-badge.taking_off,.drone-status-badge.taking-off { background: rgba(0,204,255,0.12); color: var(--cyan); }
+.drone-status-badge.landing { background: rgba(255,170,0,0.15); color: var(--amber); }
+.drone-status-badge.rtl { background: rgba(170,85,255,0.15); color: var(--purple); }
+.drone-status-badge.landed,.drone-status-badge.idle { background: rgba(90,109,130,0.2); color: var(--text-dim); }
+.drone-status-badge.emergency { background: rgba(255,51,85,0.25); color: var(--red); animation: emergency-flash 0.5s infinite; }
+.drone-status-badge.goto { background: rgba(0,204,255,0.12); color: var(--cyan); }
+.drone-status-badge.mission { background: rgba(0,255,136,0.12); color: var(--green); }
+@keyframes emergency-flash { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* GOTO indicator */
+.goto-indicator {
+  position: absolute; top: 12px; right: 12px; z-index: 500;
+  background: rgba(10,15,24,0.85); border: 1px solid var(--cyan);
+  border-radius: 6px; padding: 8px 14px; backdrop-filter: blur(10px);
+}
+
+/* ============================================================
+   FPV / SOLO MODE
+   ============================================================ */
+.video-panel {
+  position: absolute; inset: 0; background: #000; overflow: hidden; z-index: 10;
+}
+.video-panel video, .video-panel img, .video-panel canvas {
+  width: 100%; height: 100%; object-fit: contain;
+}
+.video-panel.pip {
+  position: fixed; bottom: 160px; right: 336px;
+  width: 360px; height: 240px; z-index: 1500;
+  border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.8);
+}
+.video-panel.fullscreen { position: fixed; inset: 0; z-index: 2500; }
+.osd-overlay {
+  position: absolute; inset: 0; pointer-events: none;
+  font-family: var(--font-data); color: #fff;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.9), 0 0 4px rgba(0,0,0,0.5);
+}
+.osd-element { position: absolute; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.osd-warning {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 22px; font-weight: 700; color: var(--red);
+  animation: osd-blink 0.5s infinite;
+}
+@keyframes osd-blink { 50% { opacity: 0; } }
+.dvr-badge {
+  position: absolute; top: 8px; right: 8px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 12px;
+  background: rgba(255,51,85,0.85); color: #fff;
+  font-family: var(--font-label); font-size: 10px;
+  font-weight: 600; letter-spacing: 0.5px; z-index: 20;
+}
+.dvr-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: pulse-dot 1s infinite; }
+.video-controls {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  display: flex; align-items: center; padding: 6px 12px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.85)); gap: 6px; z-index: 15;
+}
+.tilt-slider-wrap {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 15;
+}
+.tilt-slider-wrap input[type="range"] {
+  writing-mode: vertical-lr; direction: rtl;
+  width: 6px; height: 160px; -webkit-appearance: none; appearance: none;
+  background: rgba(255,255,255,0.1); border-radius: 3px; outline: none;
+}
+.tilt-slider-wrap input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--cyan); cursor: pointer;
+}
+.quick-connect-btn {
+  font-family: var(--font-label); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.5px; padding: 5px 12px;
+  border: 1px solid var(--cyan); border-radius: 17px;
+  background: transparent; color: var(--cyan); cursor: pointer;
+  transition: all 0.2s;
+}
+.quick-connect-btn:hover { background: rgba(0,204,255,0.1); }
+.quick-connect-btn.scanning { animation: pulse-dot 1s infinite; }
+.fpv-mode-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+.fpv-mode-btn {
+  font-family: var(--font-label); font-size: 9px; font-weight: 600;
+  padding: 4px 8px; border: 1px solid var(--border); border-radius: 3px;
+  background: transparent; color: var(--text-dim); cursor: pointer;
+  letter-spacing: 0.5px; transition: all 0.15s;
+}
+.fpv-mode-btn.active { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.08); }
+.fpv-mode-btn:hover:not(.active) { border-color: var(--border-light); color: var(--text); }
+.fpv-telem-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+}
+.fpv-telem-cell {
+  padding: 6px 8px; background: rgba(255,255,255,0.02); border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.fpv-telem-label { font-family: var(--font-label); font-size: 8px; color: var(--text-dim); letter-spacing: 0.5px; text-transform: uppercase; }
+.fpv-telem-value { font-family: var(--font-data); font-size: 14px; color: var(--text-bright); margin-top: 2px; }
+.fpv-link-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.fpv-link-label { font-family: var(--font-label); font-size: 9px; color: var(--text-dim); }
+.fpv-link-value { font-family: var(--font-data); font-size: 11px; color: var(--text-bright); }
+.solo-only { display: none; }
+body[data-mode="SOLO"] .solo-only { display: block !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- ==================== TOP BAR ==================== -->
+  <div id="top-bar">
+    <div class="brand">NEXUS</div>
+    <div class="brand-sub">Swarm Telemetry v2.4</div>
+    <div class="mode-switch">
+      <button class="mode-btn active" data-mode="MONITOR">MONITOR</button>
+      <button class="mode-btn" data-mode="COMMAND">COMMAND</button>
+      <button class="mode-btn" data-mode="REPLAY">REPLAY</button>
+      <button class="mode-btn" data-mode="SOLO">SOLO FPV</button>
+    </div>
+    <button class="quick-connect-btn" id="quick-connect-btn" title="Scan & auto-connect to flight controller">QUICK CONNECT</button>
+    <div class="connection-badge sim" id="connection-badge" title="Click to configure connection">
+      <div class="connection-badge-dot"></div>
+      <span id="connection-label">SIM MODE</span>
+    </div>
+    <div class="live-indicator">
+      <div class="live-dot"></div>
+      <div class="live-label" id="live-label">SIM</div>
+    </div>
+    <div class="utc-clock" id="utc-clock">00:00:00Z</div>
+  </div>
+
+  <!-- ==================== MAIN AREA ==================== -->
+  <div id="main-area">
+    <!-- LEFT PANEL -->
+    <div id="left-panel">
+      <div class="panel-header">DRONE SWARM</div>
+      <div class="drone-list" id="drone-list"></div>
+    </div>
+
+    <!-- CENTER MAP -->
+    <div id="map-container">
+      <div id="map"></div>
+      <!-- FPV Video Panel -->
+      <div id="video-panel" class="video-panel" style="display:none">
+        <video id="fpv-video" autoplay muted playsinline style="display:none"></video>
+        <img id="fpv-mjpeg" style="display:none" alt="FPV Feed">
+        <canvas id="fpv-canvas" width="640" height="480"></canvas>
+        <!-- OSD Overlay -->
+        <div class="osd-overlay" id="osd-overlay">
+          <div class="osd-element" id="osd-battery" style="top:4%;left:2%"></div>
+          <div class="osd-element" id="osd-cell" style="top:8%;left:2%"></div>
+          <div class="osd-element" id="osd-mah" style="top:12%;left:2%"></div>
+          <div class="osd-element" id="osd-timer" style="top:4%;left:44%"></div>
+          <div class="osd-element" id="osd-arm-timer" style="top:8%;left:44%"></div>
+          <div class="osd-element" id="osd-gps" style="bottom:4%;left:2%"></div>
+          <div class="osd-element" id="osd-alt" style="top:45%;right:2%"></div>
+          <div class="osd-element" id="osd-speed" style="top:45%;left:2%"></div>
+          <div class="osd-element" id="osd-rssi" style="top:4%;right:2%"></div>
+          <div class="osd-element" id="osd-home" style="bottom:4%;left:44%"></div>
+          <div class="osd-element" id="osd-mode" style="bottom:4%;right:2%"></div>
+          <div class="osd-warning" id="osd-warning" style="display:none"></div>
+        </div>
+        <!-- DVR Badge -->
+        <div class="dvr-badge" id="dvr-badge" style="display:none">
+          <div class="dvr-dot"></div>
+          <span id="dvr-timer">REC 00:00</span>
+        </div>
+        <!-- Camera Tilt -->
+        <div class="tilt-slider-wrap" id="tilt-slider-wrap">
+          <span style="font-size:8px;color:var(--text-dim);font-family:var(--font-label);letter-spacing:0.5px">TILT</span>
+          <input type="range" id="camera-tilt" min="-90" max="30" value="0">
+          <span style="font-size:10px;color:var(--text-bright);font-family:var(--font-data)" id="tilt-value">0&deg;</span>
+        </div>
+        <!-- Video Controls Bar -->
+        <div class="video-controls">
+          <button class="wp-btn" id="video-fullscreen">FULL</button>
+          <button class="wp-btn" id="video-pip">PIP</button>
+          <button class="wp-btn" id="video-record" style="border-color:var(--red);color:var(--red)">REC</button>
+          <button class="wp-btn" id="video-photo">PHOTO</button>
+          <span style="flex:1"></span>
+          <select class="cmd-select" id="video-source" style="width:auto;min-width:120px;font-size:10px">
+            <option value="canvas">Test Pattern</option>
+            <option value="">No Video Source</option>
+          </select>
+        </div>
+      </div>
+      <div class="map-overlay" id="formation-overlay">
+        <div class="formation-label">V-FORMATION</div>
+        <div>
+          <span class="cohesion-value" id="cohesion-value">97</span><span class="cohesion-unit">% COHESION</span>
+        </div>
+      </div>
+      <!-- Waypoint toolbar (COMMAND mode) -->
+      <div class="waypoint-toolbar command-only" id="waypoint-toolbar">
+        <button class="wp-btn" id="wp-add-mode">+ WAYPOINT</button>
+        <button class="wp-btn" id="wp-loiter">LOITER</button>
+        <button class="wp-btn" id="wp-orbit">ORBIT</button>
+        <span style="font-family:var(--font-data);font-size:11px;color:var(--text-dim)" id="wp-count">0 waypoints</span>
+        <button class="wp-btn execute" id="wp-execute">EXECUTE MISSION</button>
+        <button class="wp-btn clear" id="wp-clear">CLEAR</button>
+      </div>
+      <!-- Replay bar (REPLAY mode) -->
+      <div class="replay-bar replay-only" id="replay-bar">
+        <button class="wp-btn" id="replay-play-btn">PLAY</button>
+        <button class="wp-btn" id="replay-pause-btn">PAUSE</button>
+        <span class="replay-timestamp" id="replay-time-current">00:00</span>
+        <input type="range" class="replay-timeline" id="replay-timeline" min="0" max="100" value="0">
+        <span class="replay-timestamp" id="replay-time-total">00:00</span>
+        <button class="replay-speed-btn" id="replay-speed-toggle">1x</button>
+      </div>
+      <!-- GOTO indicator -->
+      <div class="goto-indicator" id="goto-indicator" style="display:none">
+        <div style="font-family:var(--font-label);font-size:9px;color:var(--cyan);letter-spacing:1px;text-transform:uppercase">GOTO Target</div>
+        <div style="font-family:var(--font-data);font-size:12px;color:var(--text-bright)" id="goto-coords">Click map...</div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div id="right-panel">
+      <!-- MONITOR MODE -->
+      <div class="monitor-only">
+        <div class="panel-header" id="detail-header">DRONE DETAIL</div>
+        <div id="detail-content"><div class="no-selection">SELECT A DRONE</div></div>
+      </div>
+      <!-- COMMAND MODE -->
+      <div class="command-only cmd-panel">
+        <div class="panel-header">COMMAND CENTER</div>
+        <div class="cmd-section">
+          <div class="cmd-target-label">TARGET</div>
+          <div class="cmd-target-name" id="cmd-target">ALL DRONES</div>
+          <div style="font-family:var(--font-label);font-size:9px;color:var(--text-dim);margin-top:4px">Select a drone to target individually</div>
+        </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Safety</div>
+          <div class="cmd-btn-grid">
+            <button class="cmd-btn" id="cmd-arm">ARM</button>
+            <button class="cmd-btn" id="cmd-disarm">DISARM</button>
+          </div>
+          <button class="cmd-btn danger" id="cmd-estop">EMERGENCY STOP</button>
+        </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Flight</div>
+          <div class="cmd-slider-group">
+            <div class="cmd-slider-header">
+              <span class="cmd-slider-label">Takeoff Altitude</span>
+              <span class="cmd-slider-value" id="takeoff-alt-val">30m</span>
+            </div>
+            <input type="range" class="cmd-slider" id="takeoff-alt" min="5" max="120" value="30" step="1">
+          </div>
+          <div class="cmd-btn-grid">
+            <button class="cmd-btn" id="cmd-takeoff">TAKEOFF</button>
+            <button class="cmd-btn" id="cmd-land">LAND</button>
+            <button class="cmd-btn" id="cmd-rtl">RTL</button>
+            <button class="cmd-btn" id="cmd-goto">GOTO (MAP)</button>
+          </div>
+        </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Swarm Control</div>
+          <div class="cmd-slider-group">
+            <div class="cmd-slider-header"><span class="cmd-slider-label">Speed</span><span class="cmd-slider-value" id="speed-val">12 m/s</span></div>
+            <input type="range" class="cmd-slider" id="cmd-speed" min="1" max="20" value="12" step="0.5">
+          </div>
+          <div class="cmd-slider-group">
+            <div class="cmd-slider-header"><span class="cmd-slider-label">Altitude</span><span class="cmd-slider-value" id="alt-val">120m</span></div>
+            <input type="range" class="cmd-slider" id="cmd-altitude" min="5" max="200" value="120" step="1">
+          </div>
+          <div class="cmd-slider-group" style="margin-top:10px">
+            <div class="cmd-slider-label" style="margin-bottom:6px">Formation</div>
+            <select class="cmd-select" id="cmd-formation">
+              <option value="V_FORMATION">V-Formation</option>
+              <option value="LINE_ABREAST">Line Abreast</option>
+              <option value="COLUMN">Column</option>
+              <option value="DIAMOND">Diamond</option>
+              <option value="ORBIT">Orbit</option>
+              <option value="SCATTER">Scatter</option>
+            </select>
+          </div>
+        </div>
+        <div class="cmd-section" style="max-height:120px;overflow-y:auto">
+          <div class="cmd-section-title">Command Log</div>
+          <div id="cmd-log" style="font-size:10px;font-family:var(--font-data)"></div>
+        </div>
+      </div>
+      <!-- SOLO FPV MODE -->
+      <div class="solo-only cmd-panel" style="overflow-y:auto">
+        <div class="panel-header">FPV PILOT</div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Controls</div>
+          <div class="cmd-btn-grid">
+            <button class="cmd-btn" id="fpv-arm">ARM</button>
+            <button class="cmd-btn" id="fpv-disarm">DISARM</button>
+          </div>
+        </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Flight Mode</div>
+          <div class="fpv-mode-btns">
+            <button class="fpv-mode-btn" data-fmode="ANGLE">ANGLE</button>
+            <button class="fpv-mode-btn" data-fmode="HORIZON">HORIZON</button>
+            <button class="fpv-mode-btn active" data-fmode="ACRO">ACRO</button>
+            <button class="fpv-mode-btn" data-fmode="GPS_RESCUE">RESCUE</button>
+          </div>
+        </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Telemetry</div>
+          <div class="fpv-telem-grid" id="fpv-telem-grid">
+            <div class="fpv-telem-cell"><div class="fpv-telem-label">Battery</div><div class="fpv-telem-value" id="fpv-bat">--</div></div>
+            <div class="fpv-telem-cell"><div class="fpv-telem-label">Cell V</div><div class="fpv-telem-value" id="fpv-cell">--</div></div>
+            <div class="fpv-telem-cell"><div class="fpv-telem-label">Alt AGL</div><div class="fpv-telem-value" id="fpv-alt">--</div></div>
+            <div class="fpv-telem-cell"><div class="fpv-telem-label">Speed</div><div class="fpv-telem-value" id="fpv-spd">--</div></div>
+            <div class="fpv-telem-cell"><div class="fpv-telem-label">RSSI</div><div class="fpv-telem-value" id="fpv-rssi">--</div></div>
+            <div class="fpv-telem-cell"><div class="fpv-telem-label">mAh</div><div class="fpv-telem-value" id="fpv-mah">--</div></div>
+            <div class="fpv-telem-cell"><div class="fpv-telem-label">Home</div><div class="fpv-telem-value" id="fpv-home">--</div></div>
+            <div class="fpv-telem-cell"><div class="fpv-telem-label">Sats</div><div class="fpv-telem-value" id="fpv-sats">--</div></div>
+          </div>
+        </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Video Link</div>
+          <div id="fpv-link-info">
+            <div class="fpv-link-row"><span class="fpv-link-label">Quality</span><span class="fpv-link-value" id="fpv-vq">--</span></div>
+            <div class="fpv-link-row"><span class="fpv-link-label">Channel</span><span class="fpv-link-value" id="fpv-vch">--</span></div>
+            <div class="fpv-link-row"><span class="fpv-link-label">Frequency</span><span class="fpv-link-value" id="fpv-vfreq">--</span></div>
+            <div class="fpv-link-row"><span class="fpv-link-label">Protocol</span><span class="fpv-link-value" id="fpv-proto">--</span></div>
+          </div>
+        </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Shortcuts</div>
+          <div style="font-family:var(--font-label);font-size:9px;color:var(--text-dim);line-height:1.6">
+            F — Fullscreen &nbsp; R — Record<br>
+            P — Photo &nbsp; &uarr;&darr; — Tilt
+          </div>
+        </div>
+        <button class="cmd-btn danger" id="fpv-estop" style="margin:8px 12px">EMERGENCY STOP</button>
+      </div>
+      <!-- REPLAY MODE -->
+      <div class="replay-only cmd-panel">
+        <div class="panel-header">REPLAY</div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Session Info</div>
+          <div id="replay-info" style="font-family:var(--font-data);font-size:11px;color:var(--text)">Recording in progress...</div>
+        </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Playback Speed</div>
+          <div style="display:flex;gap:6px">
+            <button class="replay-speed-btn" data-speed="0.5">0.5x</button>
+            <button class="replay-speed-btn active" data-speed="1">1x</button>
+            <button class="replay-speed-btn" data-speed="2">2x</button>
+            <button class="replay-speed-btn" data-speed="4">4x</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== BOTTOM PANEL ==================== -->
+  <div id="bottom-panel">
+    <div class="bottom-metric">
+      <div class="bottom-metric-header">
+        <span class="bottom-metric-title">Swarm Health</span>
+      </div>
+      <div>
+        <span class="bottom-metric-value" id="bm-health">98</span><span class="bottom-metric-unit">%</span>
+      </div>
+      <canvas class="sparkline-canvas" id="spark-health"></canvas>
+    </div>
+    <div class="bottom-metric">
+      <div class="bottom-metric-header">
+        <span class="bottom-metric-title">Avg Altitude</span>
+      </div>
+      <div>
+        <span class="bottom-metric-value" id="bm-altitude">120.0</span><span class="bottom-metric-unit">m</span>
+      </div>
+      <div class="bottom-metric-sub" id="bm-alt-spread">Spread: 115.2 - 124.8m</div>
+      <canvas class="sparkline-canvas" id="spark-altitude"></canvas>
+    </div>
+    <div class="bottom-metric">
+      <div class="bottom-metric-header">
+        <span class="bottom-metric-title">Network Latency</span>
+        <span class="mesh-badge" id="mesh-badge">MESH OK</span>
+      </div>
+      <div>
+        <span class="bottom-metric-value" id="bm-latency">28</span><span class="bottom-metric-unit">ms</span>
+      </div>
+      <canvas class="sparkline-canvas" id="spark-latency"></canvas>
+    </div>
+    <div class="bottom-metric">
+      <div class="bottom-metric-header">
+        <span class="bottom-metric-title">Avg Battery</span>
+      </div>
+      <div>
+        <span class="bottom-metric-value" id="bm-battery">85</span><span class="bottom-metric-unit">%</span>
+      </div>
+      <div class="bottom-metric-sub" id="bm-bat-spread">Range: 75 - 95%</div>
+      <canvas class="sparkline-canvas" id="spark-battery"></canvas>
+    </div>
+    <div class="bottom-metric">
+      <div class="bottom-metric-header">
+        <span class="bottom-metric-title">Signal Quality</span>
+      </div>
+      <div>
+        <span class="bottom-metric-value" id="bm-signal">93</span><span class="bottom-metric-unit">%</span>
+      </div>
+      <div class="bottom-metric-sub" id="bm-sig-spread">RSSI: 85 dBm</div>
+      <canvas class="sparkline-canvas" id="spark-signal"></canvas>
+    </div>
+    <div class="event-log-section">
+      <div class="bottom-metric-header">
+        <span class="bottom-metric-title">Event Log</span>
+      </div>
+      <div class="event-log-list" id="event-log"></div>
+    </div>
+  </div>
+
+  <!-- Connection Modal -->
+  <div id="connection-modal" style="display:none">
+    <div class="connection-panel-backdrop" id="conn-modal-backdrop"></div>
+    <div class="connection-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <span style="font-family:var(--font-ui);font-size:14px;font-weight:600;color:var(--text-bright);letter-spacing:1px">DRONE CONNECTION</span>
+        <button id="conn-close" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px">&times;</button>
+      </div>
+      <div style="margin-bottom:16px">
+        <div class="cmd-section-title">WebSocket URL</div>
+        <input class="conn-input" id="conn-ws-url" placeholder="ws://localhost:8765" value="">
+        <div style="font-family:var(--font-label);font-size:9px;color:var(--text-dim)">Connect to NEXUS ground station or drone-simulator.js</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="cmd-btn" id="conn-connect" style="flex:1;border-color:var(--green);color:var(--green)">CONNECT</button>
+        <button class="cmd-btn" id="conn-disconnect" style="flex:1;border-color:var(--red);color:var(--red)" disabled>DISCONNECT</button>
+      </div>
+      <div id="conn-status" style="margin-top:12px;font-family:var(--font-data);font-size:11px;color:var(--text-dim);text-align:center">Not connected — simulation mode</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==============================================================
+   NEXUS DRONE SWARM TELEMETRY — SIMULATION & HUD ENGINE
+   ============================================================== */
+
+// ---- CONSTANTS ----
+const CENTER_LAT = 33.6405;
+const CENTER_LNG = -117.8443;
+const ORBIT_RADIUS = 0.0025; // degrees roughly 250m
+const TRAIL_LENGTH = 60;
+const SPARKLINE_POINTS = 60;
+const EVENT_INTERVAL_MIN = 3000;
+const EVENT_INTERVAL_MAX = 8000;
+const MAX_EVENTS = 80;
+
+// ---- FORMATION OFFSETS ----
+const FORMATION_OFFSETS = {
+  V_FORMATION: [{along:0,cross:0},{along:-1,cross:-1},{along:-1,cross:1},{along:-2,cross:-2},{along:-2,cross:2},{along:-3,cross:0}],
+  LINE_ABREAST: [{along:0,cross:0},{along:0,cross:-1},{along:0,cross:1},{along:0,cross:-2},{along:0,cross:2},{along:0,cross:-3}],
+  COLUMN: [{along:0,cross:0},{along:-1,cross:0},{along:-2,cross:0},{along:-3,cross:0},{along:-4,cross:0},{along:-5,cross:0}],
+  DIAMOND: [{along:0,cross:0},{along:-1,cross:-1},{along:-1,cross:1},{along:-2,cross:0},{along:-1,cross:-2},{along:-1,cross:2}],
+  ORBIT: null,
+  SCATTER: null,
+};
+
+const DRONE_STATES = {
+  IDLE:'IDLE', ARMED:'ARMED', TAKING_OFF:'TAKING_OFF', FLYING:'FLYING',
+  LANDING:'LANDING', LANDED:'LANDED', RTL:'RTL', EMERGENCY:'EMERGENCY',
+  GOTO:'GOTO', MISSION:'MISSION'
+};
+
+// ---- DRONE DEFINITIONS ----
+const DRONE_DEFS = [
+  { id: 'ALPHA-1',   color: '#00ff88', rgb: '0,255,136', role: 'LEADER',  formationOffset: { along: 0, cross: 0 } },
+  { id: 'BRAVO-2',   color: '#3388ff', rgb: '51,136,255', role: 'WINGMAN', formationOffset: { along: -1, cross: -1 } },
+  { id: 'CHARLIE-3', color: '#ffaa00', rgb: '255,170,0',  role: 'RECON',   formationOffset: { along: -1, cross: 1 } },
+  { id: 'DELTA-4',   color: '#ff3355', rgb: '255,51,85',  role: 'WINGMAN', formationOffset: { along: -2, cross: -2 } },
+  { id: 'ECHO-5',    color: '#00ccff', rgb: '0,204,255',  role: 'SUPPORT', formationOffset: { along: -2, cross: 2 } },
+  { id: 'FOXTROT-6', color: '#aa55ff', rgb: '170,85,255', role: 'TAIL',    formationOffset: { along: -3, cross: 0 } },
+];
+
+// ---- UTILITY ----
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rand(lo, hi) { return lo + Math.random() * (hi - lo); }
+function randInt(lo, hi) { return Math.floor(rand(lo, hi + 1)); }
+function padZ(n, d) { return String(n).padStart(d, '0'); }
+function degToRad(d) { return d * Math.PI / 180; }
+function radToDeg(r) { return r * 180 / Math.PI; }
+
+function utcString() {
+  const d = new Date();
+  return padZ(d.getUTCHours(), 2) + ':' + padZ(d.getUTCMinutes(), 2) + ':' + padZ(d.getUTCSeconds(), 2) + 'Z';
+}
+
+function utcTimeStamp() {
+  const d = new Date();
+  return padZ(d.getUTCHours(), 2) + ':' + padZ(d.getUTCMinutes(), 2) + ':' + padZ(d.getUTCSeconds(), 2);
+}
+
+function batteryColor(pct) {
+  if (pct > 50) return '#00ff88';
+  if (pct > 25) return '#ffaa00';
+  return '#ff3355';
+}
+
+function rssiColor(v) {
+  if (v > 80) return '#00ff88';
+  if (v > 50) return '#ffaa00';
+  return '#ff3355';
+}
+
+/* ==============================================================
+   DRONE SIMULATOR
+   ============================================================== */
+class DroneSimulator {
+  constructor(def, index) {
+    this.id = def.id;
+    this.color = def.color;
+    this.rgb = def.rgb;
+    this.role = def.role;
+    this.formationOffset = def.formationOffset;
+    this.index = index;
+
+    // Orbital phase offset
+    this.phaseOffset = index * 0.05;
+    this.altPhaseOffset = index * 1.1;
+
+    // State
+    this.lat = CENTER_LAT;
+    this.lng = CENTER_LNG;
+    this.heading = 0;
+    this.altitude = rand(118, 125);
+    this.speed = rand(10, 13);
+    this.verticalSpeed = 0;
+    this.roll = 0;
+    this.pitch = 0;
+    this.yaw = 0;
+    this.battery = rand(75, 100);
+    this.voltage = rand(22.0, 24.8);
+    this.current = rand(8, 16);
+    this.satellites = randInt(13, 16);
+    this.hdop = rand(0.6, 1.0);
+    this.rssi = rand(82, 95);
+    this.linkQuality = rand(90, 100);
+    this.latency = rand(18, 35);
+    this.temperature = rand(40, 48);
+    this.status = 'ACTIVE';
+
+    // Trail history
+    this.trail = [];
+
+    // Internal sim time
+    this.t = rand(0, Math.PI * 2);
+
+    // Command state machine
+    this.droneState = DRONE_STATES.FLYING;
+    this.armed = true;
+    this.targetAltitude = 120;
+    this.targetSpeed = 12;
+    this.targetLat = null;
+    this.targetLng = null;
+    this.homePosition = { lat: CENTER_LAT, lng: CENTER_LNG };
+    this.missionWaypoints = [];
+    this.missionIndex = 0;
+    this.isLive = false;
+
+    // FPV extensions
+    this.fpvData = {
+      flight_mode: 'ANGLE',
+      camera_tilt: 0,
+      mah_consumed: 0,
+      cell_voltage: (this.voltage / 6),
+      flight_timer_s: 0,
+      arm_timer_s: 0,
+      home_distance_m: 0,
+      home_direction_deg: 0,
+      video_link: { quality: 95, channel: 1 + index, frequency_mhz: 5740 + index * 20, recording: false, system: 'Simulation' },
+      protocol: 'MAVLINK',
+    };
+  }
+
+  _flyFormation(dt, leaderHeading, leaderLat, leaderLng) {
+    if (this.role === 'LEADER') {
+      this.lat = CENTER_LAT + Math.cos(this.t) * ORBIT_RADIUS;
+      this.lng = CENTER_LNG + Math.sin(this.t) * ORBIT_RADIUS * 1.3;
+      this.heading = radToDeg(Math.atan2(
+        Math.cos(this.t) * ORBIT_RADIUS * 1.3,
+        -Math.sin(this.t) * ORBIT_RADIUS
+      ));
+      if (this.heading < 0) this.heading += 360;
+    } else {
+      const hr = degToRad(leaderHeading);
+      const spacing = 0.00035;
+      const alongDir = { lat: Math.cos(hr + Math.PI / 2), lng: Math.sin(hr + Math.PI / 2) };
+      const crossDir = { lat: -Math.sin(hr + Math.PI / 2), lng: Math.cos(hr + Math.PI / 2) };
+      const tLat = leaderLat + this.formationOffset.along * spacing * alongDir.lat + this.formationOffset.cross * spacing * crossDir.lat;
+      const tLng = leaderLng + this.formationOffset.along * spacing * alongDir.lng + this.formationOffset.cross * spacing * crossDir.lng;
+      this.lat = lerp(this.lat, tLat, 0.08);
+      this.lng = lerp(this.lng, tLng, 0.08);
+      this.heading = leaderHeading + Math.sin(this.t * 0.7 + this.index) * 3;
+      if (this.heading < 0) this.heading += 360;
+      if (this.heading >= 360) this.heading -= 360;
+    }
+    const prevAlt = this.altitude;
+    this.altitude = this.targetAltitude + Math.sin(this.t * 0.5 + this.altPhaseOffset) * 5;
+    this.verticalSpeed = (this.altitude - prevAlt) / dt;
+    this.roll = Math.sin(this.t * 1.3 + this.index * 0.7) * 8;
+    this.pitch = Math.sin(this.t * 0.9 + this.index * 1.2) * 3;
+    this.yaw = this.heading;
+    this.speed = this.targetSpeed + Math.sin(this.t * 0.4 + this.index) * 2;
+  }
+
+  _flyToward(targetLat, targetLng, dt) {
+    const dLat = targetLat - this.lat;
+    const dLng = targetLng - this.lng;
+    const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+    if (dist < 0.00005) return true; // arrived (~5m)
+    const step = Math.min(dist, this.targetSpeed * dt / 111320);
+    this.lat += (dLat / dist) * step;
+    this.lng += (dLng / dist) * step;
+    this.heading = radToDeg(Math.atan2(dLng, dLat));
+    if (this.heading < 0) this.heading += 360;
+    this.yaw = this.heading;
+    this.roll = Math.sin(this.t * 1.3) * 4;
+    this.pitch = Math.sin(this.t * 0.9) * 2;
+    this.speed = this.targetSpeed;
+    return false;
+  }
+
+  update(dt, leaderHeading, leaderLat, leaderLng) {
+    if (this.isLive) return; // skip sim for live drones
+    this.t += dt * 0.3;
+
+    switch (this.droneState) {
+      case DRONE_STATES.IDLE:
+      case DRONE_STATES.LANDED:
+        this.speed = 0; this.verticalSpeed = 0; this.roll = 0; this.pitch = 0;
+        break;
+
+      case DRONE_STATES.ARMED:
+        this.speed = 0; this.verticalSpeed = 0; this.roll = 0; this.pitch = 0;
+        break;
+
+      case DRONE_STATES.TAKING_OFF:
+        this.speed = 0;
+        this.verticalSpeed = 2;
+        this.altitude += 2 * dt;
+        this.roll = 0; this.pitch = 0;
+        if (this.altitude >= this.targetAltitude) {
+          this.altitude = this.targetAltitude;
+          this.droneState = DRONE_STATES.FLYING;
+          this.verticalSpeed = 0;
+        }
+        break;
+
+      case DRONE_STATES.FLYING:
+        this._flyFormation(dt, leaderHeading, leaderLat, leaderLng);
+        break;
+
+      case DRONE_STATES.GOTO:
+        if (this.role === 'LEADER') {
+          const arrived = this._flyToward(this.targetLat, this.targetLng, dt);
+          if (arrived) this.droneState = DRONE_STATES.FLYING;
+        } else {
+          this._flyFormation(dt, leaderHeading, leaderLat, leaderLng);
+        }
+        this.altitude = this.targetAltitude + Math.sin(this.t * 0.5) * 2;
+        this.verticalSpeed = Math.cos(this.t * 0.5) * 0.3;
+        break;
+
+      case DRONE_STATES.MISSION:
+        if (this.role === 'LEADER') {
+          if (this.missionIndex < this.missionWaypoints.length) {
+            const wp = this.missionWaypoints[this.missionIndex];
+            const arrived = this._flyToward(wp.lat, wp.lng, dt);
+            if (arrived) this.missionIndex++;
+          } else {
+            this.droneState = DRONE_STATES.FLYING;
+            this.missionIndex = 0;
+          }
+        } else {
+          this._flyFormation(dt, leaderHeading, leaderLat, leaderLng);
+        }
+        this.altitude = this.targetAltitude + Math.sin(this.t * 0.5) * 2;
+        this.verticalSpeed = Math.cos(this.t * 0.5) * 0.3;
+        break;
+
+      case DRONE_STATES.LANDING:
+        this.verticalSpeed = -1.5;
+        this.altitude = Math.max(0, this.altitude - 1.5 * dt);
+        this.speed = Math.max(0, this.speed - 2 * dt);
+        this.roll = 0; this.pitch = 0;
+        if (this.altitude <= 0.5) {
+          this.altitude = 0; this.droneState = DRONE_STATES.LANDED;
+          this.armed = false; this.verticalSpeed = 0; this.speed = 0;
+        }
+        break;
+
+      case DRONE_STATES.RTL:
+        if (this._flyToward(this.homePosition.lat, this.homePosition.lng, dt)) {
+          this.droneState = DRONE_STATES.LANDING;
+        }
+        this.altitude = this.targetAltitude + Math.sin(this.t * 0.3) * 2;
+        this.verticalSpeed = Math.cos(this.t * 0.3) * 0.3;
+        break;
+
+      case DRONE_STATES.EMERGENCY:
+        this.verticalSpeed = -5;
+        this.altitude = Math.max(0, this.altitude - 5 * dt);
+        this.speed = Math.max(0, this.speed - 5 * dt);
+        this.roll = rand(-15, 15); this.pitch = rand(-10, 10);
+        if (this.altitude <= 0) {
+          this.altitude = 0; this.droneState = DRONE_STATES.LANDED;
+          this.armed = false; this.verticalSpeed = 0; this.speed = 0;
+        }
+        break;
+    }
+
+    // Common sensor updates for airborne states
+    const airborne = [DRONE_STATES.FLYING, DRONE_STATES.GOTO, DRONE_STATES.MISSION,
+                      DRONE_STATES.RTL, DRONE_STATES.TAKING_OFF, DRONE_STATES.LANDING];
+    if (airborne.includes(this.droneState)) {
+      this.battery = Math.max(0, this.battery - 0.01 * dt);
+      this.voltage = 16 + this.battery * 0.09 + Math.sin(this.t) * 0.1;
+      this.current = 10 + Math.sin(this.t * 0.3) * 4;
+      this.satellites = clamp(Math.round(14 + Math.sin(this.t * 0.2 + this.index) * 2), 12, 16);
+      this.hdop = clamp(0.8 + Math.sin(this.t * 0.15 + this.index) * 0.3, 0.6, 1.2);
+      this.rssi = clamp(85 + Math.sin(this.t * 0.6 + this.index * 2) * 10 + rand(-2, 2), 55, 95);
+      this.linkQuality = clamp(93 + Math.sin(this.t * 0.25 + this.index) * 5 + rand(-1, 1), 85, 100);
+      this.latency = clamp(28 + Math.sin(this.t * 0.35 + this.index) * 12 + rand(-3, 3), 15, 45);
+      this.temperature = clamp(44 + Math.sin(this.t * 0.18 + this.index * 0.5) * 6 + rand(-1, 1), 38, 52);
+    }
+
+    // Status derivation
+    const activeStates = [DRONE_STATES.FLYING, DRONE_STATES.GOTO, DRONE_STATES.MISSION];
+    if (activeStates.includes(this.droneState)) {
+      if (this.battery < 25) this.status = 'LOW_BATT';
+      else if (this.rssi < 60) this.status = 'WEAK_SIGNAL';
+      else this.status = 'ACTIVE';
+    } else {
+      this.status = this.droneState;
+    }
+
+    // Trail (only when airborne)
+    if (this.altitude > 1) {
+      this.trail.push({ lat: this.lat, lng: this.lng });
+      if (this.trail.length > TRAIL_LENGTH) this.trail.shift();
+    }
+  }
+}
+
+/* ==============================================================
+   TOAST NOTIFICATION
+   ============================================================== */
+function showToast(msg, type) {
+  type = type || 'success';
+  const el = document.createElement('div');
+  el.className = 'cmd-toast ' + type;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; }, 2000);
+  setTimeout(() => el.remove(), 2400);
+}
+
+/* ==============================================================
+   COMMAND ENGINE
+   ============================================================== */
+class CommandEngine {
+  constructor(drones, eventCallback) {
+    this.drones = drones;
+    this.addEvent = eventCallback;
+    this.log = [];
+    this.connectionManager = null;
+  }
+
+  execute(cmd, params) {
+    params = params || {};
+    const targets = params.droneId ? this.drones.filter(d => d.id === params.droneId) : this.drones;
+    const targetLabel = params.droneId || 'ALL';
+
+    switch (cmd) {
+      case 'ARM':
+        targets.forEach(d => { d.armed = true; d.droneState = DRONE_STATES.ARMED; d.altitude = 0; d.speed = 0; });
+        this._logCmd('ARM', targetLabel);
+        showToast('ARMED — ' + targetLabel);
+        break;
+
+      case 'DISARM':
+        targets.forEach(d => { d.armed = false; d.droneState = DRONE_STATES.IDLE; d.speed = 0; });
+        this._logCmd('DISARM', targetLabel);
+        showToast('DISARMED — ' + targetLabel);
+        break;
+
+      case 'TAKEOFF':
+        const alt = params.altitude || 30;
+        targets.forEach(d => {
+          if (!d.armed) { d.armed = true; }
+          d.targetAltitude = alt;
+          d.droneState = DRONE_STATES.TAKING_OFF;
+          d.altitude = d.altitude || 0.5;
+        });
+        this._logCmd('TAKEOFF ' + alt + 'm', targetLabel);
+        showToast('TAKEOFF ' + alt + 'm — ' + targetLabel);
+        break;
+
+      case 'LAND':
+        targets.forEach(d => { d.droneState = DRONE_STATES.LANDING; });
+        this._logCmd('LAND', targetLabel);
+        showToast('LANDING — ' + targetLabel);
+        break;
+
+      case 'RTL':
+        targets.forEach(d => { d.droneState = DRONE_STATES.RTL; });
+        this._logCmd('RTL', targetLabel);
+        showToast('RTL — ' + targetLabel, 'warning');
+        break;
+
+      case 'GOTO':
+        this.drones.forEach(d => {
+          d.targetLat = params.lat;
+          d.targetLng = params.lng;
+          d.droneState = DRONE_STATES.GOTO;
+        });
+        this._logCmd('GOTO ' + params.lat.toFixed(5) + ',' + params.lng.toFixed(5), 'ALL');
+        showToast('GOTO — navigating to target');
+        break;
+
+      case 'SET_FORMATION':
+        const offsets = FORMATION_OFFSETS[params.formation];
+        if (offsets) {
+          this.drones.forEach((d, i) => { d.formationOffset = offsets[i] || { along: 0, cross: 0 }; });
+        }
+        this._logCmd('FORMATION ' + params.formation.replace('_', ' '), 'ALL');
+        showToast('Formation: ' + params.formation.replace(/_/g, ' '));
+        const label = document.querySelector('.formation-label');
+        if (label) label.textContent = params.formation.replace(/_/g, '-');
+        break;
+
+      case 'SET_SPEED':
+        targets.forEach(d => { d.targetSpeed = params.speed; });
+        this._logCmd('SPEED ' + params.speed + ' m/s', targetLabel);
+        break;
+
+      case 'SET_ALTITUDE':
+        targets.forEach(d => { d.targetAltitude = params.altitude; });
+        this._logCmd('ALT ' + params.altitude + 'm', targetLabel);
+        break;
+
+      case 'EMERGENCY_STOP':
+        this.drones.forEach(d => { d.droneState = DRONE_STATES.EMERGENCY; });
+        this._logCmd('EMERGENCY STOP', 'ALL');
+        showToast('EMERGENCY STOP — ALL DRONES', 'error');
+        break;
+
+      case 'EXECUTE_MISSION':
+        const leader = this.drones[0];
+        leader.missionWaypoints = params.waypoints || [];
+        leader.missionIndex = 0;
+        this.drones.forEach(d => { d.droneState = DRONE_STATES.MISSION; });
+        this._logCmd('MISSION ' + (params.waypoints || []).length + ' waypoints', 'ALL');
+        showToast('Mission started — ' + (params.waypoints || []).length + ' waypoints');
+        break;
+    }
+
+    // Send over WebSocket if connected
+    if (this.connectionManager && this.connectionManager.ws) {
+      try {
+        this.connectionManager.ws.send(JSON.stringify({ type: 'CMD', command: cmd, params: params }));
+      } catch (e) { /* ignore send errors */ }
+    }
+
+    this.addEvent({ time: utcTimeStamp(), source: 'CMD', msg: cmd + ' → ' + targetLabel, severity: 'info' });
+  }
+
+  _logCmd(text, target) {
+    this.log.unshift({ time: utcTimeStamp(), text: text, target: target });
+    if (this.log.length > 20) this.log.pop();
+    this._renderLog();
+  }
+
+  _renderLog() {
+    const el = document.getElementById('cmd-log');
+    if (!el) return;
+    el.innerHTML = this.log.slice(0, 5).map(e =>
+      '<div style="padding:3px 0;border-bottom:1px solid var(--border);color:var(--text-dim)">' +
+      '<span style="color:var(--text)">' + e.time + '</span> ' + e.text + ' → ' + e.target + '</div>'
+    ).join('');
+  }
+}
+
+/* ==============================================================
+   WAYPOINT MANAGER
+   ============================================================== */
+class WaypointManager {
+  constructor(mapInstance) {
+    this.map = mapInstance;
+    this.waypoints = [];
+    this.markers = [];
+    this.polyline = null;
+    this.addMode = false;
+    this.wpType = 'GOTO';
+  }
+
+  toggleAddMode() {
+    this.addMode = !this.addMode;
+    const btn = document.getElementById('wp-add-mode');
+    if (btn) {
+      btn.style.borderColor = this.addMode ? 'var(--cyan)' : '';
+      btn.style.color = this.addMode ? 'var(--cyan)' : '';
+    }
+    this.map.getContainer().style.cursor = this.addMode ? 'crosshair' : '';
+  }
+
+  setType(type) { this.wpType = type; }
+
+  addWaypoint(lat, lng) {
+    if (!this.addMode) return;
+    const idx = this.waypoints.length + 1;
+    const wp = { lat, lng, type: this.wpType, index: idx };
+    this.waypoints.push(wp);
+
+    const marker = L.circleMarker([lat, lng], {
+      radius: 10, color: '#00ccff', fillColor: '#00ccff', fillOpacity: 0.3, weight: 2,
+    }).addTo(this.map);
+    marker.bindTooltip('WP' + idx + ' ' + this.wpType, { permanent: true, direction: 'top', offset: [0, -10], className: 'drone-tooltip' });
+    this.markers.push(marker);
+
+    this._updatePolyline();
+    this._updateCount();
+  }
+
+  _updatePolyline() {
+    if (this.polyline) this.map.removeLayer(this.polyline);
+    if (this.waypoints.length > 1) {
+      this.polyline = L.polyline(
+        this.waypoints.map(w => [w.lat, w.lng]),
+        { color: '#00ccff', weight: 2, opacity: 0.6, dashArray: '8, 8' }
+      ).addTo(this.map);
+    }
+  }
+
+  _updateCount() {
+    const el = document.getElementById('wp-count');
+    if (el) el.textContent = this.waypoints.length + ' waypoint' + (this.waypoints.length !== 1 ? 's' : '');
+  }
+
+  clear() {
+    this.markers.forEach(m => this.map.removeLayer(m));
+    if (this.polyline) this.map.removeLayer(this.polyline);
+    this.waypoints = [];
+    this.markers = [];
+    this.polyline = null;
+    this._updateCount();
+    if (this.addMode) this.toggleAddMode();
+  }
+
+  getWaypoints() {
+    return this.waypoints.map(w => ({ lat: w.lat, lng: w.lng }));
+  }
+}
+
+/* ==============================================================
+   CONNECTION MANAGER
+   ============================================================== */
+class ConnectionManager {
+  constructor(drones) {
+    this.drones = drones;
+    this.ws = null;
+    this.connected = false;
+    this.reconnectTimer = null;
+  }
+
+  connect(url) {
+    if (this.ws) this.disconnect();
+    try {
+      this.ws = new WebSocket(url);
+    } catch (e) {
+      this._updateUI(false, 'Connection failed');
+      return;
+    }
+
+    this.ws.onopen = () => {
+      this.connected = true;
+      this._updateUI(true, 'Connected to ' + url);
+      showToast('Connected to drone system');
+    };
+
+    this.ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const packets = Array.isArray(data) ? data : [data];
+        packets.forEach(p => {
+          if (!p.drone_id) return;
+          const drone = this.drones.find(d => d.id === p.drone_id);
+          if (drone) {
+            drone.isLive = true;
+            if (p.position) { drone.lat = p.position.lat; drone.lng = p.position.lon; }
+            if (p.attitude) { drone.roll = p.attitude.roll; drone.pitch = p.attitude.pitch; drone.yaw = p.attitude.yaw; }
+            if (p.velocity) { drone.speed = p.velocity.ground_speed; drone.heading = p.velocity.heading; drone.verticalSpeed = p.velocity.vertical_speed; }
+            if (p.battery) { drone.battery = p.battery.remaining_pct; drone.voltage = p.battery.voltage; drone.current = p.battery.current; }
+            if (p.gps) { drone.satellites = p.gps.satellites; drone.hdop = p.gps.hdop; }
+            if (p.link) { drone.rssi = p.link.rssi; drone.linkQuality = p.link.quality; drone.latency = p.link.latency_ms; }
+            if (p.status) drone.status = p.status;
+            if (p.position && p.position.alt_agl !== undefined) drone.altitude = p.position.alt_agl;
+            if (p.fpv) drone.fpvData = p.fpv;
+          }
+        });
+      } catch (e) { /* ignore parse errors */ }
+    };
+
+    this.ws.onclose = () => {
+      this.connected = false;
+      this.drones.forEach(d => { d.isLive = false; });
+      this._updateUI(false, 'Disconnected — simulation mode');
+      this.reconnectTimer = setTimeout(() => this.connect(url), 3000);
+    };
+
+    this.ws.onerror = () => {
+      this._updateUI(false, 'Connection error');
+    };
+  }
+
+  disconnect() {
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
+    if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; }
+    this.connected = false;
+    this.drones.forEach(d => { d.isLive = false; });
+    this._updateUI(false, 'Disconnected — simulation mode');
+  }
+
+  _updateUI(connected, statusText) {
+    const badge = document.getElementById('connection-badge');
+    const label = document.getElementById('connection-label');
+    const liveLabel = document.getElementById('live-label');
+    const statusEl = document.getElementById('conn-status');
+    const connectBtn = document.getElementById('conn-connect');
+    const disconnectBtn = document.getElementById('conn-disconnect');
+    const urlInput = document.getElementById('conn-ws-url');
+
+    if (badge) badge.className = 'connection-badge ' + (connected ? 'live' : 'sim');
+    if (label) label.textContent = connected ? 'LIVE' : 'SIM MODE';
+    if (liveLabel) liveLabel.textContent = connected ? 'LIVE' : 'SIM';
+    if (statusEl) statusEl.textContent = statusText || '';
+    if (connectBtn) connectBtn.disabled = connected;
+    if (disconnectBtn) disconnectBtn.disabled = !connected;
+    if (urlInput) urlInput.disabled = connected;
+  }
+}
+
+/* ==============================================================
+   REPLAY SYSTEM
+   ============================================================== */
+class ReplaySystem {
+  constructor(drones) {
+    this.drones = drones;
+    this.frames = [];
+    this.recording = true;
+    this.playing = false;
+    this.playIndex = 0;
+    this.playSpeed = 1;
+    this.recordInterval = 100; // ms
+    this.lastRecordTime = 0;
+  }
+
+  recordFrame(now) {
+    if (!this.recording || this.playing) return;
+    if (now - this.lastRecordTime < this.recordInterval) return;
+    this.lastRecordTime = now;
+    const snapshot = this.drones.map(d => ({
+      id: d.id, lat: d.lat, lng: d.lng, heading: d.heading, altitude: d.altitude,
+      speed: d.speed, battery: d.battery, status: d.status, roll: d.roll, pitch: d.pitch,
+      yaw: d.yaw, verticalSpeed: d.verticalSpeed, droneState: d.droneState,
+    }));
+    this.frames.push(snapshot);
+  }
+
+  play() {
+    if (this.frames.length === 0) return;
+    this.playing = true;
+    this.recording = false;
+    this.playIndex = 0;
+    this._updateUI();
+  }
+
+  pause() { this.playing = false; this._updateUI(); }
+  stop() { this.playing = false; this.playIndex = 0; this.recording = true; this._updateUI(); }
+
+  setSpeed(s) { this.playSpeed = s; }
+
+  seek(pct) {
+    this.playIndex = Math.floor((pct / 100) * (this.frames.length - 1));
+    this._applyFrame();
+  }
+
+  tick() {
+    if (!this.playing || this.frames.length === 0) return;
+    this.playIndex += this.playSpeed;
+    if (this.playIndex >= this.frames.length) { this.playIndex = this.frames.length - 1; this.pause(); }
+    this._applyFrame();
+    this._updateUI();
+  }
+
+  _applyFrame() {
+    const frame = this.frames[Math.floor(this.playIndex)];
+    if (!frame) return;
+    frame.forEach(snap => {
+      const drone = this.drones.find(d => d.id === snap.id);
+      if (!drone) return;
+      Object.assign(drone, { lat: snap.lat, lng: snap.lng, heading: snap.heading, altitude: snap.altitude,
+        speed: snap.speed, battery: snap.battery, status: snap.status, roll: snap.roll, pitch: snap.pitch,
+        yaw: snap.yaw, verticalSpeed: snap.verticalSpeed });
+    });
+  }
+
+  _updateUI() {
+    const timeline = document.getElementById('replay-timeline');
+    const cur = document.getElementById('replay-time-current');
+    const total = document.getElementById('replay-time-total');
+    const info = document.getElementById('replay-info');
+    if (timeline && this.frames.length > 0) {
+      timeline.max = this.frames.length - 1;
+      timeline.value = Math.floor(this.playIndex);
+    }
+    const curSec = Math.floor(this.playIndex * this.recordInterval / 1000);
+    const totalSec = Math.floor(this.frames.length * this.recordInterval / 1000);
+    if (cur) cur.textContent = Math.floor(curSec / 60) + ':' + String(curSec % 60).padStart(2, '0');
+    if (total) total.textContent = Math.floor(totalSec / 60) + ':' + String(totalSec % 60).padStart(2, '0');
+    if (info) info.textContent = this.frames.length + ' frames / ' + totalSec + 's — ' + (this.playing ? 'Playing' : this.recording ? 'Recording' : 'Paused');
+  }
+}
+
+/* ==============================================================
+   EVENT GENERATOR
+   ============================================================== */
+const EVENT_TEMPLATES = [
+  { msg: 'Waypoint {n} reached', source: null, severity: 'ok' },
+  { msg: 'Obstacle avoidance engaged', source: null, severity: 'warn' },
+  { msg: 'Wind compensation: {w}m/s {dir}', source: null, severity: 'info' },
+  { msg: 'Sensor calibration complete', source: null, severity: 'ok' },
+  { msg: 'LIDAR sweep complete', source: null, severity: 'info' },
+  { msg: 'Altitude hold adjusted', source: null, severity: 'info' },
+  { msg: 'Formation position corrected', source: null, severity: 'info' },
+  { msg: 'Mesh route optimized', source: 'MESH', severity: 'ok' },
+  { msg: 'Link quality restored', source: 'MESH', severity: 'ok' },
+  { msg: 'Peer handoff complete', source: 'MESH', severity: 'info' },
+  { msg: 'Navigation update applied', source: 'NAV', severity: 'info' },
+  { msg: 'GPS multipath correction', source: 'NAV', severity: 'info' },
+  { msg: 'Geofence check passed', source: 'NAV', severity: 'ok' },
+  { msg: 'Swarm cohesion nominal', source: 'NEXUS', severity: 'ok' },
+  { msg: 'Telemetry snapshot archived', source: 'NEXUS', severity: 'info' },
+  { msg: 'Formation adjusted', source: 'NEXUS', severity: 'info' },
+  { msg: 'Battery management optimized', source: 'NEXUS', severity: 'info' },
+  { msg: 'Thermal updraft detected', source: null, severity: 'info' },
+  { msg: 'Barometric pressure shift', source: null, severity: 'warn' },
+  { msg: 'RF environment scan complete', source: 'MESH', severity: 'ok' },
+];
+
+const WIND_DIRS = ['N', 'NE', 'NW', 'S', 'SE', 'SW', 'E', 'W'];
+
+function generateEvent(drones) {
+  const tpl = EVENT_TEMPLATES[randInt(0, EVENT_TEMPLATES.length - 1)];
+  let source = tpl.source;
+  if (!source) {
+    source = drones[randInt(0, drones.length - 1)].id;
+  }
+  let msg = tpl.msg;
+  msg = msg.replace('{n}', randInt(1, 12));
+  msg = msg.replace('{w}', (rand(1, 6)).toFixed(1));
+  msg = msg.replace('{dir}', WIND_DIRS[randInt(0, WIND_DIRS.length - 1)]);
+  return { time: utcTimeStamp(), source, msg, severity: tpl.severity };
+}
+
+/* ==============================================================
+   SPARKLINE RENDERER
+   ============================================================== */
+class Sparkline {
+  constructor(canvasId, color, maxVal) {
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.color = color;
+    this.maxVal = maxVal || 100;
+    this.data = [];
+  }
+
+  push(val) {
+    this.data.push(val);
+    if (this.data.length > SPARKLINE_POINTS) this.data.shift();
+  }
+
+  draw() {
+    const c = this.canvas;
+    const ctx = this.ctx;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = c.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    c.width = w * dpr;
+    c.height = h * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    if (this.data.length < 2) return;
+
+    const n = this.data.length;
+    const stepX = w / (SPARKLINE_POINTS - 1);
+    const padding = 2;
+    const plotH = h - padding * 2;
+
+    // Find data range for local scaling
+    let minV = Infinity, maxV = -Infinity;
+    for (let i = 0; i < n; i++) {
+      if (this.data[i] < minV) minV = this.data[i];
+      if (this.data[i] > maxV) maxV = this.data[i];
+    }
+    const range = maxV - minV || 1;
+
+    const startX = (SPARKLINE_POINTS - n) * stepX;
+
+    // Build path
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const x = startX + i * stepX;
+      const y = padding + plotH - ((this.data[i] - minV) / range) * plotH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+
+    // Stroke
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, this.color + '30');
+    grad.addColorStop(1, this.color + '00');
+    ctx.lineTo(startX + (n - 1) * stepX, h);
+    ctx.lineTo(startX, h);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+}
+
+/* ==============================================================
+   LEAFLET MAP SETUP
+   ============================================================== */
+let map, mapMarkers = {}, mapTrails = {}, formationLines = [], selectedDroneId = null;
+
+function initMap() {
+  map = L.map('map', {
+    center: [CENTER_LAT, CENTER_LNG],
+    zoom: 16,
+    zoomControl: true,
+    attributionControl: true,
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; CARTO',
+    subdomains: 'abcd',
+    maxZoom: 20,
+  }).addTo(map);
+
+  // Create markers, trails, formation lines for each drone
+  DRONE_DEFS.forEach(def => {
+    // SVG triangle icon
+    const icon = createDroneIcon(def.color, 0);
+    const marker = L.marker([CENTER_LAT, CENTER_LNG], { icon: icon, zIndexOffset: def.role === 'LEADER' ? 1000 : 500 }).addTo(map);
+    marker.bindTooltip(def.id, { permanent: true, direction: 'top', offset: [0, -14], className: 'drone-tooltip' });
+    mapMarkers[def.id] = marker;
+
+    // Trail polylines — 3 segments with fading opacity for gradient effect
+    const trailSegs = [];
+    const opacities = [0.12, 0.25, 0.45];
+    const weights = [1.5, 2, 2.5];
+    for (let seg = 0; seg < 3; seg++) {
+      trailSegs.push(L.polyline([], {
+        color: def.color, weight: weights[seg], opacity: opacities[seg], smoothFactor: 1
+      }).addTo(map));
+    }
+    mapTrails[def.id] = trailSegs;
+  });
+
+  // Formation lines from leader to each follower
+  DRONE_DEFS.forEach((def, i) => {
+    if (i === 0) return; // skip leader
+    const line = L.polyline([], { color: '#ffffff', weight: 1, opacity: 0.3, dashArray: '6, 6' }).addTo(map);
+    formationLines.push({ id: def.id, line });
+  });
+}
+
+function createDroneIcon(color, heading) {
+  const size = 28;
+  const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+    <g transform="rotate(${heading}, ${size/2}, ${size/2})">
+      <polygon points="${size/2},4 ${size-6},${size-6} ${size/2},${size-10} 6,${size-6}" fill="${color}" fill-opacity="0.85" stroke="${color}" stroke-width="1.2"/>
+    </g>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    tooltipAnchor: [0, -size / 2],
+  });
+}
+
+function updateMapMarker(drone) {
+  const marker = mapMarkers[drone.id];
+  if (!marker) return;
+  marker.setLatLng([drone.lat, drone.lng]);
+  marker.setIcon(createDroneIcon(drone.color, drone.heading));
+
+  // Update trail — 3 segments with fading opacity
+  const trailSegs = mapTrails[drone.id];
+  if (trailSegs && drone.trail.length > 0) {
+    const pts = drone.trail.map(p => [p.lat, p.lng]);
+    const len = pts.length;
+    const third = Math.floor(len / 3);
+    // Oldest third (faintest), middle third, newest third (brightest)
+    trailSegs[0].setLatLngs(pts.slice(0, third + 1));
+    trailSegs[1].setLatLngs(pts.slice(third, third * 2 + 1));
+    trailSegs[2].setLatLngs(pts.slice(third * 2));
+  }
+}
+
+function updateFormationLines(drones) {
+  const leader = drones[0];
+  formationLines.forEach(fl => {
+    const follower = drones.find(d => d.id === fl.id);
+    if (follower) {
+      fl.line.setLatLngs([[leader.lat, leader.lng], [follower.lat, follower.lng]]);
+    }
+  });
+}
+
+/* ==============================================================
+   LEFT PANEL — DRONE LIST RENDERING
+   ============================================================== */
+function renderDroneList(drones) {
+  const container = document.getElementById('drone-list');
+  container.innerHTML = '';
+  drones.forEach(drone => {
+    const card = document.createElement('div');
+    card.className = 'drone-card' + (drone.id === selectedDroneId ? ' selected' : '');
+    card.style.setProperty('--card-color', drone.color);
+    card.style.setProperty('--card-rgb', drone.rgb);
+    card.addEventListener('click', () => selectDrone(drone.id));
+
+    const batColor = batteryColor(drone.battery);
+    const statusClass = drone.status.toLowerCase().replace('_', '_');
+
+    card.innerHTML = `
+      <div class="drone-card-top">
+        <div class="drone-dot" style="background:${drone.color};box-shadow:0 0 6px ${drone.color}50"></div>
+        <div class="drone-name">${drone.id}</div>
+        <div class="drone-role">${drone.role}</div>
+        <div class="drone-status-badge ${statusClass}">${drone.status.replace('_',' ')}</div>
+      </div>
+      <div class="drone-card-stats">
+        <div class="drone-stat-item">
+          <div class="drone-stat-label">Alt</div>
+          <div class="drone-stat-value">${drone.altitude.toFixed(1)}m</div>
+        </div>
+        <div class="drone-stat-item">
+          <div class="drone-stat-label">Spd</div>
+          <div class="drone-stat-value">${drone.speed.toFixed(1)}<span style="font-size:10px;color:var(--text-dim)">m/s</span></div>
+        </div>
+        <div class="drone-stat-item">
+          <div class="drone-stat-label">Batt</div>
+          <div class="drone-stat-value" style="color:${batColor}">${drone.battery.toFixed(1)}%</div>
+        </div>
+        <div class="battery-bar-container">
+          <div class="battery-bar-fill" style="width:${drone.battery}%;background:${batColor}"></div>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+/* ==============================================================
+   RIGHT PANEL — DETAIL RENDERING
+   ============================================================== */
+function selectDrone(id) {
+  selectedDroneId = id;
+}
+
+function renderDetailPanel(drone) {
+  if (!drone) {
+    document.getElementById('detail-header').textContent = 'DRONE DETAIL';
+    document.getElementById('detail-content').innerHTML = '<div class="no-selection">SELECT A DRONE</div>';
+    return;
+  }
+
+  document.getElementById('detail-header').textContent = drone.id + ' // ' + drone.role;
+
+  const batColor = batteryColor(drone.battery);
+  const vsColor = drone.verticalSpeed >= 0 ? 'var(--green)' : 'var(--red)';
+  const vsSign = drone.verticalSpeed >= 0 ? '+' : '';
+  const rssiC = rssiColor(drone.rssi);
+
+  const content = document.getElementById('detail-content');
+  content.innerHTML = `
+    <!-- ATTITUDE -->
+    <div class="detail-section">
+      <div class="detail-section-title">Attitude</div>
+      <div class="attitude-container">
+        <div class="attitude-ball" id="attitude-ball" style="transform: translate(-50%, -50%) rotate(${drone.roll}deg) translateY(${-drone.pitch * 1.5}px);">
+          <div class="attitude-sky"></div>
+          <div class="attitude-ground"></div>
+          <div class="attitude-horizon"></div>
+        </div>
+        <div class="attitude-reticle">
+          <div class="reticle-dot"></div>
+          <div class="reticle-wing-left"></div>
+          <div class="reticle-wing-right"></div>
+          <div class="reticle-stem"></div>
+        </div>
+      </div>
+      <div class="attitude-values">
+        <div class="attitude-val">
+          <div class="attitude-val-label">Roll</div>
+          <div class="attitude-val-num" style="color:var(--cyan)">${drone.roll.toFixed(1)}&deg;</div>
+        </div>
+        <div class="attitude-val">
+          <div class="attitude-val-label">Pitch</div>
+          <div class="attitude-val-num" style="color:var(--amber)">${drone.pitch.toFixed(1)}&deg;</div>
+        </div>
+        <div class="attitude-val">
+          <div class="attitude-val-label">Yaw</div>
+          <div class="attitude-val-num" style="color:var(--purple)">${drone.yaw.toFixed(1)}&deg;</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TELEMETRY -->
+    <div class="detail-section">
+      <div class="detail-section-title">Telemetry</div>
+      <div class="telem-grid">
+        <div class="telem-cell">
+          <div class="telem-cell-label">Alt AGL</div>
+          <div class="telem-cell-value">${drone.altitude.toFixed(1)}<span class="telem-cell-unit">m</span></div>
+        </div>
+        <div class="telem-cell">
+          <div class="telem-cell-label">Ground Speed</div>
+          <div class="telem-cell-value">${drone.speed.toFixed(1)}<span class="telem-cell-unit">m/s</span></div>
+        </div>
+        <div class="telem-cell">
+          <div class="telem-cell-label">Vert Speed</div>
+          <div class="telem-cell-value" style="color:${vsColor}">${vsSign}${drone.verticalSpeed.toFixed(2)}<span class="telem-cell-unit">m/s</span></div>
+        </div>
+        <div class="telem-cell">
+          <div class="telem-cell-label">Heading</div>
+          <div class="telem-cell-value">${drone.heading.toFixed(1)}<span class="telem-cell-unit">&deg;</span></div>
+        </div>
+        <div class="telem-cell">
+          <div class="telem-cell-label">RSSI</div>
+          <div class="telem-cell-value" style="color:${rssiC}">${drone.rssi.toFixed(0)}<span class="telem-cell-unit">dBm</span></div>
+        </div>
+        <div class="telem-cell">
+          <div class="telem-cell-label">Temp</div>
+          <div class="telem-cell-value">${drone.temperature.toFixed(1)}<span class="telem-cell-unit">&deg;C</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BATTERY -->
+    <div class="detail-section">
+      <div class="detail-section-title">Battery</div>
+      <div class="battery-detail">
+        <div class="battery-big-num" style="color:${batColor}">${drone.battery.toFixed(1)}%</div>
+        <div class="battery-meta">
+          <div class="battery-meta-row"><span class="battery-meta-label">Voltage</span>${drone.voltage.toFixed(1)}V</div>
+          <div class="battery-meta-row"><span class="battery-meta-label">Current</span>${drone.current.toFixed(1)}A</div>
+        </div>
+      </div>
+      <div class="battery-detail-bar">
+        <div class="battery-detail-bar-fill" style="width:${drone.battery}%;background:${batColor}"></div>
+      </div>
+    </div>
+
+    <!-- GPS -->
+    <div class="detail-section">
+      <div class="detail-section-title">GPS</div>
+      <div class="gps-fix-badge">3D-RTK FIX</div>
+      <div class="gps-grid">
+        <div class="gps-cell">
+          <div class="gps-cell-label">Satellites</div>
+          <div class="gps-cell-value">${drone.satellites}</div>
+        </div>
+        <div class="gps-cell">
+          <div class="gps-cell-label">HDOP</div>
+          <div class="gps-cell-value">${drone.hdop.toFixed(2)}</div>
+        </div>
+        <div class="gps-cell">
+          <div class="gps-cell-label">Latitude</div>
+          <div class="gps-cell-value">${drone.lat.toFixed(6)}</div>
+        </div>
+        <div class="gps-cell">
+          <div class="gps-cell-label">Longitude</div>
+          <div class="gps-cell-value">${drone.lng.toFixed(6)}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LINK -->
+    <div class="detail-section">
+      <div class="detail-section-title">Link</div>
+      <div class="link-cards">
+        <div class="link-card">
+          <div class="link-card-value">${drone.linkQuality.toFixed(0)}<span class="link-card-unit">%</span></div>
+          <div class="link-card-label">Quality</div>
+        </div>
+        <div class="link-card">
+          <div class="link-card-value">${drone.latency.toFixed(0)}<span class="link-card-unit">ms</span></div>
+          <div class="link-card-label">Latency</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ==============================================================
+   BOTTOM PANEL — EVENTS
+   ============================================================== */
+const eventLog = [];
+
+function addEvent(ev) {
+  eventLog.push(ev);
+  if (eventLog.length > MAX_EVENTS) eventLog.shift();
+  renderEventLog();
+}
+
+function renderEventLog() {
+  const container = document.getElementById('event-log');
+  // Append new item instead of full rerender for performance
+  const latest = eventLog[eventLog.length - 1];
+  const item = document.createElement('div');
+  item.className = 'event-item';
+  item.innerHTML = `
+    <span class="event-time">${latest.time}</span>
+    <span class="event-source severity-${latest.severity}">${latest.source}</span>
+    <span class="event-msg">${latest.msg}</span>
+  `;
+  container.appendChild(item);
+
+  // Trim DOM nodes
+  while (container.children.length > MAX_EVENTS) {
+    container.removeChild(container.firstChild);
+  }
+
+  // Auto-scroll
+  container.scrollTop = container.scrollHeight;
+}
+
+/* ==============================================================
+   MODE SWITCH
+   ============================================================== */
+let currentMode = 'MONITOR';
+
+function setMode(mode) {
+  currentMode = mode;
+  document.body.dataset.mode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+}
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => setMode(btn.dataset.mode));
+});
+
+// Initialize mode
+setMode('MONITOR');
+
+/* ==============================================================
+   MAIN APPLICATION
+   ============================================================== */
+(function main() {
+  // Initialize drones
+  const drones = DRONE_DEFS.map((def, i) => new DroneSimulator(def, i));
+
+  // Initialize map
+  initMap();
+
+  // Initialize sparklines
+  const sparkHealth = new Sparkline('spark-health', '#00ff88');
+  const sparkAltitude = new Sparkline('spark-altitude', '#3388ff');
+  const sparkLatency = new Sparkline('spark-latency', '#ffaa00');
+  const sparkBattery = new Sparkline('spark-battery', '#ff3355');
+  const sparkSignal = new Sparkline('spark-signal', '#00ccff');
+
+  // Initialize subsystems
+  const cmdEngine = new CommandEngine(drones, addEvent);
+  const wpManager = new WaypointManager(map);
+  const connManager = new ConnectionManager(drones);
+  const replaySystem = new ReplaySystem(drones);
+  cmdEngine.connectionManager = connManager;
+
+  // GOTO mode state
+  let gotoMode = false;
+
+  function enableGotoMode() {
+    gotoMode = true;
+    map.getContainer().style.cursor = 'crosshair';
+    document.getElementById('goto-indicator').style.display = '';
+    document.getElementById('goto-coords').textContent = 'Click map to set target...';
+    const btn = document.getElementById('cmd-goto');
+    if (btn) { btn.style.borderColor = 'var(--cyan)'; btn.style.color = 'var(--cyan)'; }
+  }
+
+  function disableGotoMode() {
+    gotoMode = false;
+    if (!wpManager.addMode) map.getContainer().style.cursor = '';
+    document.getElementById('goto-indicator').style.display = 'none';
+    const btn = document.getElementById('cmd-goto');
+    if (btn) { btn.style.borderColor = ''; btn.style.color = ''; }
+  }
+
+  // ---- COMMAND BUTTON HANDLERS ----
+  document.getElementById('cmd-arm').addEventListener('click', () => {
+    cmdEngine.execute('ARM', { droneId: selectedDroneId === drones[0].id ? null : selectedDroneId });
+  });
+  document.getElementById('cmd-disarm').addEventListener('click', () => {
+    cmdEngine.execute('DISARM', { droneId: selectedDroneId === drones[0].id ? null : selectedDroneId });
+  });
+  document.getElementById('cmd-takeoff').addEventListener('click', () => {
+    const alt = parseInt(document.getElementById('takeoff-alt').value);
+    cmdEngine.execute('TAKEOFF', { altitude: alt });
+  });
+  document.getElementById('cmd-land').addEventListener('click', () => cmdEngine.execute('LAND'));
+  document.getElementById('cmd-rtl').addEventListener('click', () => cmdEngine.execute('RTL'));
+  document.getElementById('cmd-goto').addEventListener('click', () => {
+    if (gotoMode) disableGotoMode(); else enableGotoMode();
+  });
+  document.getElementById('cmd-estop').addEventListener('click', () => {
+    if (confirm('EMERGENCY STOP — all drones will descend immediately. Confirm?')) {
+      cmdEngine.execute('EMERGENCY_STOP');
+    }
+  });
+
+  // ---- SLIDER HANDLERS ----
+  document.getElementById('takeoff-alt').addEventListener('input', function() {
+    document.getElementById('takeoff-alt-val').textContent = this.value + 'm';
+  });
+  document.getElementById('cmd-speed').addEventListener('input', function() {
+    document.getElementById('speed-val').textContent = this.value + ' m/s';
+  });
+  document.getElementById('cmd-speed').addEventListener('change', function() {
+    cmdEngine.execute('SET_SPEED', { speed: parseFloat(this.value) });
+  });
+  document.getElementById('cmd-altitude').addEventListener('input', function() {
+    document.getElementById('alt-val').textContent = this.value + 'm';
+  });
+  document.getElementById('cmd-altitude').addEventListener('change', function() {
+    cmdEngine.execute('SET_ALTITUDE', { altitude: parseInt(this.value) });
+  });
+
+  // ---- FORMATION DROPDOWN ----
+  document.getElementById('cmd-formation').addEventListener('change', function() {
+    cmdEngine.execute('SET_FORMATION', { formation: this.value });
+  });
+
+  // ---- MAP CLICK ----
+  map.on('click', function(e) {
+    if (gotoMode) {
+      cmdEngine.execute('GOTO', { lat: e.latlng.lat, lng: e.latlng.lng });
+      document.getElementById('goto-coords').textContent = e.latlng.lat.toFixed(5) + ', ' + e.latlng.lng.toFixed(5);
+      setTimeout(disableGotoMode, 1500);
+    } else if (wpManager.addMode && currentMode === 'COMMAND') {
+      wpManager.addWaypoint(e.latlng.lat, e.latlng.lng);
+    }
+  });
+
+  // ---- WAYPOINT TOOLBAR ----
+  document.getElementById('wp-add-mode').addEventListener('click', () => wpManager.toggleAddMode());
+  document.getElementById('wp-loiter').addEventListener('click', () => wpManager.setType('LOITER'));
+  document.getElementById('wp-orbit').addEventListener('click', () => wpManager.setType('ORBIT'));
+  document.getElementById('wp-clear').addEventListener('click', () => wpManager.clear());
+  document.getElementById('wp-execute').addEventListener('click', () => {
+    const wps = wpManager.getWaypoints();
+    if (wps.length === 0) { showToast('Add waypoints first', 'error'); return; }
+    cmdEngine.execute('EXECUTE_MISSION', { waypoints: wps });
+  });
+
+  // ---- CONNECTION MODAL ----
+  document.getElementById('connection-badge').addEventListener('click', () => {
+    document.getElementById('connection-modal').style.display = '';
+  });
+  document.getElementById('conn-modal-backdrop').addEventListener('click', () => {
+    document.getElementById('connection-modal').style.display = 'none';
+  });
+  document.getElementById('conn-close').addEventListener('click', () => {
+    document.getElementById('connection-modal').style.display = 'none';
+  });
+  document.getElementById('conn-connect').addEventListener('click', () => {
+    const url = document.getElementById('conn-ws-url').value.trim();
+    if (!url) { showToast('Enter a WebSocket URL', 'error'); return; }
+    connManager.connect(url);
+  });
+  document.getElementById('conn-disconnect').addEventListener('click', () => {
+    connManager.disconnect();
+    showToast('Disconnected');
+  });
+
+  // ---- REPLAY CONTROLS ----
+  document.getElementById('replay-play-btn').addEventListener('click', () => replaySystem.play());
+  document.getElementById('replay-pause-btn').addEventListener('click', () => replaySystem.pause());
+  document.getElementById('replay-timeline').addEventListener('input', function() {
+    replaySystem.seek(parseFloat(this.value) / parseFloat(this.max) * 100);
+  });
+  document.getElementById('replay-speed-toggle').addEventListener('click', function() {
+    const speeds = [0.5, 1, 2, 4];
+    const cur = speeds.indexOf(replaySystem.playSpeed);
+    const next = speeds[(cur + 1) % speeds.length];
+    replaySystem.setSpeed(next);
+    this.textContent = next + 'x';
+  });
+  document.querySelectorAll('.replay-speed-btn[data-speed]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const spd = parseFloat(this.dataset.speed);
+      replaySystem.setSpeed(spd);
+      document.querySelectorAll('.replay-speed-btn[data-speed]').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      document.getElementById('replay-speed-toggle').textContent = spd + 'x';
+    });
+  });
+
+  // ---- COMMAND TARGET UPDATES ----
+  function updateCmdTarget() {
+    const el = document.getElementById('cmd-target');
+    if (el) el.textContent = selectedDroneId || 'ALL DRONES';
+  }
+
+  // Select first drone by default
+  selectedDroneId = drones[0].id;
+
+  // Event timer
+  let nextEventTime = performance.now() + rand(EVENT_INTERVAL_MIN, EVENT_INTERVAL_MAX);
+
+  // Seed initial events
+  for (let i = 0; i < 6; i++) {
+    addEvent(generateEvent(drones));
+  }
+
+  // Last update tracking for 1s tick
+  let lastTickTime = 0;
+  let lastFrameTime = performance.now();
+  let replayTickCounter = 0;
+
+  // Cohesion calculation
+  function calcCohesion() {
+    const leader = drones[0];
+    let totalDeviation = 0;
+    let count = 0;
+    const spacing = 0.00035;
+    const hr = degToRad(leader.heading);
+    const alongDir = { lat: Math.cos(hr + Math.PI / 2), lng: Math.sin(hr + Math.PI / 2) };
+    const crossDir = { lat: -Math.sin(hr + Math.PI / 2), lng: Math.cos(hr + Math.PI / 2) };
+
+    for (let i = 1; i < drones.length; i++) {
+      const d = drones[i];
+      const expectedLat = leader.lat + d.formationOffset.along * spacing * alongDir.lat + d.formationOffset.cross * spacing * crossDir.lat;
+      const expectedLng = leader.lng + d.formationOffset.along * spacing * alongDir.lng + d.formationOffset.cross * spacing * crossDir.lng;
+      const dLat = d.lat - expectedLat;
+      const dLng = d.lng - expectedLng;
+      const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+      totalDeviation += dist;
+      count++;
+    }
+    const avgDev = totalDeviation / count;
+    return clamp(100 - (avgDev / spacing) * 100, 70, 100);
+  }
+
+  // Animation loop
+  function frame(now) {
+    requestAnimationFrame(frame);
+
+    const dtMs = now - lastFrameTime;
+    lastFrameTime = now;
+    const dtSec = Math.min(dtMs / 1000, 0.1); // cap dt to avoid huge jumps
+
+    // Update UTC clock every frame
+    document.getElementById('utc-clock').textContent = utcString();
+
+    // Replay mode: tick replay instead of simulation
+    if (currentMode === 'REPLAY' && replaySystem.playing) {
+      replayTickCounter++;
+      if (replayTickCounter % 6 === 0) replaySystem.tick();
+    } else {
+      // Update drone simulation
+      const leader = drones[0];
+      leader.update(dtSec, 0, 0, 0);
+      for (let i = 1; i < drones.length; i++) {
+        drones[i].update(dtSec, leader.heading, leader.lat, leader.lng);
+      }
+    }
+
+    // Record replay frames
+    replaySystem.recordFrame(now);
+
+    // Update map markers every frame (smooth movement)
+    drones.forEach(d => updateMapMarker(d));
+    updateFormationLines(drones);
+
+    // 1-second tick for heavier UI updates
+    if (now - lastTickTime >= 1000) {
+      lastTickTime = now;
+
+      // Render drone list
+      renderDroneList(drones);
+
+      // Render detail panel (MONITOR mode)
+      if (currentMode === 'MONITOR') {
+        const selected = drones.find(d => d.id === selectedDroneId);
+        renderDetailPanel(selected || null);
+      }
+
+      // Update command target
+      updateCmdTarget();
+
+      // Cohesion
+      const cohesion = calcCohesion();
+      document.getElementById('cohesion-value').textContent = cohesion.toFixed(0);
+
+      // Bottom metrics
+      const avgBat = drones.reduce((s, d) => s + d.battery, 0) / drones.length;
+      const allActive = drones.every(d => d.status === 'ACTIVE' || d.status === 'FLYING');
+      const healthPct = allActive ? clamp(95 + rand(0, 5), 90, 100) : clamp(70 + avgBat * 0.3, 50, 95);
+      document.getElementById('bm-health').textContent = healthPct.toFixed(0);
+
+      const avgAlt = drones.reduce((s, d) => s + d.altitude, 0) / drones.length;
+      const minAlt = Math.min(...drones.map(d => d.altitude));
+      const maxAlt = Math.max(...drones.map(d => d.altitude));
+      document.getElementById('bm-altitude').textContent = avgAlt.toFixed(1);
+      document.getElementById('bm-alt-spread').textContent = `Spread: ${minAlt.toFixed(1)} - ${maxAlt.toFixed(1)}m`;
+
+      const avgLat = drones.reduce((s, d) => s + d.latency, 0) / drones.length;
+      document.getElementById('bm-latency').textContent = avgLat.toFixed(0);
+
+      // Mesh badge
+      const meshOk = avgLat < 40;
+      const meshBadge = document.getElementById('mesh-badge');
+      meshBadge.textContent = meshOk ? 'MESH OK' : 'MESH DEGRADED';
+      meshBadge.style.background = meshOk ? 'rgba(0,255,136,0.1)' : 'rgba(255,170,0,0.15)';
+      meshBadge.style.color = meshOk ? 'var(--green)' : 'var(--amber)';
+
+      // Battery metrics
+      const avgBat2 = drones.reduce((s, d) => s + d.battery, 0) / drones.length;
+      const minBat = Math.min(...drones.map(d => d.battery));
+      const maxBat = Math.max(...drones.map(d => d.battery));
+      document.getElementById('bm-battery').textContent = avgBat2.toFixed(0);
+      document.getElementById('bm-bat-spread').textContent = `Range: ${minBat.toFixed(0)} - ${maxBat.toFixed(0)}%`;
+
+      // Signal metrics
+      const avgSig = drones.reduce((s, d) => s + d.linkQuality, 0) / drones.length;
+      const avgRssi = drones.reduce((s, d) => s + d.rssi, 0) / drones.length;
+      document.getElementById('bm-signal').textContent = avgSig.toFixed(0);
+      document.getElementById('bm-sig-spread').textContent = `RSSI: ${avgRssi.toFixed(0)} dBm`;
+
+      // Sparklines
+      sparkHealth.push(healthPct);
+      sparkAltitude.push(avgAlt);
+      sparkLatency.push(avgLat);
+      sparkBattery.push(avgBat2);
+      sparkSignal.push(avgSig);
+      sparkHealth.draw();
+      sparkAltitude.draw();
+      sparkLatency.draw();
+      sparkBattery.draw();
+      sparkSignal.draw();
+    }
+
+    // Random events
+    if (now >= nextEventTime) {
+      addEvent(generateEvent(drones));
+      nextEventTime = now + rand(EVENT_INTERVAL_MIN, EVENT_INTERVAL_MAX);
+    }
+  }
+
+  // Kick off
+  requestAnimationFrame(frame);
+
+  /* ==============================================================
+     FPV SUBSYSTEMS
+     ============================================================== */
+
+  // ---- Video Feed Manager ----
+  class VideoFeedManager {
+    constructor() {
+      this.videoEl = document.getElementById('fpv-video');
+      this.mjpegEl = document.getElementById('fpv-mjpeg');
+      this.canvasEl = document.getElementById('fpv-canvas');
+      this.panelEl = document.getElementById('video-panel');
+      this.activeMode = 'canvas';
+      this.recording = false;
+      this.mediaRecorder = null;
+      this.recordedChunks = [];
+      this._testPatternId = null;
+      this._testFrame = 0;
+    }
+
+    startTestPattern() {
+      this.activeMode = 'canvas';
+      this.videoEl.style.display = 'none';
+      this.mjpegEl.style.display = 'none';
+      this.canvasEl.style.display = '';
+      const ctx = this.canvasEl.getContext('2d');
+      const w = 640, h = 480;
+      const draw = () => {
+        this._testFrame++;
+        ctx.fillStyle = '#0a0f18';
+        ctx.fillRect(0, 0, w, h);
+        // Grid lines
+        ctx.strokeStyle = 'rgba(0,255,136,0.08)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+        for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+        // Crosshair
+        ctx.strokeStyle = 'rgba(0,255,136,0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(w/2 - 20, h/2); ctx.lineTo(w/2 + 20, h/2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(w/2, h/2 - 20); ctx.lineTo(w/2, h/2 + 20); ctx.stroke();
+        // Text
+        ctx.font = '16px JetBrains Mono';
+        ctx.fillStyle = '#00ff88';
+        ctx.textAlign = 'center';
+        ctx.fillText('NEXUS FPV TEST PATTERN', w/2, h/2 - 50);
+        ctx.font = '12px JetBrains Mono';
+        ctx.fillStyle = '#5a6d82';
+        ctx.fillText('No video source connected', w/2, h/2 + 50);
+        ctx.fillText('Frame ' + this._testFrame, w/2, h/2 + 70);
+        const t = new Date();
+        ctx.fillStyle = '#ffaa00';
+        ctx.fillText(t.toISOString().substr(11, 8) + 'Z', w/2, h/2 + 90);
+        this._testPatternId = requestAnimationFrame(draw);
+      };
+      draw();
+    }
+
+    stopTestPattern() {
+      if (this._testPatternId) { cancelAnimationFrame(this._testPatternId); this._testPatternId = null; }
+    }
+
+    connectMJPEG(url) {
+      this.stopTestPattern();
+      this.mjpegEl.src = url;
+      this.mjpegEl.style.display = '';
+      this.videoEl.style.display = 'none';
+      this.canvasEl.style.display = 'none';
+      this.activeMode = 'mjpeg';
+    }
+
+    toggleFullscreen() {
+      if (this.panelEl.classList.contains('fullscreen')) {
+        this.panelEl.classList.remove('fullscreen');
+      } else {
+        this.panelEl.classList.remove('pip');
+        this.panelEl.classList.add('fullscreen');
+      }
+    }
+
+    togglePIP() {
+      if (this.panelEl.classList.contains('pip')) {
+        this.panelEl.classList.remove('pip');
+        if (currentMode !== 'SOLO') this.panelEl.style.display = 'none';
+      } else {
+        this.panelEl.classList.remove('fullscreen');
+        this.panelEl.classList.add('pip');
+        this.panelEl.style.display = '';
+      }
+    }
+
+    startRecording() {
+      try {
+        const stream = this.canvasEl.captureStream(30);
+        this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+        this.recordedChunks = [];
+        this.mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) this.recordedChunks.push(e.data); };
+        this.mediaRecorder.start(1000);
+        this.recording = true;
+      } catch (e) {
+        showToast('Recording not supported in this browser', 'warn');
+      }
+    }
+
+    stopRecording() {
+      if (!this.mediaRecorder) return;
+      this.mediaRecorder.onstop = () => {
+        const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = 'nexus-dvr-' + Date.now() + '.webm'; a.click();
+        URL.revokeObjectURL(url);
+      };
+      this.mediaRecorder.stop();
+      this.recording = false;
+    }
+
+    capturePhoto() {
+      const canvas = document.createElement('canvas');
+      const src = this.canvasEl;
+      canvas.width = src.width; canvas.height = src.height;
+      canvas.getContext('2d').drawImage(src, 0, 0);
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = 'nexus-photo-' + Date.now() + '.jpg'; a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/jpeg', 0.95);
+      showToast('Photo captured');
+    }
+  }
+
+  // ---- OSD Renderer ----
+  class OSDRenderer {
+    constructor() {
+      this.els = {
+        battery: document.getElementById('osd-battery'),
+        cell: document.getElementById('osd-cell'),
+        mah: document.getElementById('osd-mah'),
+        timer: document.getElementById('osd-timer'),
+        armTimer: document.getElementById('osd-arm-timer'),
+        gps: document.getElementById('osd-gps'),
+        alt: document.getElementById('osd-alt'),
+        speed: document.getElementById('osd-speed'),
+        rssi: document.getElementById('osd-rssi'),
+        home: document.getElementById('osd-home'),
+        mode: document.getElementById('osd-mode'),
+        warning: document.getElementById('osd-warning'),
+      };
+    }
+
+    update(drone) {
+      if (!drone) return;
+      const f = drone.fpvData || {};
+      const fmt = (v, d) => (v || 0).toFixed(d);
+
+      this.els.battery.textContent = fmt(drone.voltage, 1) + 'V  ' + fmt(drone.battery, 0) + '%';
+      this.els.battery.style.color = drone.battery < 25 ? '#ff3355' : drone.battery < 50 ? '#ffaa00' : '#fff';
+      this.els.cell.textContent = fmt(f.cell_voltage || drone.voltage / 6, 2) + 'V/cell';
+      this.els.mah.textContent = (f.mah_consumed || 0).toFixed(0) + ' mAh';
+
+      const fs = f.flight_timer_s || 0;
+      this.els.timer.textContent = Math.floor(fs / 60) + ':' + String(Math.floor(fs % 60)).padStart(2, '0');
+      const as = f.arm_timer_s || 0;
+      this.els.armTimer.textContent = 'ARM ' + Math.floor(as / 60) + ':' + String(Math.floor(as % 60)).padStart(2, '0');
+
+      this.els.gps.textContent = drone.lat.toFixed(6) + '  ' + drone.lng.toFixed(6);
+      this.els.alt.textContent = fmt(drone.altitude, 1) + 'm';
+      this.els.speed.textContent = fmt(drone.speed, 1) + 'm/s';
+      this.els.rssi.textContent = 'RSSI ' + fmt(drone.rssi, 0);
+      this.els.rssi.style.color = drone.rssi < 50 ? '#ff3355' : drone.rssi < 70 ? '#ffaa00' : '#fff';
+
+      const hd = f.home_distance_m || 0;
+      const hdir = f.home_direction_deg || 0;
+      const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+      const compass = dirs[Math.round(((hdir % 360) + 360) % 360 / 45) % 8];
+      this.els.home.textContent = hd.toFixed(0) + 'm ' + compass;
+      this.els.mode.textContent = f.flight_mode || 'ANGLE';
+
+      // Warnings
+      if (drone.battery < 20) {
+        this.els.warning.textContent = 'LOW BATTERY'; this.els.warning.style.display = '';
+      } else if (drone.rssi < 50) {
+        this.els.warning.textContent = 'LOW SIGNAL'; this.els.warning.style.display = '';
+      } else {
+        this.els.warning.style.display = 'none';
+      }
+    }
+  }
+
+  // ---- DVR Manager ----
+  class DVRManager {
+    constructor(videoMgr) {
+      this.videoMgr = videoMgr;
+      this.recording = false;
+      this.startTime = 0;
+      this.telemLog = [];
+    }
+
+    start() {
+      this.videoMgr.startRecording();
+      this.recording = true;
+      this.startTime = performance.now();
+      this.telemLog = [];
+      document.getElementById('dvr-badge').style.display = '';
+      document.getElementById('video-record').style.background = 'rgba(255,51,85,0.2)';
+      showToast('DVR recording started');
+    }
+
+    stop() {
+      this.videoMgr.stopRecording();
+      this.recording = false;
+      document.getElementById('dvr-badge').style.display = 'none';
+      document.getElementById('video-record').style.background = '';
+      showToast('DVR recording saved');
+      // Export telemetry log
+      if (this.telemLog.length > 0) {
+        const blob = new Blob([JSON.stringify(this.telemLog, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = 'nexus-telem-' + Date.now() + '.json'; a.click();
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    logTelemetry(drone) {
+      if (!this.recording || !drone) return;
+      this.telemLog.push({
+        t: ((performance.now() - this.startTime) / 1000).toFixed(2),
+        lat: drone.lat, lng: drone.lng, alt: drone.altitude,
+        spd: drone.speed, hdg: drone.heading, bat: drone.battery,
+        rssi: drone.rssi, roll: drone.roll, pitch: drone.pitch,
+      });
+    }
+
+    updateTimer() {
+      if (!this.recording) return;
+      const s = (performance.now() - this.startTime) / 1000;
+      document.getElementById('dvr-timer').textContent =
+        'REC ' + Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+    }
+  }
+
+  // ---- Initialize FPV subsystems ----
+  const videoMgr = new VideoFeedManager();
+  const osdRenderer = new OSDRenderer();
+  const dvrMgr = new DVRManager(videoMgr);
+
+  // ---- FPV simulation data updates (when not live) ----
+  setInterval(() => {
+    if (currentMode !== 'SOLO') return;
+    drones.forEach(d => {
+      if (!d.isLive) {
+        const f = d.fpvData;
+        f.mah_consumed += Math.abs(d.current) * (1/10) / 3.6;
+        f.cell_voltage = d.voltage / 6;
+        f.flight_timer_s += 0.1;
+        f.arm_timer_s += 0.1;
+        const dlat = (d.lat - CENTER_LAT) * 111320;
+        const dlng = (d.lng - CENTER_LNG) * 111320 * Math.cos(d.lat * Math.PI / 180);
+        f.home_distance_m = Math.sqrt(dlat * dlat + dlng * dlng);
+        f.home_direction_deg = ((Math.atan2(-dlng, -dlat) * 180 / Math.PI) + 360) % 360;
+      }
+    });
+  }, 100);
+
+  // ---- SOLO mode update (inside animation loop) ----
+  const origFrame = frame;
+  const soloTick = setInterval(() => {
+    if (currentMode !== 'SOLO') return;
+    const sel = drones.find(d => d.id === selectedDroneId) || drones[0];
+    if (!sel) return;
+
+    // Update OSD
+    osdRenderer.update(sel);
+
+    // Update DVR
+    dvrMgr.logTelemetry(sel);
+    dvrMgr.updateTimer();
+
+    // Update right panel telemetry
+    const f = sel.fpvData || {};
+    const $ = id => document.getElementById(id);
+    $('fpv-bat').textContent = sel.battery.toFixed(0) + '%';
+    $('fpv-bat').style.color = sel.battery < 25 ? 'var(--red)' : sel.battery < 50 ? 'var(--amber)' : 'var(--green)';
+    $('fpv-cell').textContent = (f.cell_voltage || sel.voltage / 6).toFixed(2) + 'V';
+    $('fpv-alt').textContent = sel.altitude.toFixed(1) + 'm';
+    $('fpv-spd').textContent = sel.speed.toFixed(1) + 'm/s';
+    $('fpv-rssi').textContent = sel.rssi.toFixed(0);
+    $('fpv-rssi').style.color = sel.rssi < 50 ? 'var(--red)' : sel.rssi < 70 ? 'var(--amber)' : 'var(--green)';
+    $('fpv-mah').textContent = (f.mah_consumed || 0).toFixed(0);
+    $('fpv-home').textContent = (f.home_distance_m || 0).toFixed(0) + 'm';
+    $('fpv-sats').textContent = sel.satellites;
+
+    // Video link info
+    const vl = f.video_link || {};
+    $('fpv-vq').textContent = (vl.quality || 0) + '%';
+    $('fpv-vch').textContent = 'CH' + (vl.channel || '-');
+    $('fpv-vfreq').textContent = (vl.frequency_mhz || 0) + ' MHz';
+    $('fpv-proto').textContent = f.protocol || 'MAVLINK';
+
+    // Update active flight mode button
+    document.querySelectorAll('.fpv-mode-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.fmode === (f.flight_mode || 'ACRO'));
+    });
+  }, 100);
+
+  // ---- Mode switch extension ----
+  const origSetMode = setMode;
+  setMode = function(mode) {
+    origSetMode(mode);
+    const videoPanel = document.getElementById('video-panel');
+    const mapEl = document.getElementById('map');
+    if (mode === 'SOLO') {
+      videoPanel.style.display = '';
+      videoPanel.classList.remove('pip', 'fullscreen');
+      mapEl.style.display = 'none';
+      videoMgr.startTestPattern();
+      if (!selectedDroneId && drones.length > 0) {
+        selectedDroneId = drones[0].id;
+      }
+    } else {
+      if (!videoPanel.classList.contains('pip')) {
+        videoPanel.style.display = 'none';
+      }
+      mapEl.style.display = '';
+      videoMgr.stopTestPattern();
+    }
+  };
+
+  // ---- Quick Connect ----
+  document.getElementById('quick-connect-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('quick-connect-btn');
+    btn.classList.add('scanning');
+    btn.textContent = 'SCANNING...';
+    try {
+      // Try connecting to common local URLs
+      const urls = ['ws://localhost:8765', 'ws://localhost:8080/ws'];
+      let connected = false;
+      for (const url of urls) {
+        try {
+          connManager.connect(url);
+          connected = true;
+          showToast('Connecting to ' + url);
+          break;
+        } catch (e) { continue; }
+      }
+      if (!connected) showToast('No drone system found', 'warn');
+    } finally {
+      setTimeout(() => { btn.classList.remove('scanning'); btn.textContent = 'QUICK CONNECT'; }, 2000);
+    }
+  });
+
+  // ---- Video controls ----
+  document.getElementById('video-fullscreen').addEventListener('click', () => videoMgr.toggleFullscreen());
+  document.getElementById('video-pip').addEventListener('click', () => videoMgr.togglePIP());
+  document.getElementById('video-record').addEventListener('click', () => {
+    if (dvrMgr.recording) dvrMgr.stop(); else dvrMgr.start();
+  });
+  document.getElementById('video-photo').addEventListener('click', () => videoMgr.capturePhoto());
+
+  // Camera tilt
+  document.getElementById('camera-tilt').addEventListener('input', function() {
+    document.getElementById('tilt-value').innerHTML = this.value + '&deg;';
+    if (connManager.ws && connManager.connected) {
+      connManager.ws.send(JSON.stringify({ type: 'CMD', command: 'CAMERA_TILT', params: { angle: parseInt(this.value) } }));
+    }
+  });
+
+  // Video source selector
+  document.getElementById('video-source').addEventListener('change', function() {
+    if (this.value === 'canvas') {
+      videoMgr.stopTestPattern();
+      videoMgr.startTestPattern();
+    } else if (this.value) {
+      videoMgr.connectMJPEG(this.value);
+    }
+  });
+
+  // ---- FPV ARM/DISARM ----
+  document.getElementById('fpv-arm').addEventListener('click', () => {
+    cmdEngine.execute('ARM', selectedDroneId);
+  });
+  document.getElementById('fpv-disarm').addEventListener('click', () => {
+    cmdEngine.execute('DISARM', selectedDroneId);
+  });
+  document.getElementById('fpv-estop').addEventListener('click', () => {
+    if (confirm('EMERGENCY STOP — Are you sure?')) {
+      cmdEngine.execute('EMERGENCY_STOP', selectedDroneId);
+    }
+  });
+
+  // ---- Flight mode buttons ----
+  document.querySelectorAll('.fpv-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.fmode;
+      document.querySelectorAll('.fpv-mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const sel = drones.find(d => d.id === selectedDroneId);
+      if (sel) sel.fpvData.flight_mode = mode;
+      if (connManager.ws && connManager.connected) {
+        connManager.ws.send(JSON.stringify({ type: 'CMD', command: 'MSP_SET_MODE', params: { mode } }));
+      }
+      showToast('Flight mode: ' + mode);
+    });
+  });
+
+  // ---- Keyboard shortcuts (SOLO mode) ----
+  document.addEventListener('keydown', (e) => {
+    if (currentMode !== 'SOLO') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    const key = e.key.toLowerCase();
+    if (key === 'f') { e.preventDefault(); videoMgr.toggleFullscreen(); }
+    if (key === 'r') { e.preventDefault(); if (dvrMgr.recording) dvrMgr.stop(); else dvrMgr.start(); }
+    if (key === 'p') { e.preventDefault(); videoMgr.capturePhoto(); }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const slider = document.getElementById('camera-tilt');
+      slider.value = Math.min(30, parseInt(slider.value) + 5);
+      slider.dispatchEvent(new Event('input'));
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const slider = document.getElementById('camera-tilt');
+      slider.value = Math.max(-90, parseInt(slider.value) - 5);
+      slider.dispatchEvent(new Event('input'));
+    }
+    if (key === 'escape') {
+      const vp = document.getElementById('video-panel');
+      if (vp.classList.contains('fullscreen')) vp.classList.remove('fullscreen');
+    }
+  });
+
+})();
+
+</script>
+</body>
+</html>

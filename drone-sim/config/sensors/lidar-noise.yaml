@@ -1,0 +1,320 @@
+# =============================================================================
+# LiDAR Sensor Noise Model Configuration
+# =============================================================================
+# Defines noise characteristics for LiDAR rangefinder and scanning sensors.
+# Covers single-beam altimeters (LW20, SF45) and multi-beam scanning LiDARs.
+# Models range noise, dropout, surface reflectivity effects, angular error,
+# and environmental interference (rain, dust, sun).
+# =============================================================================
+
+sensor_type: lidar
+description: >
+  LiDAR sensor noise model for rangefinding and 3D scanning applications.
+  Covers range measurement noise, minimum/maximum range limits, angular
+  resolution, dropout probability based on surface properties and distance,
+  environmental interference, and scan pattern distortion. Applicable to
+  both single-beam altimeters and multi-beam scanning units.
+
+update_rate_hz: 100 # single-beam; scanning may differ
+output_units:
+  range: "m"
+  angle: "deg"
+
+# =============================================================================
+# Presets
+# =============================================================================
+
+presets:
+  # ---------------------------------------------------------------------------
+  # PERFECT: No noise -- ideal LiDAR
+  # ---------------------------------------------------------------------------
+  perfect:
+    label: "Perfect (No Noise)"
+    description: "Ideal LiDAR with zero noise for algorithm validation"
+
+    range:
+      noise_std_m: 0.0
+      bias_m: 0.0
+      quantization_m: 0.0
+      min_range_m: 0.0
+      max_range_m: 1000.0
+      range_walk_error_m: 0.0
+
+    angular:
+      noise_std_deg: 0.0
+      resolution_deg: 0.0
+      scan_rate_hz: 20
+      scan_fov_deg: 360
+
+    dropout:
+      probability: 0.0
+      distance_dependent: false
+
+    surface:
+      reflectivity_effect: false
+      angle_of_incidence_effect: false
+
+    environment:
+      ambient_light_effect: false
+      rain_effect: false
+      dust_effect: false
+      fog_effect: false
+
+    multi_return:
+      enabled: false
+
+  # ---------------------------------------------------------------------------
+  # TYPICAL: Realistic LiDAR sensor (Lightware SF45/B, LW20)
+  # ---------------------------------------------------------------------------
+  typical:
+    label: "Typical Survey LiDAR"
+    description: "Realistic noise for a quality LiDAR rangefinder like Lightware SF45/B"
+
+    range:
+      noise_std_m: 0.02
+      bias_m: 0.005
+      quantization_m: 0.01
+      min_range_m: 0.2
+      max_range_m: 50.0
+      range_walk_error_m: 0.01 # varies with signal strength
+      range_noise_distance_model:
+        # Noise increases with distance: sigma = base + k * distance
+        base_noise_m: 0.01
+        distance_coefficient: 0.001 # 1mm per meter
+      temperature_drift_m_per_c: 0.0005
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 0.5
+        amplitude_m: 0.005
+
+    angular:
+      noise_std_deg: 0.05
+      resolution_deg: 0.39 # 1024 points over 360 deg for scanning
+      scan_rate_hz: 20
+      scan_fov_deg: 320
+      scan_uniformity_percent: 98 # slight non-uniformity in scan speed
+      beam_divergence_mrad: 7.0
+
+    dropout:
+      probability: 0.01 # base probability at mid-range
+      distance_dependent: true
+      distance_dropout_model:
+        # Dropout probability increases near max range
+        threshold_distance_m: 40.0 # starts increasing
+        max_probability: 0.15 # at max range
+        curve: "exponential"
+      min_range_dropout: true # below min_range returns invalid
+
+    surface:
+      reflectivity_effect: true
+      reflectivity_model:
+        # Low reflectivity surfaces (dark, wet) reduce max range
+        nominal_reflectivity_percent: 80
+        range_reduction_at_10_percent: 0.50 # 50% range at 10% reflectivity
+        dropout_increase_at_low_reflectivity: 0.08
+      angle_of_incidence_effect: true
+      angle_model:
+        max_reliable_angle_deg: 75 # beyond this, range degrades
+        dropout_increase_per_10_deg: 0.02
+
+    environment:
+      ambient_light_effect: true
+      ambient_light_model:
+        direct_sunlight_range_reduction_percent: 20
+        indirect_bright_range_reduction_percent: 5
+      rain_effect: true
+      rain_model:
+        light_rain_dropout_increase: 0.02
+        heavy_rain_dropout_increase: 0.15
+        range_reduction_percent: 10
+      dust_effect: true
+      dust_model:
+        light_dust_dropout_increase: 0.01
+        heavy_dust_dropout_increase: 0.10
+      fog_effect: true
+      fog_model:
+        thin_fog_range_reduction_percent: 30
+        thick_fog_range_reduction_percent: 80
+
+    multi_return:
+      enabled: true
+      max_returns: 2
+      secondary_return_probability: 0.05
+      secondary_return_offset_m: [0.5, 5.0]
+
+  # ---------------------------------------------------------------------------
+  # NOISY: Degraded or low-cost LiDAR
+  # ---------------------------------------------------------------------------
+  noisy:
+    label: "Noisy / Low-Cost LiDAR"
+    description: "Degraded LiDAR with high noise, frequent dropout, limited range"
+
+    range:
+      noise_std_m: 0.08
+      bias_m: 0.03
+      quantization_m: 0.05
+      min_range_m: 0.5
+      max_range_m: 20.0
+      range_walk_error_m: 0.05
+      range_noise_distance_model:
+        base_noise_m: 0.05
+        distance_coefficient: 0.005
+      temperature_drift_m_per_c: 0.005
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 2.0
+        amplitude_m: 0.03
+
+    angular:
+      noise_std_deg: 0.3
+      resolution_deg: 1.0
+      scan_rate_hz: 10
+      scan_fov_deg: 270
+      scan_uniformity_percent: 90
+      beam_divergence_mrad: 15.0
+
+    dropout:
+      probability: 0.08
+      distance_dependent: true
+      distance_dropout_model:
+        threshold_distance_m: 12.0
+        max_probability: 0.40
+        curve: "exponential"
+      min_range_dropout: true
+      random_burst_dropout:
+        enabled: true
+        probability: 0.005
+        burst_length: [3, 20] # consecutive samples
+
+    surface:
+      reflectivity_effect: true
+      reflectivity_model:
+        nominal_reflectivity_percent: 80
+        range_reduction_at_10_percent: 0.70
+        dropout_increase_at_low_reflectivity: 0.25
+      angle_of_incidence_effect: true
+      angle_model:
+        max_reliable_angle_deg: 55
+        dropout_increase_per_10_deg: 0.06
+
+    environment:
+      ambient_light_effect: true
+      ambient_light_model:
+        direct_sunlight_range_reduction_percent: 50
+        indirect_bright_range_reduction_percent: 20
+      rain_effect: true
+      rain_model:
+        light_rain_dropout_increase: 0.08
+        heavy_rain_dropout_increase: 0.40
+        range_reduction_percent: 30
+      dust_effect: true
+      dust_model:
+        light_dust_dropout_increase: 0.05
+        heavy_dust_dropout_increase: 0.30
+      fog_effect: true
+      fog_model:
+        thin_fog_range_reduction_percent: 60
+        thick_fog_range_reduction_percent: 95
+
+    multi_return:
+      enabled: false
+
+  # ---------------------------------------------------------------------------
+  # FAILING: LiDAR with severe degradation
+  # ---------------------------------------------------------------------------
+  failing:
+    label: "Failing / Degraded Hardware"
+    description: >
+      Simulates a failing LiDAR with dirty optics, motor issues (scanning),
+      intermittent electronics, and severely degraded performance.
+
+    range:
+      noise_std_m: 0.5
+      bias_m: 0.2
+      quantization_m: 0.1
+      min_range_m: 1.0
+      max_range_m: 8.0 # severely reduced
+      range_walk_error_m: 0.2
+      range_noise_distance_model:
+        base_noise_m: 0.3
+        distance_coefficient: 0.05
+      temperature_drift_m_per_c: 0.02
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 5.0
+        amplitude_m: 0.3
+
+    angular:
+      noise_std_deg: 1.5
+      resolution_deg: 3.0 # scan motor degradation
+      scan_rate_hz: 5 # reduced scan speed
+      scan_fov_deg: 200 # partial scan failure
+      scan_uniformity_percent: 60
+      beam_divergence_mrad: 25.0 # dirty optics widen beam
+      scan_jitter_deg: 2.0
+
+    dropout:
+      probability: 0.35
+      distance_dependent: true
+      distance_dropout_model:
+        threshold_distance_m: 4.0
+        max_probability: 0.80
+        curve: "linear"
+      min_range_dropout: true
+      random_burst_dropout:
+        enabled: true
+        probability: 0.03
+        burst_length: [10, 100]
+      complete_signal_loss:
+        enabled: true
+        probability_per_second: 0.01
+        duration_s: [1.0, 10.0]
+
+    surface:
+      reflectivity_effect: true
+      reflectivity_model:
+        nominal_reflectivity_percent: 80
+        range_reduction_at_10_percent: 0.90
+        dropout_increase_at_low_reflectivity: 0.50
+      angle_of_incidence_effect: true
+      angle_model:
+        max_reliable_angle_deg: 30
+        dropout_increase_per_10_deg: 0.15
+
+    environment:
+      ambient_light_effect: true
+      ambient_light_model:
+        direct_sunlight_range_reduction_percent: 80
+        indirect_bright_range_reduction_percent: 40
+      rain_effect: true
+      rain_model:
+        light_rain_dropout_increase: 0.20
+        heavy_rain_dropout_increase: 0.70
+        range_reduction_percent: 60
+      dust_effect: true
+      dust_model:
+        light_dust_dropout_increase: 0.15
+        heavy_dust_dropout_increase: 0.60
+      fog_effect: true
+      fog_model:
+        thin_fog_range_reduction_percent: 85
+        thick_fog_range_reduction_percent: 99
+
+    multi_return:
+      enabled: false
+
+    failure_modes:
+      ghost_returns:
+        enabled: true
+        probability: 0.05
+        range_offset_m: [2.0, 20.0]
+      stuck_reading:
+        enabled: true
+        probability_per_second: 0.008
+        duration_s: [0.5, 5.0]
+        stuck_value_m: 3.14 # fixed reading
+      oscillating_output:
+        enabled: true
+        probability_per_second: 0.005
+        frequency_hz: 10
+        amplitude_m: 1.0

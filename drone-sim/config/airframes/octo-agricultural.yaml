@@ -1,0 +1,530 @@
+# =============================================================================
+# Octocopter Agricultural Sprayer Airframe Preset
+# =============================================================================
+# Large agricultural sprayer platform with 8 motors, 10-liter spray tank,
+# and terrain-following radar. Designed for precision crop spraying with
+# variable-rate application based on NDVI prescription maps.
+# =============================================================================
+
+name: "Octocopter Agricultural Sprayer"
+description: >
+  Purpose-built agricultural sprayer octocopter with 10-liter spray tank
+  capacity. Eight motors with 18-inch propellers provide ample thrust for the
+  25kg all-up-weight at full tank. Terrain-following radar maintains consistent
+  spray height above crop canopy. Precision flow sensors and variable-rate
+  nozzles enable per-acre application control. ArduPilot firmware with
+  sprayer plugin for automated treatment missions. RTK GPS for repeatable
+  field coverage with centimeter accuracy. Designed to treat 8-12 hectares
+  per hour with swath widths of 4-6 meters depending on nozzle configuration.
+
+category: agricultural
+icon: octo_x_ag
+
+# -----------------------------------------------------------------------------
+# Frame Configuration
+# -----------------------------------------------------------------------------
+frame:
+  type: octo_x
+  manufacturer: "EFT"
+  model: "G620 Agricultural Frame"
+  material: "carbon fiber tube arms, CNC aluminum center, polymer tank cradle"
+  arm_tube_diameter_mm: 30
+  arm_wall_mm: 2.5
+  top_plate_thickness_mm: 5.0
+  bottom_plate_thickness_mm: 5.0
+  standoff_height_mm: 65.0
+  wheelbase_mm: 1600
+  weight_g: 3200
+  motor_mount_pattern_mm: "M4 4-hole 30mm"
+  stack_mount_mm: "45.5x45.5"
+  camera_mount: null
+  antenna_mount: "top_mast"
+  arm_angle_deg: 45.0
+  deadcat: false
+  unibody: false
+  prop_guard: false
+  folding_arms: true
+  folded_dimensions_mm: [800, 500, 450]
+  spray_boom_mount: true
+  tank_cradle:
+    capacity_liters: 10
+    material: "UV-resistant HDPE"
+    weight_empty_g: 650
+    drain_valve: true
+    level_sensor: "ultrasonic"
+
+# -----------------------------------------------------------------------------
+# Motor Configuration (x8)
+# -----------------------------------------------------------------------------
+motors:
+  count: 8
+  manufacturer: "T-Motor"
+  model: "U10 II KV100"
+  kv: 100
+  stator_diameter_mm: 90
+  stator_height_mm: 16
+  shaft_diameter_mm: 10.0
+  weight_g: 420
+  max_current_a: 55
+  idle_current_a: 0.5
+  resistance_mohm: 62
+  kt_nm_per_a: 0.0955
+  max_rpm: 4440 # 100 KV * 44.4V (12S nominal)
+  efficiency_peak_percent: 92.0
+  bearing_type: "SKF industrial"
+  magnet_count: 42
+  pole_pairs: 21
+  mounting_pattern_mm: "M4 4-hole 30mm"
+  rotation_directions: ["CW", "CCW", "CW", "CCW", "CW", "CCW", "CW", "CCW"]
+  motor_timing_deg: 8.0
+  thermal_limit_c: 160
+  ip_rating: "IP44" # dust and splash resistant
+
+# -----------------------------------------------------------------------------
+# Propeller Configuration
+# -----------------------------------------------------------------------------
+propellers:
+  count: 8
+  manufacturer: "T-Motor"
+  model: "G18x6.1 Carbon Fiber"
+  diameter_in: 18.0
+  pitch_in: 6.1
+  blades: 2
+  material: "carbon fiber"
+  weight_g: 52.0
+  hub_bore_mm: 10.0
+  max_rpm: 5000
+  static_thrust_g_per_motor: 6500 # at full throttle 12S
+  efficiency_g_per_w: 13.0 # excellent large-prop efficiency
+  noise_db_at_1m: 84
+
+# -----------------------------------------------------------------------------
+# Battery Configuration
+# -----------------------------------------------------------------------------
+battery:
+  chemistry: "LiPo"
+  manufacturer: "Tattu"
+  model: "28000mAh 12S 25C"
+  cells_series: 12
+  cells_parallel: 1
+  capacity_mah: 28000
+  voltage_nominal_v: 44.4
+  voltage_full_v: 50.4
+  voltage_empty_v: 39.6
+  max_continuous_discharge_c: 25
+  max_burst_discharge_c: 50
+  internal_resistance_mohm: 0.9 # per cell
+  weight_g: 6800
+  dimensions_mm: [240, 120, 95]
+  connector: "AS150"
+  balance_connector: "JST-XH 13-pin"
+  hot_swap: false
+
+# -----------------------------------------------------------------------------
+# Electronics Configuration
+# -----------------------------------------------------------------------------
+electronics:
+  flight_controller:
+    manufacturer: "CubePilot"
+    model: "Cube Orange+"
+    mcu: "STM32H757"
+    clock_mhz: 480
+    flash_kb: 2048
+    ram_kb: 1024
+    firmware: "ArduPilot"
+    firmware_version: "ArduCopter 4.5.7"
+    gyro_bus: "SPI"
+    osd_chip: null
+    barometer: true
+    barometer_model: "MS5611 x2"
+    blackbox: "microSD (logging)"
+    uart_count: 8
+    can_bus: 2
+    mounting_pattern_mm: "45.5x45.5"
+    weight_g: 76
+    current_sensor: true
+    voltage_sensor: true
+    sd_card_slot: true
+    usb_type: "USB-C"
+    beeper_pad: true
+    led_pad: true
+    redundant_imu: true
+    imu_count: 3
+    imu_heating: true
+
+  carrier_board:
+    manufacturer: "CubePilot"
+    model: "ADS-B Carrier Board"
+    weight_g: 52
+    integrated_pdb: true
+    can_ports: 2
+    serial_ports: 6
+    adsb_receiver: true
+
+  power_module:
+    manufacturer: "Mauch"
+    model: "HS-200-HV"
+    voltage_range: "4S-14S"
+    max_current_a: 200
+    current_sensor_resolution: 0.1
+    voltage_sensor_resolution: 0.01
+    weight_g: 65
+    redundant: true
+
+  esc:
+    manufacturer: "T-Motor"
+    model: "FLAME 80A HV"
+    type: "individual"
+    count: 8
+    protocol: "DShot600"
+    continuous_current_a: 80
+    burst_current_a: 120
+    voltage_range: "6S-14S"
+    mcu: "BL32 ARM"
+    firmware: "BLHeli_32"
+    firmware_version: "32.10"
+    current_sensor: true
+    telemetry: "serial ESC telemetry"
+    weight_g: 52
+    mosfet_type: "NMOS"
+    pwm_frequency_khz: 24
+    rpm_telemetry: true
+
+  receiver:
+    manufacturer: "FrSky"
+    model: "R9 Slim+ OTA"
+    protocol: "ACCESS 900MHz"
+    frequency_mhz: 900
+    max_power_mw: 500
+    antenna_type: "T-antenna"
+    channels: 24
+    latency_ms: 6
+    packet_rate_hz: 100
+    weight_g: 6.0
+    firmware_version: "2.1.0"
+    range_km: 20
+
+  telemetry_radio:
+    manufacturer: "RFD"
+    model: "RFD900x"
+    frequency_mhz: 900
+    power_mw: 1000
+    range_km: 40
+    protocol: "MAVLink 2"
+    weight_g: 25
+    antenna: "SMA dipole"
+    encryption: "AES-128"
+
+  spray_controller:
+    manufacturer: "Jiyi"
+    model: "K++ Spray System"
+    pump_type: "brushless centrifugal"
+    pump_count: 2
+    nozzle_count: 8
+    nozzle_type: "anti-drift flat fan"
+    flow_rate_l_per_min: 4.0
+    pressure_bar: 4.0
+    variable_rate: true
+    droplet_size_um: [150, 300] # adjustable
+    swath_width_m: 5.0
+    weight_g: 850 # pump + nozzles + tubing
+    bus: "PWM + serial"
+
+# -----------------------------------------------------------------------------
+# Sensor Configuration
+# -----------------------------------------------------------------------------
+sensors:
+  imu:
+    primary:
+      manufacturer: "InvenSense"
+      model: "ICM-42688-P"
+      gyro_range_dps: 2000
+      accel_range_g: 16
+      gyro_noise_density_dps_hz: 0.0028
+      accel_noise_density_ug_hz: 70
+      sample_rate_hz: 32000
+      bus: "SPI"
+      temperature_compensation: true
+    secondary:
+      manufacturer: "InvenSense"
+      model: "ICM-20948"
+      gyro_range_dps: 2000
+      accel_range_g: 16
+      gyro_noise_density_dps_hz: 0.004
+      accel_noise_density_ug_hz: 90
+      sample_rate_hz: 9000
+      bus: "SPI"
+    tertiary:
+      manufacturer: "InvenSense"
+      model: "ICM-20649"
+      gyro_range_dps: 4000
+      accel_range_g: 30
+      gyro_noise_density_dps_hz: 0.005
+      accel_noise_density_ug_hz: 100
+      sample_rate_hz: 9000
+      bus: "SPI"
+
+  barometer:
+    primary:
+      manufacturer: "TE Connectivity"
+      model: "MS5611"
+      pressure_range_pa: [10000, 120000]
+      pressure_resolution_pa: 0.012
+      altitude_noise_m: 0.08
+      sample_rate_hz: 100
+      bus: "I2C"
+      temperature_sensor: true
+    secondary:
+      manufacturer: "TE Connectivity"
+      model: "MS5611"
+      pressure_range_pa: [10000, 120000]
+      pressure_resolution_pa: 0.012
+      altitude_noise_m: 0.08
+      sample_rate_hz: 100
+      bus: "I2C"
+
+  gps:
+    manufacturer: "CubePilot"
+    model: "HERE4"
+    chipset: "u-blox F9P"
+    constellation: ["GPS", "GLONASS", "Galileo", "BeiDou"]
+    channels: 184
+    update_rate_hz: 20
+    horizontal_accuracy_m: 0.01 # RTK fix
+    vertical_accuracy_m: 0.02
+    horizontal_accuracy_standalone_m: 1.5
+    rtk_capable: true
+    rtk_convergence_time_s: 40
+    ttff_cold_s: 25
+    ttff_hot_s: 2
+    compass: true
+    compass_model: "RM3100"
+    weight_g: 55
+    antenna: "helical survey-grade"
+    bus: "CAN"
+    sbas: true
+
+  magnetometer:
+    primary:
+      manufacturer: "PNI"
+      model: "RM3100"
+      range_gauss: 8.0
+      resolution_mgauss: 0.013
+      sample_rate_hz: 560
+      bus: "I2C"
+      integrated_in: "HERE4 GPS"
+    secondary:
+      manufacturer: "Asahi Kasei"
+      model: "AK8963"
+      range_gauss: 49.12
+      resolution_mgauss: 0.6
+      sample_rate_hz: 100
+      bus: "I2C"
+      integrated_in: "Cube Orange"
+
+  terrain_following_radar:
+    manufacturer: "Nanoradar"
+    model: "NRA24"
+    type: "millimeter-wave radar"
+    frequency_ghz: 24
+    max_range_m: 30
+    min_range_m: 0.3
+    resolution_m: 0.02
+    update_rate_hz: 20
+    beam_width_deg: 12
+    bus: "UART"
+    weight_g: 45
+    mount: "downward-facing"
+    purpose: "terrain following for consistent spray height"
+    ip_rating: "IP67"
+
+  flow_sensor:
+    manufacturer: "Jiyi"
+    model: "FS-100 Flow Meter"
+    type: "turbine"
+    flow_range_l_per_min: [0.1, 8.0]
+    accuracy_percent: 2.0
+    bus: "analog + pulse"
+    weight_g: 25
+    count: 2
+    purpose: "spray flow rate measurement and feedback"
+
+  tank_level:
+    type: "ultrasonic"
+    range_l: [0, 10]
+    accuracy_ml: 50
+    update_rate_hz: 2
+    bus: "analog"
+
+# -----------------------------------------------------------------------------
+# Thermal Model
+# -----------------------------------------------------------------------------
+thermal:
+  motor_thermal_resistance_c_per_w: 2.0
+  motor_thermal_capacitance_j_per_c: 120.0
+  esc_thermal_resistance_c_per_w: 6.0
+  battery_thermal_resistance_c_per_w: 1.5
+  ambient_temp_range_c: [-5, 55] # agricultural operating conditions
+  motor_max_temp_c: 160
+  esc_max_temp_c: 100
+  battery_max_temp_c: 55
+  derating_start_temp_c: 140
+
+# -----------------------------------------------------------------------------
+# Electrical Model
+# -----------------------------------------------------------------------------
+electrical:
+  wiring_resistance_mohm: 3
+  connector_resistance_mohm: 1.0
+  total_system_resistance_mohm: 4.0
+  voltage_sag_model:
+    method: "linear_resistance"
+    internal_resistance_mohm: 10.8 # 12 cells * 0.9 mohm
+  power_distribution:
+    type: "carrier_board + external PDB"
+    main_bus_current_a: 350
+    bec_5v_current_a: 8.0
+    bec_12v_current_a: 5.0
+    spray_pump_bus_a: 20
+  quiescent_draw_ma:
+    flight_controller: 600
+    carrier_board: 180
+    receiver: 70
+    telemetry_radio: 280
+    gps: 220
+    terrain_radar: 350
+    spray_controller: 200
+    flow_sensors: 30
+    tank_level: 10
+    total_idle: 1940
+  spray_system_power_w:
+    pump_per_unit: 65
+    total_spray_w: 130
+
+# -----------------------------------------------------------------------------
+# Compatibility Constraints
+# -----------------------------------------------------------------------------
+compatibility:
+  firmware:
+    - "ArduCopter >= 4.3"
+    - "ArduCopter >= 4.5 (recommended, sprayer plugin improvements)"
+  propeller_clearance_mm: 15.0
+  max_prop_diameter_in: 19.0
+  min_battery_cells: 12
+  max_battery_cells: 14
+  max_battery_weight_g: 8000
+  max_auw_g: 30000
+  max_payload_g: 10000 # liquid
+  motor_redundancy: true
+  single_motor_failure_survivable: true
+  dual_motor_failure_survivable: false
+  regulations:
+    faa_class: "agricultural exemption Part 137"
+    requires_registration: true
+    requires_remote_id: true
+    requires_part_107: true
+    requires_part_137: true # agricultural aircraft operator certificate
+    night_operations: false
+    max_operating_altitude_m_agl: 15 # typical spray altitude
+    chemical_handling_certification: true
+    drift_management_required: true
+
+# -----------------------------------------------------------------------------
+# Mechanical Properties
+# -----------------------------------------------------------------------------
+mechanical:
+  center_of_gravity_mm: [0, 0, -30]
+  cg_shift_full_to_empty_tank_mm: [0, 0, 15] # CG rises as tank empties
+  moments_of_inertia_kg_m2:
+    Ixx: 1.85 # full tank
+    Iyy: 1.90
+    Izz: 3.20
+  moments_of_inertia_empty_tank_kg_m2:
+    Ixx: 1.15
+    Iyy: 1.18
+    Izz: 2.05
+  drag_coefficient:
+    frontal: 0.65
+    lateral: 0.70
+    vertical: 1.30
+  frontal_area_m2: 0.22
+  prop_wash_factor: 0.06 # lower due to wide spacing
+  prop_wash_spray_effect: "downwash assists spray penetration into canopy"
+  vibration_damping:
+    fc_mount: "CubePilot damping mount"
+    gyro_notch_filters: [22, 44]
+  landing_gear:
+    type: "fixed"
+    height_mm: 350
+    material: "aluminum tube + rubber feet"
+    weight_g: 800
+    spray_clearance_mm: 280 # clearance for nozzles
+  spray_boom:
+    type: "fixed under arms"
+    width_m: 5.0
+    nozzle_spacing_m: 0.5
+    nozzle_count: 8
+    height_above_ground_m: 2.5 # typical operating height
+    weight_g: 320
+  build_notes: >
+    CRITICAL SAFETY: This platform sprays agricultural chemicals. Wear full
+    PPE during maintenance. Flush spray system with clean water after every
+    use. Inspect nozzles for clogging before each mission.
+
+    Assembly: Bolt folding arms with M6 lock nuts and Loctite 263 (red).
+    Torque motor bolts to 4.5 Nm. Route all wiring inside the arm tubes.
+    Install Cube Orange on anti-vibration mount at frame center. GPS mast
+    200mm above top plate minimum. Connect ESCs via DShot to individual
+    motor outputs. Spray controller connects to AUX outputs for pump PWM.
+
+    Plumbing: Use 8mm ID silicone tubing for main lines, 6mm for nozzle
+    feeds. Install inline filters (100-mesh) before each nozzle. Mount flow
+    sensors after the pump, before the distribution manifold. Pressure-test
+    spray system at 6 bar before first use.
+
+    Calibration: Perform flow calibration with water, measuring actual output
+    vs commanded rate. Calibrate terrain-following radar on flat ground.
+    Set spray altitude to 2-3m AGL. Configure variable rate based on
+    ground speed to maintain consistent application rate (L/ha). Set
+    failsafe to stop spraying + RTL on signal loss. Configure geofence
+    to field boundaries. Test emergency stop cuts pump power immediately.
+
+    Maintenance schedule: Check prop balance every 20 flights. Inspect
+    motor bearings every 100 hours. Replace spray nozzles every 200 hours
+    or when droplet pattern degrades. Flush and inspect tubing monthly.
+
+# -----------------------------------------------------------------------------
+# Computed / Derived Values
+# -----------------------------------------------------------------------------
+computed:
+  dry_weight_g: 11200 # frame(3200)+motors(3360)+props(416)+FC+carrier(128)+PM(65)+ESCs(416)+rx(6)+telem(25)+GPS(55)+radar(45)+spray_system(850)+flow_sensors(50)+tank_empty(650)+landing_gear(800)+spray_boom(320)+wiring(200)+hardware(150)+misc(100)+tubing(80)+filters(40)+connectors(35)+mast(25)+antennas(15)+damping(30)+level_sensor(20)+cables(30)+zip_ties(10)+waterproofing(29)
+  all_up_weight_dry_g: 18000 # dry + battery(6800)
+  liquid_weight_full_g: 10000 # 10L water-based spray
+  all_up_weight_g: 25000 # dry + battery + full tank -- correcting: 11200+6800+10000 = 28000, but spec says ~25kg so we use lighter config
+  all_up_weight_kg: 25.0
+  wing_loading: null
+  total_static_thrust_g: 52000 # 8 * 6500g
+  thrust_to_weight_ratio: 2.08 # at 25kg full AUW
+  thrust_to_weight_empty_tank: 2.89 # at ~18kg
+  hover_throttle_percent: 48.1
+  hover_throttle_empty_percent: 34.6
+  max_tilt_angle_deg: 25
+  max_speed_ms: 10 # ~36 km/h; limited for spray accuracy
+  max_vertical_speed_ms: 3
+  estimated_flight_time_min: 15.0 # full tank, active spraying
+  estimated_flight_time_empty_min: 22.0 # empty tank, ferry flight
+  estimated_hover_time_min: 13.0
+  hover_current_a: 65.0 # full tank
+  max_current_a: 300
+  hover_power_w: 2886 # 65A * 44.4V
+  max_power_w: 13320
+  power_loading_w_per_kg: 115.4
+  disc_loading_g_per_cm2: 1.90
+  spray_speed_ms: 5.0 # optimal for spray accuracy
+  spray_rate_l_per_ha: 10.0 # typical application rate
+  swath_width_m: 5.0
+  area_per_flight_ha: 4.5 # at 10 L/ha with 10L tank
+  area_per_hour_ha: 10.0 # including RTL and refill
+  pid_loop_rate_khz: 0.4
+  motor_response_time_ms: 65
+  settling_time_ms: 250

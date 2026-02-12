@@ -1,0 +1,191 @@
+# =============================================================================
+# IMU Sensor Noise Model Configuration
+# =============================================================================
+# Defines noise characteristics for gyroscope and accelerometer sensors.
+# Based on Allan variance parameters commonly used in INS/GNSS simulation.
+# Reference: IEEE Std 952-1997 (gyro noise), MIL-STD-1553 (accel noise).
+# =============================================================================
+
+sensor_type: imu
+description: >
+  Inertial Measurement Unit noise model covering gyroscope and accelerometer
+  error sources. Includes bias instability, random walk, noise density,
+  scale factor error, cross-axis sensitivity, and temperature-dependent drift.
+  Parameters follow the Allan variance decomposition standard.
+
+update_rate_hz: 8000
+axes: ["x", "y", "z"]
+
+# =============================================================================
+# Presets
+# =============================================================================
+
+presets:
+  # ---------------------------------------------------------------------------
+  # PERFECT: No noise -- ideal sensor for baseline testing
+  # ---------------------------------------------------------------------------
+  perfect:
+    label: "Perfect (No Noise)"
+    description: "Ideal sensor with zero noise for algorithm validation"
+
+    gyroscope:
+      noise_density_dps_per_sqrt_hz: 0.0
+      bias_instability_dps: 0.0
+      bias_initial_dps: [0.0, 0.0, 0.0]
+      random_walk_dps_per_sqrt_s: 0.0
+      scale_factor_error_ppm: 0
+      cross_axis_sensitivity_ppm: 0
+      quantization_dps: 0.0
+      saturation_dps: 2000
+      bandwidth_hz: 4000
+      temperature_sensitivity_dps_per_c: 0.0
+      temperature_bias_drift_dps_per_c: 0.0
+      nonlinearity_percent_fs: 0.0
+
+    accelerometer:
+      noise_density_ug_per_sqrt_hz: 0.0
+      bias_instability_mg: 0.0
+      bias_initial_mg: [0.0, 0.0, 0.0]
+      random_walk_m_per_s_per_sqrt_s: 0.0
+      scale_factor_error_ppm: 0
+      cross_axis_sensitivity_ppm: 0
+      quantization_mg: 0.0
+      saturation_g: 16
+      bandwidth_hz: 4000
+      temperature_sensitivity_mg_per_c: 0.0
+      temperature_bias_drift_mg_per_c: 0.0
+      nonlinearity_percent_fs: 0.0
+
+    alignment:
+      misalignment_mrad: [0.0, 0.0, 0.0]
+      gyro_accel_misalignment_mrad: [0.0, 0.0, 0.0]
+
+  # ---------------------------------------------------------------------------
+  # TYPICAL: Realistic consumer MEMS IMU (e.g., BMI270, ICM-42688-P)
+  # ---------------------------------------------------------------------------
+  typical:
+    label: "Typical Consumer MEMS"
+    description: "Realistic noise for a modern consumer MEMS IMU like BMI270"
+
+    gyroscope:
+      noise_density_dps_per_sqrt_hz: 0.007
+      bias_instability_dps: 3.0 # degrees per hour
+      bias_initial_dps: [0.15, -0.10, 0.08]
+      random_walk_dps_per_sqrt_s: 0.0015
+      scale_factor_error_ppm: 200
+      cross_axis_sensitivity_ppm: 50
+      quantization_dps: 0.004
+      saturation_dps: 2000
+      bandwidth_hz: 3200
+      temperature_sensitivity_dps_per_c: 0.015
+      temperature_bias_drift_dps_per_c: 0.012
+      nonlinearity_percent_fs: 0.05
+
+    accelerometer:
+      noise_density_ug_per_sqrt_hz: 160
+      bias_instability_mg: 0.04
+      bias_initial_mg: [5.0, -3.0, 8.0]
+      random_walk_m_per_s_per_sqrt_s: 0.002
+      scale_factor_error_ppm: 300
+      cross_axis_sensitivity_ppm: 100
+      quantization_mg: 0.06
+      saturation_g: 16
+      bandwidth_hz: 1600
+      temperature_sensitivity_mg_per_c: 0.15
+      temperature_bias_drift_mg_per_c: 0.08
+      nonlinearity_percent_fs: 0.1
+
+    alignment:
+      misalignment_mrad: [1.0, -0.8, 0.5]
+      gyro_accel_misalignment_mrad: [0.5, 0.3, -0.2]
+
+  # ---------------------------------------------------------------------------
+  # NOISY: Degraded or low-quality MEMS IMU
+  # ---------------------------------------------------------------------------
+  noisy:
+    label: "Noisy / Low-Quality MEMS"
+    description: "Degraded IMU with significant noise and drift, e.g., MPU-6050"
+
+    gyroscope:
+      noise_density_dps_per_sqrt_hz: 0.03
+      bias_instability_dps: 15.0
+      bias_initial_dps: [0.8, -1.2, 0.5]
+      random_walk_dps_per_sqrt_s: 0.008
+      scale_factor_error_ppm: 1000
+      cross_axis_sensitivity_ppm: 300
+      quantization_dps: 0.06
+      saturation_dps: 2000
+      bandwidth_hz: 1000
+      temperature_sensitivity_dps_per_c: 0.08
+      temperature_bias_drift_dps_per_c: 0.06
+      nonlinearity_percent_fs: 0.2
+
+    accelerometer:
+      noise_density_ug_per_sqrt_hz: 400
+      bias_instability_mg: 0.2
+      bias_initial_mg: [20.0, -15.0, 25.0]
+      random_walk_m_per_s_per_sqrt_s: 0.012
+      scale_factor_error_ppm: 1500
+      cross_axis_sensitivity_ppm: 500
+      quantization_mg: 0.5
+      saturation_g: 16
+      bandwidth_hz: 500
+      temperature_sensitivity_mg_per_c: 0.8
+      temperature_bias_drift_mg_per_c: 0.4
+      nonlinearity_percent_fs: 0.5
+
+    alignment:
+      misalignment_mrad: [5.0, -4.0, 3.0]
+      gyro_accel_misalignment_mrad: [2.5, 1.5, -1.0]
+
+  # ---------------------------------------------------------------------------
+  # FAILING: Sensor experiencing hardware degradation or failure modes
+  # ---------------------------------------------------------------------------
+  failing:
+    label: "Failing / Degraded Hardware"
+    description: >
+      Simulates a failing IMU with intermittent spikes, extreme drift,
+      and occasional stuck readings. Useful for testing EKF robustness
+      and sensor health monitoring.
+
+    gyroscope:
+      noise_density_dps_per_sqrt_hz: 0.1
+      bias_instability_dps: 60.0
+      bias_initial_dps: [3.0, -5.0, 2.0]
+      random_walk_dps_per_sqrt_s: 0.05
+      scale_factor_error_ppm: 5000
+      cross_axis_sensitivity_ppm: 2000
+      quantization_dps: 0.5
+      saturation_dps: 2000
+      bandwidth_hz: 500
+      temperature_sensitivity_dps_per_c: 0.5
+      temperature_bias_drift_dps_per_c: 0.3
+      nonlinearity_percent_fs: 1.0
+      spike_probability: 0.005 # 0.5% chance per sample
+      spike_magnitude_dps: 500
+      stuck_probability: 0.001 # 0.1% chance of stuck reading
+      stuck_duration_samples: 50
+
+    accelerometer:
+      noise_density_ug_per_sqrt_hz: 1500
+      bias_instability_mg: 2.0
+      bias_initial_mg: [80.0, -60.0, 100.0]
+      random_walk_m_per_s_per_sqrt_s: 0.08
+      scale_factor_error_ppm: 8000
+      cross_axis_sensitivity_ppm: 3000
+      quantization_mg: 2.0
+      saturation_g: 16
+      bandwidth_hz: 250
+      temperature_sensitivity_mg_per_c: 3.0
+      temperature_bias_drift_mg_per_c: 2.0
+      nonlinearity_percent_fs: 2.0
+      spike_probability: 0.003
+      spike_magnitude_g: 5.0
+      stuck_probability: 0.001
+      stuck_duration_samples: 80
+
+    alignment:
+      misalignment_mrad: [15.0, -12.0, 10.0]
+      gyro_accel_misalignment_mrad: [8.0, 5.0, -4.0]
+      time_varying_misalignment: true
+      misalignment_drift_mrad_per_hour: 0.5

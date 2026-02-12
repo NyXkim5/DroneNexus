@@ -1,0 +1,15 @@
+appId: com.nexus.drone-sim
+productName: NEXUS Drone Simulator
+directories:
+  output: release
+files:
+  - dist/**/*
+  - main/**/*
+  - package.json
+mac:
+  category: public.app-category.developer-tools
+  target: dmg
+win:
+  target: nsis
+linux:
+  target: AppImage

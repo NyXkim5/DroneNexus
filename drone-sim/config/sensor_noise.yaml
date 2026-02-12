@@ -1,0 +1,32 @@
+# Sensor noise configuration for NEXUS drone simulation
+# Used by the SensorNoisePlugin Gazebo plugin
+
+imu:
+  enabled: true
+  accel_noise_density: 0.004       # m/s^2/sqrt(Hz)
+  accel_random_walk: 0.0006        # m/s^3/sqrt(Hz)
+  gyro_noise_density: 0.0002       # rad/s/sqrt(Hz)
+  gyro_random_walk: 0.00004        # rad/s^2/sqrt(Hz)
+
+gps:
+  enabled: true
+  position_noise_m: 0.5            # meters horizontal stddev
+  velocity_noise_ms: 0.1           # m/s velocity noise
+  hdop_base: 1.0                   # base HDOP value
+  hdop_variance: 0.2               # HDOP random variation
+  dropout_probability: 0.0         # probability of GPS loss per second (0=never)
+  dropout_duration_sec: 2.0        # how long a dropout lasts
+
+barometer:
+  enabled: true
+  altitude_noise_m: 0.1            # meters altitude noise
+  pressure_noise_pa: 5.0           # Pascals pressure noise
+  temperature_drift_k: 0.5         # Kelvin temperature drift
+
+magnetometer:
+  enabled: true
+  hard_iron_x: 0.0                 # hard iron bias X (Tesla)
+  hard_iron_y: 0.0                 # hard iron bias Y
+  hard_iron_z: 0.0                 # hard iron bias Z
+  soft_iron_scale: 1.0             # soft iron scaling factor
+  noise_stddev: 0.001              # white noise standard deviation

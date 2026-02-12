@@ -1,0 +1,7 @@
+string airframe_name
+string airframe_yaml
+float64 all_up_weight_g
+float64 thrust_to_weight
+float64 max_flight_time_min
+int32 motor_count
+string frame_layout

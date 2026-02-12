@@ -1,0 +1,272 @@
+# =============================================================================
+# GPS Sensor Noise Model Configuration
+# =============================================================================
+# Defines noise characteristics for GNSS receivers including position error,
+# velocity error, multipath, signal dropout, and atmospheric effects.
+# Based on u-blox M8/F9P performance specifications and empirical models.
+# =============================================================================
+
+sensor_type: gps
+description: >
+  GNSS receiver noise model covering horizontal and vertical position accuracy,
+  velocity accuracy, signal dropout, multipath error, satellite geometry
+  effects (HDOP/VDOP), and atmospheric error sources. Supports RTK, SBAS,
+  and standalone positioning modes with realistic temporal correlation.
+
+update_rate_hz: 10
+coordinate_frame: "WGS84"
+
+# =============================================================================
+# Presets
+# =============================================================================
+
+presets:
+  # ---------------------------------------------------------------------------
+  # PERFECT: No noise -- ideal GPS for baseline testing
+  # ---------------------------------------------------------------------------
+  perfect:
+    label: "Perfect (No Noise)"
+    description: "Ideal GPS with zero error for algorithm validation"
+
+    position:
+      horizontal_accuracy_m: 0.0
+      vertical_accuracy_m: 0.0
+      horizontal_noise_std_m: 0.0
+      vertical_noise_std_m: 0.0
+      position_bias_m: [0.0, 0.0, 0.0] # north, east, down
+      time_correlated_noise:
+        enabled: false
+
+    velocity:
+      horizontal_accuracy_ms: 0.0
+      vertical_accuracy_ms: 0.0
+      velocity_noise_std_ms: 0.0
+
+    timing:
+      time_accuracy_ns: 0
+      pps_jitter_ns: 0
+
+    fix_quality:
+      fix_type: "RTK_FIXED" # always perfect fix
+      satellites_visible: 24
+      hdop: 0.5
+      vdop: 0.8
+      pdop: 0.9
+
+    signal:
+      dropout_probability: 0.0
+      dropout_duration_s: 0
+      multipath:
+        enabled: false
+      ionospheric_delay_m: 0.0
+      tropospheric_delay_m: 0.0
+
+    startup:
+      ttff_cold_s: 0
+      ttff_warm_s: 0
+      ttff_hot_s: 0
+
+  # ---------------------------------------------------------------------------
+  # TYPICAL: Realistic consumer GNSS (u-blox M8N / M10 standalone)
+  # ---------------------------------------------------------------------------
+  typical:
+    label: "Typical Consumer GNSS"
+    description: "Realistic noise for a modern multi-constellation GNSS receiver"
+
+    position:
+      horizontal_accuracy_m: 2.0 # CEP50
+      vertical_accuracy_m: 3.5
+      horizontal_noise_std_m: 1.2
+      vertical_noise_std_m: 2.0
+      position_bias_m: [0.3, -0.2, 0.8]
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 60.0
+        amplitude_m: 0.5
+
+    velocity:
+      horizontal_accuracy_ms: 0.1
+      vertical_accuracy_ms: 0.15
+      velocity_noise_std_ms: 0.05
+
+    timing:
+      time_accuracy_ns: 30
+      pps_jitter_ns: 10
+
+    fix_quality:
+      fix_type: "3D_FIX"
+      satellites_visible: 14 # typical multi-constellation
+      hdop: 1.2
+      vdop: 1.8
+      pdop: 2.1
+      hdop_variation:
+        min: 0.8
+        max: 3.0
+        change_rate: 0.01 # per second
+
+    signal:
+      dropout_probability: 0.002 # per update
+      dropout_duration_s: [0.5, 3.0] # min, max
+      multipath:
+        enabled: true
+        environment: "suburban"
+        additional_error_m: 1.5
+        temporal_correlation_s: 5.0
+        probability: 0.05
+      ionospheric_delay_m: 2.0 # residual after correction
+      tropospheric_delay_m: 0.5
+      cn0_threshold_dbhz: 25
+
+    startup:
+      ttff_cold_s: 26
+      ttff_warm_s: 5
+      ttff_hot_s: 1
+      acquisition_noise_m: 15.0 # initial position scatter
+      convergence_time_s: 30
+
+  # ---------------------------------------------------------------------------
+  # NOISY: Degraded GPS in challenging environment (urban canyon, forest)
+  # ---------------------------------------------------------------------------
+  noisy:
+    label: "Noisy / Urban Canyon"
+    description: "Degraded GPS in challenging signal environments with frequent multipath"
+
+    position:
+      horizontal_accuracy_m: 8.0
+      vertical_accuracy_m: 15.0
+      horizontal_noise_std_m: 5.0
+      vertical_noise_std_m: 8.0
+      position_bias_m: [2.0, -3.0, 5.0]
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 120.0
+        amplitude_m: 4.0
+
+    velocity:
+      horizontal_accuracy_ms: 0.5
+      vertical_accuracy_ms: 0.8
+      velocity_noise_std_ms: 0.3
+
+    timing:
+      time_accuracy_ns: 100
+      pps_jitter_ns: 50
+
+    fix_quality:
+      fix_type: "3D_FIX" # may degrade to 2D
+      satellites_visible: 6
+      hdop: 4.5
+      vdop: 6.0
+      pdop: 7.5
+      hdop_variation:
+        min: 2.0
+        max: 15.0
+        change_rate: 0.1
+      fix_type_transitions:
+        probability_3d_to_2d: 0.02
+        probability_2d_to_no_fix: 0.005
+        probability_recovery: 0.05
+
+    signal:
+      dropout_probability: 0.05
+      dropout_duration_s: [1.0, 15.0]
+      dropout_clustering: true # dropouts tend to occur in bursts
+      multipath:
+        enabled: true
+        environment: "urban_canyon"
+        additional_error_m: 8.0
+        temporal_correlation_s: 15.0
+        probability: 0.30
+        nlos_probability: 0.10 # non-line-of-sight reflections
+        nlos_additional_error_m: 25.0
+      ionospheric_delay_m: 5.0
+      tropospheric_delay_m: 1.5
+      cn0_threshold_dbhz: 20
+
+    startup:
+      ttff_cold_s: 60
+      ttff_warm_s: 15
+      ttff_hot_s: 3
+      acquisition_noise_m: 50.0
+      convergence_time_s: 120
+
+  # ---------------------------------------------------------------------------
+  # FAILING: GPS experiencing severe degradation or jamming
+  # ---------------------------------------------------------------------------
+  failing:
+    label: "Failing / Jammed"
+    description: >
+      Simulates GPS under severe degradation: heavy interference, spoofing
+      attempts, antenna damage, or dense urban blockage. Tests EKF
+      behavior when GPS becomes unreliable.
+
+    position:
+      horizontal_accuracy_m: 50.0
+      vertical_accuracy_m: 80.0
+      horizontal_noise_std_m: 25.0
+      vertical_noise_std_m: 40.0
+      position_bias_m: [15.0, -20.0, 30.0]
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 300.0
+        amplitude_m: 20.0
+      position_jump:
+        enabled: true
+        probability_per_update: 0.01
+        max_jump_m: 100.0
+
+    velocity:
+      horizontal_accuracy_ms: 3.0
+      vertical_accuracy_ms: 5.0
+      velocity_noise_std_ms: 2.0
+      velocity_spike:
+        enabled: true
+        probability: 0.005
+        max_spike_ms: 50.0
+
+    timing:
+      time_accuracy_ns: 1000
+      pps_jitter_ns: 500
+
+    fix_quality:
+      fix_type: "NO_FIX" # frequently no fix
+      satellites_visible: 2
+      hdop: 50.0
+      vdop: 99.0
+      pdop: 99.0
+      fix_type_transitions:
+        probability_fix_available: 0.15 # only 15% of the time
+        probability_3d_to_2d: 0.30
+        probability_2d_to_no_fix: 0.40
+        probability_recovery: 0.01
+
+    signal:
+      dropout_probability: 0.40
+      dropout_duration_s: [5.0, 60.0]
+      dropout_clustering: true
+      multipath:
+        enabled: true
+        environment: "severe"
+        additional_error_m: 30.0
+        temporal_correlation_s: 60.0
+        probability: 0.60
+        nlos_probability: 0.40
+        nlos_additional_error_m: 80.0
+      jamming:
+        enabled: true
+        j_to_s_ratio_db: 30
+        affected_bands: ["L1", "L2"]
+      spoofing:
+        enabled: false # can enable for testing
+        drift_rate_m_per_s: 0.0
+      ionospheric_delay_m: 15.0
+      tropospheric_delay_m: 5.0
+      cn0_threshold_dbhz: 15
+
+    startup:
+      ttff_cold_s: 300
+      ttff_warm_s: 60
+      ttff_hot_s: 30
+      acquisition_noise_m: 200.0
+      convergence_time_s: 600
+      may_fail_to_acquire: true
+      acquisition_failure_probability: 0.50

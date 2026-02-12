@@ -1,0 +1,24 @@
+# Wind configuration for NEXUS drone simulation
+# Used by the WindPlugin Gazebo plugin
+
+wind:
+  mean_speed_ms: 3.0               # mean wind speed in m/s
+  mean_direction_deg: 270.0        # wind FROM west (meteorological convention)
+  mean_vertical_ms: 0.0            # vertical wind component
+
+  gusts:
+    enabled: true
+    speed_ms: 5.0                  # additional gust speed
+    duration_sec: 2.0              # gust duration
+    interval_mean_sec: 30.0        # mean time between gusts (exponential)
+    direction_variance_deg: 30.0   # gust direction variance from mean
+
+  turbulence:
+    enabled: true
+    intensity: 0.1                 # 0.0=calm, 0.5=moderate, 1.0=severe
+    length_scale_m: 200.0          # turbulence length scale
+
+  drag_coefficient: 1.0            # aerodynamic drag coefficient
+  frontal_area_m2: 0.1             # drone frontal area
+  altitude_scaling: true           # logarithmic wind profile with altitude
+  surface_roughness: 0.01          # terrain roughness parameter (z0)

@@ -1,0 +1,12 @@
+{
+  "name": "nexus-swarm-system",
+  "version": "1.0.0",
+  "description": "NEXUS - Swarm Telemetry & Coordination System",
+  "scripts": {
+    "generate-doc": "node src/docs/generate-doc.js",
+    "build": "node src/docs/generate-doc.js && cp src/hud/index.html dist/nexus-hud.html"
+  },
+  "dependencies": {
+    "docx": "^8.5.0"
+  }
+}

@@ -1,0 +1,165 @@
+# =============================================================================
+# Simple Square Mission
+# =============================================================================
+# Basic 4-waypoint square pattern for testing waypoint navigation, heading
+# control, and position hold accuracy. Suitable for initial flight validation
+# and PID tuning verification.
+# =============================================================================
+
+mission:
+  name: "Simple Square"
+  description: >
+    Four-waypoint square pattern at constant altitude. The drone takes off,
+    climbs to mission altitude, flies a square pattern visiting each corner
+    waypoint, then returns to launch and lands. Useful for validating basic
+    waypoint navigation, heading tracking, and position hold performance.
+  version: "1.0"
+  author: "NEXUS Drone Sim"
+  created: "2025-10-01"
+
+# -----------------------------------------------------------------------------
+# Mission Parameters
+# -----------------------------------------------------------------------------
+parameters:
+  coordinate_frame: "local_ENU" # East-North-Up relative to home
+  home_position:
+    latitude_deg: 37.7749
+    longitude_deg: -122.4194
+    altitude_msl_m: 10.0
+    heading_deg: 0.0 # North
+
+  defaults:
+    altitude_m: 20.0 # AGL
+    speed_ms: 5.0
+    acceptance_radius_m: 2.0
+    yaw_behavior: "next_waypoint" # face toward next WP
+    loiter_time_s: 0.0
+
+  safety:
+    max_altitude_m: 50.0
+    geofence_radius_m: 200.0
+    geofence_action: "RTL"
+    min_battery_percent: 20
+    failsafe_action: "RTL"
+    wind_abort_speed_ms: 12.0
+
+# -----------------------------------------------------------------------------
+# Waypoints
+# -----------------------------------------------------------------------------
+waypoints:
+  - id: 1
+    name: "Takeoff"
+    type: "takeoff"
+    position:
+      x_m: 0.0
+      y_m: 0.0
+      z_m: 20.0
+    speed_ms: 2.0
+    heading_deg: 0.0
+    hold_time_s: 3.0
+    notes: "Vertical climb to 20m, hold 3 seconds to stabilize"
+
+  - id: 2
+    name: "Corner A (NE)"
+    type: "waypoint"
+    position:
+      x_m: 50.0
+      y_m: 50.0
+      z_m: 20.0
+    speed_ms: 5.0
+    acceptance_radius_m: 2.0
+    heading_deg: null # auto: face next waypoint
+    hold_time_s: 2.0
+    notes: "Northeast corner of square"
+
+  - id: 3
+    name: "Corner B (SE)"
+    type: "waypoint"
+    position:
+      x_m: 50.0
+      y_m: -50.0
+      z_m: 20.0
+    speed_ms: 5.0
+    acceptance_radius_m: 2.0
+    heading_deg: null
+    hold_time_s: 2.0
+    notes: "Southeast corner of square"
+
+  - id: 4
+    name: "Corner C (SW)"
+    type: "waypoint"
+    position:
+      x_m: -50.0
+      y_m: -50.0
+      z_m: 20.0
+    speed_ms: 5.0
+    acceptance_radius_m: 2.0
+    heading_deg: null
+    hold_time_s: 2.0
+    notes: "Southwest corner of square"
+
+  - id: 5
+    name: "Corner D (NW)"
+    type: "waypoint"
+    position:
+      x_m: -50.0
+      y_m: 50.0
+      z_m: 20.0
+    speed_ms: 5.0
+    acceptance_radius_m: 2.0
+    heading_deg: null
+    hold_time_s: 2.0
+    notes: "Northwest corner of square"
+
+  - id: 6
+    name: "Return to Launch"
+    type: "waypoint"
+    position:
+      x_m: 0.0
+      y_m: 0.0
+      z_m: 20.0
+    speed_ms: 5.0
+    acceptance_radius_m: 2.0
+    heading_deg: 0.0
+    hold_time_s: 3.0
+    notes: "Return overhead of home position"
+
+  - id: 7
+    name: "Land"
+    type: "land"
+    position:
+      x_m: 0.0
+      y_m: 0.0
+      z_m: 0.0
+    speed_ms: 1.5
+    heading_deg: 0.0
+    precision_land: false
+    notes: "Descend and land at home position"
+
+# -----------------------------------------------------------------------------
+# Mission Geometry Summary
+# -----------------------------------------------------------------------------
+geometry:
+  pattern: "square"
+  side_length_m: 100.0
+  perimeter_m: 400.0
+  area_m2: 10000.0
+  total_distance_m: 490.0 # including takeoff/landing transit
+  estimated_duration_s: 130.0 # at 5 m/s + holds + takeoff/land
+  altitude_changes: 0 # flat mission
+  max_turn_angle_deg: 90
+
+# -----------------------------------------------------------------------------
+# Expected Performance (for validation)
+# -----------------------------------------------------------------------------
+expected_performance:
+  position_accuracy_m: 2.0 # within acceptance radius
+  altitude_accuracy_m: 0.5
+  heading_accuracy_deg: 5.0
+  speed_accuracy_ms: 0.5
+  total_energy_wh: 8.0 # rough estimate for 5" quad
+  compatible_airframes:
+    - "5inch-fpv-freestyle"
+    - "3inch-cinewhoop"
+    - "7inch-long-range"
+    - "mapping-quad"

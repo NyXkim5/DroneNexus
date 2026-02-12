@@ -1,0 +1,5 @@
+string yaml_path
+---
+bool success
+string message
+drone_interfaces/AirframeConfig config

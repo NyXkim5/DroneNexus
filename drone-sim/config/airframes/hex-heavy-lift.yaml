@@ -1,0 +1,474 @@
+# =============================================================================
+# Hexacopter Heavy-Lift Airframe Preset
+# =============================================================================
+# Heavy-lift hexacopter platform designed for carrying substantial payloads
+# including cinema cameras, gimbals, LiDAR scanners, and delivery packages.
+# Motor redundancy (6 motors) provides single-motor-failure survivability.
+# =============================================================================
+
+name: "Hexacopter Heavy-Lift"
+description: >
+  Industrial heavy-lift hexacopter built for 5kg+ payload capacity. Six T-Motor
+  U8 Lite motors on 15-inch propellers provide over 30kg of static thrust with
+  single-motor-failure tolerance. Powered by 12S 22000mAh battery for extended
+  flight endurance. Cube Orange flight controller running ArduPilot with full
+  redundant sensor suite. RTK GPS for precision positioning. Designed for
+  professional cinema, LiDAR survey, delivery, and industrial inspection
+  operations requiring heavy payload capacity and reliable flight.
+
+category: heavy_lift
+icon: hex_x_heavy
+
+# -----------------------------------------------------------------------------
+# Frame Configuration
+# -----------------------------------------------------------------------------
+frame:
+  type: hex_x
+  manufacturer: "Tarot"
+  model: "X6 960mm"
+  material: "3K carbon fiber tube arms, aluminum CNC center hub"
+  arm_tube_diameter_mm: 25
+  arm_wall_mm: 2.0
+  top_plate_thickness_mm: 4.0
+  bottom_plate_thickness_mm: 4.0
+  standoff_height_mm: 55.0
+  wheelbase_mm: 960
+  weight_g: 1450
+  motor_mount_pattern_mm: "M3 4-hole 25mm"
+  stack_mount_mm: "45.5x45.5"
+  camera_mount: "gimbal_rail_bottom"
+  antenna_mount: "top_mast"
+  arm_angle_deg: 60.0
+  deadcat: false
+  unibody: false
+  prop_guard: false
+  folding_arms: true
+  folded_dimensions_mm: [550, 350, 280]
+  retractable_landing_gear: true
+
+# -----------------------------------------------------------------------------
+# Motor Configuration (x6)
+# -----------------------------------------------------------------------------
+motors:
+  count: 6
+  manufacturer: "T-Motor"
+  model: "U8 Lite KV150"
+  kv: 150
+  stator_diameter_mm: 85
+  stator_height_mm: 14
+  shaft_diameter_mm: 8.0
+  weight_g: 240
+  max_current_a: 45
+  idle_current_a: 0.4
+  resistance_mohm: 85
+  kt_nm_per_a: 0.0637
+  max_rpm: 6660 # 150 KV * 44.4V (12S nominal)
+  efficiency_peak_percent: 91.0
+  bearing_type: "NSK Japan high-load"
+  magnet_count: 42
+  pole_pairs: 21
+  mounting_pattern_mm: "M3 4-hole 25mm"
+  rotation_directions: ["CW", "CCW", "CW", "CCW", "CW", "CCW"]
+  motor_timing_deg: 10.0
+  thermal_limit_c: 150
+
+# -----------------------------------------------------------------------------
+# Propeller Configuration
+# -----------------------------------------------------------------------------
+propellers:
+  count: 6
+  manufacturer: "T-Motor"
+  model: "G15x5 Carbon Fiber"
+  diameter_in: 15.0
+  pitch_in: 5.0
+  blades: 2
+  material: "carbon fiber"
+  weight_g: 32.0
+  hub_bore_mm: 8.0
+  max_rpm: 7500
+  static_thrust_g_per_motor: 5200 # at full throttle 12S
+  efficiency_g_per_w: 12.0 # at hover -- excellent efficiency
+  noise_db_at_1m: 80
+
+# -----------------------------------------------------------------------------
+# Battery Configuration
+# -----------------------------------------------------------------------------
+battery:
+  chemistry: "LiPo"
+  manufacturer: "Tattu"
+  model: "22000mAh 12S 25C"
+  cells_series: 12
+  cells_parallel: 1
+  capacity_mah: 22000
+  voltage_nominal_v: 44.4
+  voltage_full_v: 50.4
+  voltage_empty_v: 39.6
+  max_continuous_discharge_c: 25
+  max_burst_discharge_c: 50
+  internal_resistance_mohm: 1.2 # per cell
+  weight_g: 4950
+  dimensions_mm: [210, 100, 85]
+  connector: "AS150"
+  balance_connector: "JST-XH 13-pin"
+
+# -----------------------------------------------------------------------------
+# Electronics Configuration
+# -----------------------------------------------------------------------------
+electronics:
+  flight_controller:
+    manufacturer: "CubePilot"
+    model: "Cube Orange+"
+    mcu: "STM32H757"
+    clock_mhz: 480
+    flash_kb: 2048
+    ram_kb: 1024
+    firmware: "ArduPilot"
+    firmware_version: "ArduCopter 4.5.7"
+    gyro_bus: "SPI"
+    osd_chip: null
+    barometer: true
+    barometer_model: "MS5611 x2 + ICM20948 baro"
+    blackbox: "microSD (logging)"
+    uart_count: 8
+    can_bus: 2
+    mounting_pattern_mm: "45.5x45.5"
+    weight_g: 76
+    current_sensor: true
+    voltage_sensor: true
+    sd_card_slot: true
+    usb_type: "USB-C"
+    beeper_pad: true
+    led_pad: true
+    redundant_imu: true
+    imu_count: 3
+    imu_heating: true
+
+  carrier_board:
+    manufacturer: "CubePilot"
+    model: "Kore Carrier Board"
+    weight_g: 45
+    integrated_pdb: true
+    can_ports: 2
+    serial_ports: 6
+    i2c_ports: 2
+    power_input: "12S direct"
+
+  power_module:
+    manufacturer: "Mauch"
+    model: "HS-200-HV"
+    voltage_range: "4S-14S"
+    max_current_a: 200
+    current_sensor_resolution: 0.1
+    voltage_sensor_resolution: 0.01
+    weight_g: 65
+    redundant: true
+
+  esc:
+    manufacturer: "T-Motor"
+    model: "FLAME 60A HV"
+    type: "individual"
+    count: 6
+    protocol: "DShot600"
+    continuous_current_a: 60
+    burst_current_a: 80
+    voltage_range: "6S-14S"
+    mcu: "BL32 ARM"
+    firmware: "BLHeli_32"
+    firmware_version: "32.10"
+    current_sensor: true
+    telemetry: "serial ESC telemetry"
+    weight_g: 38
+    mosfet_type: "NMOS"
+    pwm_frequency_khz: 24
+    rpm_telemetry: true
+
+  receiver:
+    manufacturer: "TBS"
+    model: "Crossfire Diversity Nano RX"
+    protocol: "CRSF"
+    frequency_mhz: 900
+    max_power_mw: 500
+    antenna_type: "dual immortal-T diversity"
+    channels: 16
+    latency_ms: 4
+    packet_rate_hz: 150
+    weight_g: 5.0
+    firmware_version: "6.37"
+    range_km: 40
+
+  telemetry_radio:
+    manufacturer: "RFD"
+    model: "RFD900x"
+    frequency_mhz: 900
+    power_mw: 1000
+    range_km: 40
+    protocol: "MAVLink 2"
+    weight_g: 25
+    antenna: "SMA dipole"
+    encryption: "AES-128"
+
+  companion_computer:
+    manufacturer: "NVIDIA"
+    model: "Jetson Orin Nano"
+    cpu: "6-core ARM Cortex-A78AE"
+    gpu: "1024-core Ampere"
+    ram_gb: 8
+    ai_tops: 40
+    weight_g: 60
+    power_w: 15
+    interface: "MAVLink over serial + Ethernet"
+    purpose: "payload management, obstacle avoidance, AI inference"
+
+# -----------------------------------------------------------------------------
+# Sensor Configuration
+# -----------------------------------------------------------------------------
+sensors:
+  imu:
+    primary:
+      manufacturer: "InvenSense"
+      model: "ICM-42688-P"
+      gyro_range_dps: 2000
+      accel_range_g: 16
+      gyro_noise_density_dps_hz: 0.0028
+      accel_noise_density_ug_hz: 70
+      sample_rate_hz: 32000
+      bus: "SPI"
+      temperature_compensation: true
+    secondary:
+      manufacturer: "InvenSense"
+      model: "ICM-20948"
+      gyro_range_dps: 2000
+      accel_range_g: 16
+      gyro_noise_density_dps_hz: 0.004
+      accel_noise_density_ug_hz: 90
+      sample_rate_hz: 9000
+      bus: "SPI"
+      temperature_compensation: true
+    tertiary:
+      manufacturer: "InvenSense"
+      model: "ICM-20649"
+      gyro_range_dps: 4000
+      accel_range_g: 30
+      gyro_noise_density_dps_hz: 0.005
+      accel_noise_density_ug_hz: 100
+      sample_rate_hz: 9000
+      bus: "SPI"
+
+  barometer:
+    primary:
+      manufacturer: "TE Connectivity"
+      model: "MS5611"
+      pressure_range_pa: [10000, 120000]
+      pressure_resolution_pa: 0.012
+      altitude_noise_m: 0.08
+      sample_rate_hz: 100
+      bus: "I2C"
+      temperature_sensor: true
+    secondary:
+      manufacturer: "TE Connectivity"
+      model: "MS5611"
+      pressure_range_pa: [10000, 120000]
+      pressure_resolution_pa: 0.012
+      altitude_noise_m: 0.08
+      sample_rate_hz: 100
+      bus: "I2C"
+
+  gps:
+    manufacturer: "CubePilot"
+    model: "HERE3+"
+    chipset: "u-blox F9P"
+    constellation: ["GPS", "GLONASS", "Galileo", "BeiDou"]
+    channels: 184
+    update_rate_hz: 20
+    horizontal_accuracy_m: 0.01 # RTK fix
+    vertical_accuracy_m: 0.02
+    horizontal_accuracy_standalone_m: 1.5
+    rtk_capable: true
+    rtk_convergence_time_s: 45
+    ttff_cold_s: 25
+    ttff_hot_s: 2
+    compass: true
+    compass_model: "IST8310"
+    weight_g: 48
+    antenna: "helical survey-grade"
+    bus: "CAN"
+    sbas: true
+
+  magnetometer:
+    primary:
+      manufacturer: "iSentek"
+      model: "IST8310"
+      range_gauss: 16.0
+      resolution_mgauss: 0.3
+      sample_rate_hz: 200
+      bus: "I2C"
+      integrated_in: "HERE3+ GPS"
+    secondary:
+      manufacturer: "Asahi Kasei"
+      model: "AK8963"
+      range_gauss: 49.12
+      resolution_mgauss: 0.6
+      sample_rate_hz: 100
+      bus: "I2C"
+      integrated_in: "Cube Orange (ICM-20948)"
+
+  rangefinder:
+    manufacturer: "Lightware"
+    model: "LW20/C"
+    type: "lidar"
+    max_range_m: 100
+    min_range_m: 0.1
+    resolution_m: 0.01
+    update_rate_hz: 48
+    beam_divergence_mrad: 7
+    bus: "I2C"
+    weight_g: 22
+    mount: "downward-facing"
+
+# -----------------------------------------------------------------------------
+# Thermal Model
+# -----------------------------------------------------------------------------
+thermal:
+  motor_thermal_resistance_c_per_w: 2.5
+  motor_thermal_capacitance_j_per_c: 80.0
+  esc_thermal_resistance_c_per_w: 8.0
+  battery_thermal_resistance_c_per_w: 2.0
+  ambient_temp_range_c: [-20, 50]
+  motor_max_temp_c: 150
+  esc_max_temp_c: 95
+  battery_max_temp_c: 55
+  derating_start_temp_c: 130
+
+# -----------------------------------------------------------------------------
+# Electrical Model
+# -----------------------------------------------------------------------------
+electrical:
+  wiring_resistance_mohm: 4
+  connector_resistance_mohm: 1.5
+  total_system_resistance_mohm: 5.5
+  voltage_sag_model:
+    method: "linear_resistance"
+    internal_resistance_mohm: 14.4 # 12 cells * 1.2 mohm
+  power_distribution:
+    type: "carrier_board_integrated"
+    main_bus_current_a: 200
+    bec_5v_current_a: 6.0
+    bec_12v_current_a: 5.0
+  quiescent_draw_ma:
+    flight_controller: 600
+    carrier_board: 150
+    receiver: 65
+    telemetry_radio: 280
+    gps: 200
+    rangefinder: 180
+    companion_computer: 340
+    total_idle: 1815
+
+# -----------------------------------------------------------------------------
+# Compatibility Constraints
+# -----------------------------------------------------------------------------
+compatibility:
+  firmware:
+    - "ArduCopter >= 4.3"
+    - "ArduCopter >= 4.5 (recommended)"
+    - "PX4 >= 1.14"
+  propeller_clearance_mm: 12.0
+  max_prop_diameter_in: 16.0
+  min_battery_cells: 12
+  max_battery_cells: 14
+  max_battery_weight_g: 6000
+  max_auw_g: 18000
+  max_payload_g: 5000
+  motor_redundancy: true
+  single_motor_failure_survivable: true
+  regulations:
+    faa_class: "standard Part 107"
+    requires_registration: true
+    requires_remote_id: true
+    requires_part_107: true
+    bvlos_capable: true
+    night_operations: true
+    requires_waiver_for_weight: true # over 25kg with max payload
+
+# -----------------------------------------------------------------------------
+# Mechanical Properties
+# -----------------------------------------------------------------------------
+mechanical:
+  center_of_gravity_mm: [0, 0, -25]
+  moments_of_inertia_kg_m2:
+    Ixx: 0.385
+    Iyy: 0.395
+    Izz: 0.650
+  drag_coefficient:
+    frontal: 0.55
+    lateral: 0.60
+    vertical: 1.20
+  frontal_area_m2: 0.085
+  prop_wash_factor: 0.08
+  vibration_damping:
+    fc_mount: "CubePilot damping mount"
+    payload_mount: "3-axis gimbal + vibration plate"
+    gyro_notch_filters: [34, 68]
+  landing_gear:
+    type: "retractable electric"
+    height_mm: 280
+    material: "carbon fiber tube + aluminum CNC"
+    weight_g: 450
+    retract_servo: "Tarot 450-class"
+    clearance_for_gimbal: true
+  gimbal_mount:
+    type: "rail_quick_release"
+    rail_spacing_mm: 100
+    max_payload_g: 5000
+    vibration_isolated: true
+    power_output_v: [5, 12, 24]
+    signal_interface: "S.Bus + MAVLink serial + HDMI"
+    stabilization: "3-axis brushless"
+  build_notes: >
+    CRITICAL: This is a heavy platform -- double-check all structural
+    connections. Use Loctite 243 on all arm pivot bolts and motor mounts.
+    Perform a pull test on each arm before flight. Install Cube Orange with
+    the carrier board on anti-vibration mount, arrow forward. GPS mast height
+    must be at least 150mm above top plate for reliable compass. Route all
+    high-current wiring (12AWG minimum for battery to ESC) away from the Cube
+    and GPS. Install the Mauch power module inline between battery and PDB.
+    Connect ESCs via individual DShot pads, not DroneCAN (for faster response
+    on this platform). Wire RFD900x telemetry radio to TELEM1 port. Wire
+    Crossfire to SERIAL4. Configure motor ordering carefully in ArduPilot --
+    verify with Motor Test tab in Mission Planner. Enable MOT_SPIN_ARM at 8%
+    for reliable spin-up under load. Set BATT_ARM_VOLT = 48.0, BATT_LOW_VOLT
+    = 42.0, BATT_CRT_VOLT = 39.6. Enable single-motor failure handling. Run
+    vibration analysis on test hover -- Z-axis vibrations must be under 30
+    m/s/s. Verify gimbal clearance with landing gear retracted.
+
+# -----------------------------------------------------------------------------
+# Computed / Derived Values
+# -----------------------------------------------------------------------------
+computed:
+  dry_weight_g: 7050 # frame(1450)+motors(1440)+props(192)+FC+carrier(121)+PM(65)+ESCs(228)+rx(5)+telem(25)+GPS(48)+rangefinder(22)+landing_gear(450)+companion(60)+gimbal_mount(80)+wiring(120)+hardware(95)+misc(85)+cables(50)+antennas(15)+damping(30)+connectors(18)
+  all_up_weight_g: 12000 # dry(7050) + battery(4950)
+  all_up_weight_kg: 12.000
+  all_up_weight_with_payload_g: 17000
+  all_up_weight_with_payload_kg: 17.000
+  wing_loading: null
+  total_static_thrust_g: 31200 # 6 * 5200g
+  thrust_to_weight_ratio: 2.60 # at 12kg AUW
+  thrust_to_weight_with_payload: 1.84 # at 17kg AUW
+  hover_throttle_percent: 38.5
+  hover_throttle_with_payload_percent: 54.5
+  max_tilt_angle_deg: 35
+  max_speed_ms: 15 # ~54 km/h
+  max_vertical_speed_ms: 5
+  estimated_flight_time_min: 25.0 # no payload, moderate cruise
+  estimated_flight_time_payload_min: 16.0 # 5kg payload
+  estimated_hover_time_min: 22.0
+  hover_current_a: 32.0
+  max_current_a: 180
+  hover_power_w: 1420.8
+  max_power_w: 7992
+  power_loading_w_per_kg: 118.4
+  disc_loading_g_per_cm2: 1.39
+  max_payload_g: 5000
+  pid_loop_rate_khz: 0.4
+  motor_response_time_ms: 50
+  settling_time_ms: 180

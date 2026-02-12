@@ -1,0 +1,227 @@
+# ============================================================
+# NEXUS — Swarm Telemetry & Coordination System
+# Companion Computer Configuration
+# ============================================================
+# Copy this file to /etc/nexus/nexus.yaml on each companion
+# computer and modify per-drone settings.
+# ============================================================
+
+# --- Drone Identity ---
+drone:
+  id: "ALPHA-1"
+  role: "LEADER"                    # LEADER | WINGMAN | RECON | SUPPORT | TAIL
+  color: "#00ff88"
+  airframe: "quad"                  # quad | hex | octo | fixed_wing
+  weight_kg: 2.4
+  max_speed_ms: 18.0
+  ceiling_m: 400
+
+# --- Swarm Configuration ---
+swarm:
+  swarm_id: "NEXUS-SWARM-01"
+  max_drones: 6
+  formation:
+    default: "v_formation"          # v_formation | line_abreast | column | diamond | orbit | scatter
+    spacing_m: 15.0
+    cohesion_threshold: 0.75        # Minimum acceptable cohesion (0.0-1.0)
+  leader_election:
+    algorithm: "modified_raft"
+    criteria:
+      battery_weight: 0.30
+      gps_quality_weight: 0.25
+      link_quality_weight: 0.25
+      position_centrality_weight: 0.20
+    election_timeout_ms: 5000
+    heartbeat_interval_ms: 1000
+  task_allocation:
+    method: "market_based"
+    bid_timeout_ms: 2000
+
+# --- Network Configuration ---
+network:
+  primary:
+    type: "wifi_mesh"
+    interface: "wlan0"
+    ssid: "NEXUS-MESH"
+    channel: 36
+    frequency_mhz: 5180
+    tx_power_dbm: 20
+    encryption: "WPA3-SAE"
+    passphrase: "${NEXUS_WIFI_PASSPHRASE}"
+  fallback:
+    type: "rfd900x"
+    device: "/dev/ttyUSB0"
+    baud_rate: 57600
+    air_speed: 64
+    net_id: 25
+    tx_power: 20
+    encoding: "msgpack_binary"
+  ground_station:
+    host: "192.168.10.1"
+    websocket_port: 8765
+    http_port: 8080
+    reconnect_interval_ms: 3000
+    max_reconnect_attempts: 50
+  peer_mesh:
+    discovery: "zeroconf"
+    service_name: "_nexus._tcp.local."
+    state_exchange_hz: 5
+    timeout_ms: 3000
+
+# --- MAVLink Configuration ---
+mavlink:
+  connection: "/dev/ttyAMA0"        # UART to flight controller
+  baud_rate: 921600
+  dialect: "ardupilotmega"
+  source_system: 1
+  source_component: 191             # MAV_COMP_ID_ONBOARD_COMPUTER
+  heartbeat_interval_ms: 1000
+  stream_rates:
+    raw_sensors: 2
+    extended_status: 2
+    rc_channels: 0
+    raw_controller: 0
+    position: 10
+    extra1: 10                      # Attitude
+    extra2: 2
+    extra3: 2
+
+# --- Telemetry Publishing ---
+telemetry:
+  publish_rate_hz: 10
+  fields:
+    - position
+    - attitude
+    - velocity
+    - battery
+    - gps
+    - link
+    - status
+  compression: false
+  history_length: 60                # Positions retained for trail
+
+# --- Failover Rules ---
+failover:
+  link_loss:
+    heartbeat_timeout_ms: 3000
+    action: "rtl"                   # rtl | hover | land | continue
+    rtl_delay_s: 10
+    altitude_separation_m: 5
+  low_battery:
+    warning_pct: 25
+    critical_pct: 10
+    action: "rtl"
+    priority_landing: true
+  gps_loss:
+    min_fix_type: 3                 # 3 = 3D fix
+    max_hdop: 5.0
+    action: "hold_and_descend"
+    descent_rate_ms: 0.5
+  leader_failure:
+    detection_timeout_ms: 5000
+    action: "elect_new_leader"
+
+# --- Safety Limits ---
+safety:
+  geofence:
+    enabled: true
+    type: "polygon"                 # polygon | cylinder
+    max_altitude_m: 120
+    min_altitude_m: 5
+    vertices:                       # Polygon vertices (lat, lon)
+      - [33.6450, -117.8500]
+      - [33.6450, -117.8380]
+      - [33.6360, -117.8380]
+      - [33.6360, -117.8500]
+    breach_action: "rtl"
+  collision_avoidance:
+    enabled: true
+    safety_bubble_m: 5.0
+    deconfliction_rate_hz: 10
+    min_vertical_separation_m: 3.0
+    avoidance_priority: "altitude"  # Higher altitude has right-of-way
+  max_bank_angle_deg: 35
+  max_speed_ms: 20
+  return_altitude_m: 50
+
+# --- FPV Configuration ---
+fpv:
+  enabled: false
+  solo_mode_default: false
+  video:
+    sources:
+      - name: "Main Camera"
+        url: "rtsp://localhost:8554/fpv"
+        type: "rtsp"                    # rtsp | webrtc | mjpeg
+        codec: "h264"
+      - name: "Analog Capture"
+        url: "/dev/video0"
+        type: "v4l2"
+    resolution: "1280x720"
+    framerate: 60
+    low_latency: true
+  msp:
+    enabled: false
+    serial_device: ""                   # Auto-detected if empty
+    baud_rate: 115200
+    auto_detect: true
+    poll_rate_hz: 10
+  goggles:
+    enabled: false
+    system: "auto"                      # dji | hdzero | walksnail | auto
+    serial_device: ""
+    baud_rate: 115200
+  camera:
+    tilt_min: -90
+    tilt_max: 30
+    tilt_speed: 30                      # degrees per second
+    gimbal_enabled: false
+  osd:
+    enabled: true
+    layout: "default"                   # default | racing | freestyle | custom
+    elements:
+      - { id: "battery_voltage", x: 1, y: 1, visible: true }
+      - { id: "cell_voltage", x: 1, y: 2, visible: true }
+      - { id: "mah_consumed", x: 1, y: 3, visible: true }
+      - { id: "flight_timer", x: 14, y: 1, visible: true }
+      - { id: "gps_coords", x: 1, y: 13, visible: true }
+      - { id: "altitude", x: 26, y: 7, visible: true }
+      - { id: "speed", x: 1, y: 7, visible: true }
+      - { id: "rssi", x: 26, y: 1, visible: true }
+      - { id: "home_distance", x: 14, y: 13, visible: true }
+      - { id: "warnings", x: 14, y: 7, visible: true }
+  dvr:
+    auto_record_on_arm: false
+    timestamp_overlay: true
+    telemetry_sync: true
+    max_duration_minutes: 30
+
+# --- USB Auto-Detection ---
+usb:
+  auto_scan: true
+  scan_interval_s: 5
+  known_devices:
+    - vid: "0x10c4"                     # CP2102 (common FC USB chip)
+      pid: "0xea60"
+      label: "CP2102 Flight Controller"
+    - vid: "0x0483"                     # STM32 DFU (Betaflight FCs)
+      pid: "0x5740"
+      label: "STM32 Betaflight FC"
+    - vid: "0x1a86"                     # CH340
+      pid: "0x7523"
+      label: "CH340 Serial Adapter"
+
+# --- Logging ---
+logging:
+  level: "INFO"                     # DEBUG | INFO | WARN | ERROR
+  console: true
+  file:
+    enabled: true
+    path: "/var/log/nexus/"
+    rotation: "daily"
+    max_files: 30
+  telemetry_recording:
+    enabled: true
+    format: "jsonl"
+    path: "/var/log/nexus/telemetry/"
+    flush_interval_s: 5

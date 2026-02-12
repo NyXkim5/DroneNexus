@@ -1,0 +1,221 @@
+# =============================================================================
+# Barometer Sensor Noise Model Configuration
+# =============================================================================
+# Defines noise characteristics for barometric pressure/altitude sensors.
+# Based on Bosch BMP388/BMP280 and TE Connectivity MS5611 specifications.
+# Models pressure noise, altitude drift, temperature sensitivity, and
+# environmental effects (wind, prop wash, weather fronts).
+# =============================================================================
+
+sensor_type: barometer
+description: >
+  Barometric pressure sensor noise model for altitude estimation. Covers
+  pressure measurement noise, altitude drift from weather changes, temperature
+  sensitivity, prop wash effects, and wind-induced pressure fluctuations.
+  Altitude is derived from pressure using the international standard atmosphere
+  model with corrections applied by the EKF.
+
+update_rate_hz: 50
+output_units:
+  pressure: "Pa"
+  altitude: "m"
+  temperature: "C"
+
+# =============================================================================
+# Presets
+# =============================================================================
+
+presets:
+  # ---------------------------------------------------------------------------
+  # PERFECT: No noise -- ideal barometer
+  # ---------------------------------------------------------------------------
+  perfect:
+    label: "Perfect (No Noise)"
+    description: "Ideal barometer with zero noise for algorithm validation"
+
+    pressure:
+      noise_std_pa: 0.0
+      bias_pa: 0.0
+      drift_pa_per_hour: 0.0
+      quantization_pa: 0.0
+      range_pa: [30000, 110000]
+
+    altitude:
+      noise_std_m: 0.0
+      bias_m: 0.0
+      drift_m_per_hour: 0.0
+
+    temperature:
+      sensitivity_pa_per_c: 0.0
+      cross_coupling_coefficient: 0.0
+      internal_heating_c: 0.0
+
+    environment:
+      weather_drift_enabled: false
+      prop_wash_effect_enabled: false
+      wind_effect_enabled: false
+
+  # ---------------------------------------------------------------------------
+  # TYPICAL: Realistic MEMS barometer (BMP388 / ICP-20100)
+  # ---------------------------------------------------------------------------
+  typical:
+    label: "Typical MEMS Barometer"
+    description: "Realistic noise for a modern MEMS barometer like BMP388"
+
+    pressure:
+      noise_std_pa: 1.5 # ~0.12m altitude noise
+      bias_pa: 5.0
+      drift_pa_per_hour: 10.0 # weather-induced
+      quantization_pa: 0.016
+      range_pa: [30000, 110000]
+      response_time_ms: 5.0
+
+    altitude:
+      noise_std_m: 0.12
+      bias_m: 0.04
+      drift_m_per_hour: 0.08 # typical weather drift
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 30.0
+        amplitude_m: 0.15
+
+    temperature:
+      sensitivity_pa_per_c: 1.5
+      cross_coupling_coefficient: 0.002
+      internal_heating_c: 2.0 # self-heating in enclosed stack
+      compensation_residual_pa_per_c: 0.3
+
+    environment:
+      weather_drift_enabled: true
+      weather_drift_model:
+        pressure_change_rate_pa_per_min: 1.0 # normal weather
+        max_pressure_change_pa: 300 # ~2.5m over a flight
+        random_walk_pa_per_sqrt_s: 0.2
+      prop_wash_effect_enabled: true
+      prop_wash_model:
+        pressure_depression_pa: 8.0 # dynamic pressure under props
+        frequency_hz: [50, 200] # correlated to motor RPM
+        amplitude_pa: 3.0
+        throttle_coupling: 0.6 # scales with throttle
+      wind_effect_enabled: true
+      wind_effect_model:
+        dynamic_pressure_pa_per_ms2: 0.6 # 0.5 * rho * v^2 coupling
+        turbulence_std_pa: 2.0
+
+  # ---------------------------------------------------------------------------
+  # NOISY: Degraded or older barometer (BMP180 / poor mounting)
+  # ---------------------------------------------------------------------------
+  noisy:
+    label: "Noisy / Poorly Mounted"
+    description: "Degraded barometer with high noise from poor mounting or old sensor"
+
+    pressure:
+      noise_std_pa: 8.0 # ~0.65m altitude noise
+      bias_pa: 25.0
+      drift_pa_per_hour: 40.0
+      quantization_pa: 0.5
+      range_pa: [30000, 110000]
+      response_time_ms: 20.0
+
+    altitude:
+      noise_std_m: 0.65
+      bias_m: 0.20
+      drift_m_per_hour: 0.35
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 60.0
+        amplitude_m: 0.8
+
+    temperature:
+      sensitivity_pa_per_c: 5.0
+      cross_coupling_coefficient: 0.01
+      internal_heating_c: 5.0
+      compensation_residual_pa_per_c: 2.0
+
+    environment:
+      weather_drift_enabled: true
+      weather_drift_model:
+        pressure_change_rate_pa_per_min: 3.0
+        max_pressure_change_pa: 800
+        random_walk_pa_per_sqrt_s: 1.0
+      prop_wash_effect_enabled: true
+      prop_wash_model:
+        pressure_depression_pa: 25.0 # poorly shielded from prop wash
+        frequency_hz: [30, 300]
+        amplitude_pa: 12.0
+        throttle_coupling: 0.9
+      wind_effect_enabled: true
+      wind_effect_model:
+        dynamic_pressure_pa_per_ms2: 2.5 # exposed to airflow
+        turbulence_std_pa: 8.0
+
+  # ---------------------------------------------------------------------------
+  # FAILING: Barometer with severe hardware issues
+  # ---------------------------------------------------------------------------
+  failing:
+    label: "Failing / Hardware Degradation"
+    description: >
+      Simulates a failing barometer with extreme drift, intermittent freezing,
+      and erratic readings. Tests altitude estimator robustness.
+
+    pressure:
+      noise_std_pa: 30.0 # ~2.5m altitude noise
+      bias_pa: 100.0
+      drift_pa_per_hour: 200.0
+      quantization_pa: 2.0
+      range_pa: [30000, 110000]
+      response_time_ms: 50.0
+      spike_probability: 0.01
+      spike_magnitude_pa: 500.0
+
+    altitude:
+      noise_std_m: 2.5
+      bias_m: 0.8
+      drift_m_per_hour: 1.6
+      time_correlated_noise:
+        enabled: true
+        correlation_time_s: 120.0
+        amplitude_m: 3.0
+      step_change:
+        enabled: true
+        probability_per_second: 0.002
+        step_magnitude_m: 5.0
+
+    temperature:
+      sensitivity_pa_per_c: 15.0
+      cross_coupling_coefficient: 0.05
+      internal_heating_c: 12.0
+      compensation_residual_pa_per_c: 8.0
+      temperature_sensor_failing: true
+      temperature_noise_c: 5.0
+
+    environment:
+      weather_drift_enabled: true
+      weather_drift_model:
+        pressure_change_rate_pa_per_min: 10.0
+        max_pressure_change_pa: 2000
+        random_walk_pa_per_sqrt_s: 5.0
+      prop_wash_effect_enabled: true
+      prop_wash_model:
+        pressure_depression_pa: 60.0
+        frequency_hz: [10, 400]
+        amplitude_pa: 30.0
+        throttle_coupling: 1.0
+      wind_effect_enabled: true
+      wind_effect_model:
+        dynamic_pressure_pa_per_ms2: 8.0
+        turbulence_std_pa: 20.0
+      moisture_ingress:
+        enabled: true
+        drift_amplification_factor: 3.0
+        response_time_degradation_factor: 5.0
+
+    failure_modes:
+      frozen_reading:
+        enabled: true
+        probability_per_second: 0.005
+        duration_s: [2.0, 30.0]
+      erratic_output:
+        enabled: true
+        probability_per_second: 0.003
+        magnitude_pa: 1000

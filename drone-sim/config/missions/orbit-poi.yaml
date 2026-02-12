@@ -1,0 +1,485 @@
+# =============================================================================
+# Orbit Around Point of Interest Mission
+# =============================================================================
+# Circular orbit around a specified point of interest with the camera
+# continuously pointing at the target. Useful for inspection, cinematic
+# footage, and 3D reconstruction of structures.
+# =============================================================================
+
+mission:
+  name: "Orbit Point of Interest"
+  description: >
+    Automated circular orbit around a defined point of interest. The drone
+    maintains a constant radius and altitude while continuously yawing to
+    keep the camera or nose pointed at the target. Supports variable orbit
+    speed, radius, altitude, and number of revolutions. Useful for building
+    inspection, cinematic orbits, cell tower inspection, and 3D structure
+    reconstruction. Can optionally descend or ascend during orbit for
+    spiral inspection patterns.
+  version: "1.0"
+  author: "NEXUS Drone Sim"
+  created: "2025-10-01"
+
+# -----------------------------------------------------------------------------
+# Mission Parameters
+# -----------------------------------------------------------------------------
+parameters:
+  coordinate_frame: "local_ENU"
+  home_position:
+    latitude_deg: 37.7749
+    longitude_deg: -122.4194
+    altitude_msl_m: 10.0
+    heading_deg: 0.0
+
+  orbit:
+    center_position:
+      x_m: 100.0 # 100m east of home
+      y_m: 50.0 # 50m north of home
+      z_m: 0.0 # ground level of POI
+    poi_height_m: 25.0 # height of the point of interest structure
+    radius_m: 40.0
+    altitude_agl_m: 35.0 # fly 10m above POI top
+    direction: "clockwise"
+    speed_ms: 4.0 # tangential speed
+    revolutions: 2.0
+    yaw_behavior: "poi" # always face the POI center
+    orbit_resolution_deg: 15 # waypoint every 15 degrees
+    entry_angle_deg: 0.0 # enter orbit from the north side (0 = north of POI)
+    spiral:
+      enabled: false
+      altitude_change_per_revolution_m: 0.0
+
+  camera:
+    gimbal_pitch_deg: -35.0 # angle down toward POI
+    trigger_mode: "interval"
+    trigger_interval_s: 2.0
+    auto_gimbal_tracking: true
+
+  defaults:
+    speed_ms: 4.0
+    acceptance_radius_m: 3.0
+    loiter_time_s: 0.0
+
+  safety:
+    max_altitude_m: 80.0
+    geofence_radius_m: 200.0
+    geofence_action: "RTL"
+    min_battery_percent: 20
+    failsafe_action: "RTL"
+    wind_abort_speed_ms: 10.0
+    min_clearance_from_poi_m: 10.0 # never closer than this to POI
+
+# -----------------------------------------------------------------------------
+# Waypoints
+# -----------------------------------------------------------------------------
+# Orbit center is at (100, 50). Radius = 40m. Altitude = 35m.
+# Waypoints placed every 15 degrees = 24 waypoints per revolution.
+# 2 revolutions = 48 orbit waypoints.
+# Yaw at each point is calculated to face (100, 50).
+
+waypoints:
+  - id: 1
+    name: "Takeoff"
+    type: "takeoff"
+    position:
+      x_m: 0.0
+      y_m: 0.0
+      z_m: 35.0
+    speed_ms: 3.0
+    heading_deg: 0.0
+    hold_time_s: 5.0
+    notes: "Climb to orbit altitude"
+
+  - id: 2
+    name: "Transit to Orbit Entry"
+    type: "waypoint"
+    position:
+      x_m: 100.0 # directly north of POI center
+      y_m: 90.0 # center_y(50) + radius(40)
+      z_m: 35.0
+    speed_ms: 6.0
+    heading_deg: 180.0 # facing south toward POI
+    hold_time_s: 3.0
+    notes: "Arrive at orbit entry point, stabilize, point at POI"
+
+  # --- Revolution 1: 24 waypoints, every 15 degrees, CW ---
+  # Angle 0 = North of POI. CW means angle increases: 0, 15, 30, ...
+  # Position: x = cx + r*sin(angle), y = cy + r*cos(angle)
+  # Yaw: atan2(cx - x, cy - y) -- face toward center
+
+  - id: 3
+    name: "Orbit R1 - 0 deg"
+    type: "orbit"
+    position: { x_m: 100.0, y_m: 90.0, z_m: 35.0 }
+    heading_deg: 180.0
+    camera_trigger: "start"
+
+  - id: 4
+    name: "Orbit R1 - 15 deg"
+    type: "orbit"
+    position: { x_m: 110.35, y_m: 88.64, z_m: 35.0 }
+    heading_deg: 195.0
+
+  - id: 5
+    name: "Orbit R1 - 30 deg"
+    type: "orbit"
+    position: { x_m: 120.0, y_m: 84.64, z_m: 35.0 }
+    heading_deg: 210.0
+
+  - id: 6
+    name: "Orbit R1 - 45 deg"
+    type: "orbit"
+    position: { x_m: 128.28, y_m: 78.28, z_m: 35.0 }
+    heading_deg: 225.0
+
+  - id: 7
+    name: "Orbit R1 - 60 deg"
+    type: "orbit"
+    position: { x_m: 134.64, y_m: 70.0, z_m: 35.0 }
+    heading_deg: 240.0
+
+  - id: 8
+    name: "Orbit R1 - 75 deg"
+    type: "orbit"
+    position: { x_m: 138.64, y_m: 60.35, z_m: 35.0 }
+    heading_deg: 255.0
+
+  - id: 9
+    name: "Orbit R1 - 90 deg"
+    type: "orbit"
+    position: { x_m: 140.0, y_m: 50.0, z_m: 35.0 }
+    heading_deg: 270.0
+
+  - id: 10
+    name: "Orbit R1 - 105 deg"
+    type: "orbit"
+    position: { x_m: 138.64, y_m: 39.65, z_m: 35.0 }
+    heading_deg: 285.0
+
+  - id: 11
+    name: "Orbit R1 - 120 deg"
+    type: "orbit"
+    position: { x_m: 134.64, y_m: 30.0, z_m: 35.0 }
+    heading_deg: 300.0
+
+  - id: 12
+    name: "Orbit R1 - 135 deg"
+    type: "orbit"
+    position: { x_m: 128.28, y_m: 21.72, z_m: 35.0 }
+    heading_deg: 315.0
+
+  - id: 13
+    name: "Orbit R1 - 150 deg"
+    type: "orbit"
+    position: { x_m: 120.0, y_m: 15.36, z_m: 35.0 }
+    heading_deg: 330.0
+
+  - id: 14
+    name: "Orbit R1 - 165 deg"
+    type: "orbit"
+    position: { x_m: 110.35, y_m: 11.36, z_m: 35.0 }
+    heading_deg: 345.0
+
+  - id: 15
+    name: "Orbit R1 - 180 deg"
+    type: "orbit"
+    position: { x_m: 100.0, y_m: 10.0, z_m: 35.0 }
+    heading_deg: 0.0
+
+  - id: 16
+    name: "Orbit R1 - 195 deg"
+    type: "orbit"
+    position: { x_m: 89.65, y_m: 11.36, z_m: 35.0 }
+    heading_deg: 15.0
+
+  - id: 17
+    name: "Orbit R1 - 210 deg"
+    type: "orbit"
+    position: { x_m: 80.0, y_m: 15.36, z_m: 35.0 }
+    heading_deg: 30.0
+
+  - id: 18
+    name: "Orbit R1 - 225 deg"
+    type: "orbit"
+    position: { x_m: 71.72, y_m: 21.72, z_m: 35.0 }
+    heading_deg: 45.0
+
+  - id: 19
+    name: "Orbit R1 - 240 deg"
+    type: "orbit"
+    position: { x_m: 65.36, y_m: 30.0, z_m: 35.0 }
+    heading_deg: 60.0
+
+  - id: 20
+    name: "Orbit R1 - 255 deg"
+    type: "orbit"
+    position: { x_m: 61.36, y_m: 39.65, z_m: 35.0 }
+    heading_deg: 75.0
+
+  - id: 21
+    name: "Orbit R1 - 270 deg"
+    type: "orbit"
+    position: { x_m: 60.0, y_m: 50.0, z_m: 35.0 }
+    heading_deg: 90.0
+
+  - id: 22
+    name: "Orbit R1 - 285 deg"
+    type: "orbit"
+    position: { x_m: 61.36, y_m: 60.35, z_m: 35.0 }
+    heading_deg: 105.0
+
+  - id: 23
+    name: "Orbit R1 - 300 deg"
+    type: "orbit"
+    position: { x_m: 65.36, y_m: 70.0, z_m: 35.0 }
+    heading_deg: 120.0
+
+  - id: 24
+    name: "Orbit R1 - 315 deg"
+    type: "orbit"
+    position: { x_m: 71.72, y_m: 78.28, z_m: 35.0 }
+    heading_deg: 135.0
+
+  - id: 25
+    name: "Orbit R1 - 330 deg"
+    type: "orbit"
+    position: { x_m: 80.0, y_m: 84.64, z_m: 35.0 }
+    heading_deg: 150.0
+
+  - id: 26
+    name: "Orbit R1 - 345 deg"
+    type: "orbit"
+    position: { x_m: 89.65, y_m: 88.64, z_m: 35.0 }
+    heading_deg: 165.0
+
+  # --- Revolution 2: Same 24 waypoints, completing full second orbit ---
+
+  - id: 27
+    name: "Orbit R2 - 0 deg"
+    type: "orbit"
+    position: { x_m: 100.0, y_m: 90.0, z_m: 35.0 }
+    heading_deg: 180.0
+
+  - id: 28
+    name: "Orbit R2 - 15 deg"
+    type: "orbit"
+    position: { x_m: 110.35, y_m: 88.64, z_m: 35.0 }
+    heading_deg: 195.0
+
+  - id: 29
+    name: "Orbit R2 - 30 deg"
+    type: "orbit"
+    position: { x_m: 120.0, y_m: 84.64, z_m: 35.0 }
+    heading_deg: 210.0
+
+  - id: 30
+    name: "Orbit R2 - 45 deg"
+    type: "orbit"
+    position: { x_m: 128.28, y_m: 78.28, z_m: 35.0 }
+    heading_deg: 225.0
+
+  - id: 31
+    name: "Orbit R2 - 60 deg"
+    type: "orbit"
+    position: { x_m: 134.64, y_m: 70.0, z_m: 35.0 }
+    heading_deg: 240.0
+
+  - id: 32
+    name: "Orbit R2 - 75 deg"
+    type: "orbit"
+    position: { x_m: 138.64, y_m: 60.35, z_m: 35.0 }
+    heading_deg: 255.0
+
+  - id: 33
+    name: "Orbit R2 - 90 deg"
+    type: "orbit"
+    position: { x_m: 140.0, y_m: 50.0, z_m: 35.0 }
+    heading_deg: 270.0
+
+  - id: 34
+    name: "Orbit R2 - 105 deg"
+    type: "orbit"
+    position: { x_m: 138.64, y_m: 39.65, z_m: 35.0 }
+    heading_deg: 285.0
+
+  - id: 35
+    name: "Orbit R2 - 120 deg"
+    type: "orbit"
+    position: { x_m: 134.64, y_m: 30.0, z_m: 35.0 }
+    heading_deg: 300.0
+
+  - id: 36
+    name: "Orbit R2 - 135 deg"
+    type: "orbit"
+    position: { x_m: 128.28, y_m: 21.72, z_m: 35.0 }
+    heading_deg: 315.0
+
+  - id: 37
+    name: "Orbit R2 - 150 deg"
+    type: "orbit"
+    position: { x_m: 120.0, y_m: 15.36, z_m: 35.0 }
+    heading_deg: 330.0
+
+  - id: 38
+    name: "Orbit R2 - 165 deg"
+    type: "orbit"
+    position: { x_m: 110.35, y_m: 11.36, z_m: 35.0 }
+    heading_deg: 345.0
+
+  - id: 39
+    name: "Orbit R2 - 180 deg"
+    type: "orbit"
+    position: { x_m: 100.0, y_m: 10.0, z_m: 35.0 }
+    heading_deg: 0.0
+
+  - id: 40
+    name: "Orbit R2 - 195 deg"
+    type: "orbit"
+    position: { x_m: 89.65, y_m: 11.36, z_m: 35.0 }
+    heading_deg: 15.0
+
+  - id: 41
+    name: "Orbit R2 - 210 deg"
+    type: "orbit"
+    position: { x_m: 80.0, y_m: 15.36, z_m: 35.0 }
+    heading_deg: 30.0
+
+  - id: 42
+    name: "Orbit R2 - 225 deg"
+    type: "orbit"
+    position: { x_m: 71.72, y_m: 21.72, z_m: 35.0 }
+    heading_deg: 45.0
+
+  - id: 43
+    name: "Orbit R2 - 240 deg"
+    type: "orbit"
+    position: { x_m: 65.36, y_m: 30.0, z_m: 35.0 }
+    heading_deg: 60.0
+
+  - id: 44
+    name: "Orbit R2 - 255 deg"
+    type: "orbit"
+    position: { x_m: 61.36, y_m: 39.65, z_m: 35.0 }
+    heading_deg: 75.0
+
+  - id: 45
+    name: "Orbit R2 - 270 deg"
+    type: "orbit"
+    position: { x_m: 60.0, y_m: 50.0, z_m: 35.0 }
+    heading_deg: 90.0
+
+  - id: 46
+    name: "Orbit R2 - 285 deg"
+    type: "orbit"
+    position: { x_m: 61.36, y_m: 60.35, z_m: 35.0 }
+    heading_deg: 105.0
+
+  - id: 47
+    name: "Orbit R2 - 300 deg"
+    type: "orbit"
+    position: { x_m: 65.36, y_m: 70.0, z_m: 35.0 }
+    heading_deg: 120.0
+
+  - id: 48
+    name: "Orbit R2 - 315 deg"
+    type: "orbit"
+    position: { x_m: 71.72, y_m: 78.28, z_m: 35.0 }
+    heading_deg: 135.0
+
+  - id: 49
+    name: "Orbit R2 - 330 deg"
+    type: "orbit"
+    position: { x_m: 80.0, y_m: 84.64, z_m: 35.0 }
+    heading_deg: 150.0
+
+  - id: 50
+    name: "Orbit R2 - 345 deg"
+    type: "orbit"
+    position: { x_m: 89.65, y_m: 88.64, z_m: 35.0 }
+    heading_deg: 165.0
+    camera_trigger: "stop"
+
+  # --- Exit and Return ---
+  - id: 51
+    name: "Orbit Exit"
+    type: "waypoint"
+    position:
+      x_m: 100.0
+      y_m: 90.0
+      z_m: 35.0
+    speed_ms: 4.0
+    heading_deg: 0.0
+    hold_time_s: 2.0
+    notes: "Exit orbit at entry point"
+
+  - id: 52
+    name: "Return to Launch"
+    type: "waypoint"
+    position:
+      x_m: 0.0
+      y_m: 0.0
+      z_m: 35.0
+    speed_ms: 6.0
+    heading_deg: 0.0
+    hold_time_s: 3.0
+
+  - id: 53
+    name: "Land"
+    type: "land"
+    position:
+      x_m: 0.0
+      y_m: 0.0
+      z_m: 0.0
+    speed_ms: 1.5
+    heading_deg: 0.0
+    precision_land: false
+
+# -----------------------------------------------------------------------------
+# Mission Geometry Summary
+# -----------------------------------------------------------------------------
+geometry:
+  pattern: "circular_orbit"
+  poi_location_m: [100.0, 50.0, 0.0]
+  orbit_radius_m: 40.0
+  orbit_altitude_agl_m: 35.0
+  orbit_circumference_m: 251.3 # 2 * pi * 40
+  revolutions: 2
+  total_orbit_distance_m: 502.7
+  transit_distance_m: 230.0 # to/from orbit
+  total_distance_m: 732.7
+  estimated_duration_s: 195.0 # orbit(126s) + transit(40s) + holds(29s)
+  waypoints_per_revolution: 24
+  angular_resolution_deg: 15
+
+# -----------------------------------------------------------------------------
+# POI Details
+# -----------------------------------------------------------------------------
+poi:
+  name: "Target Structure"
+  type: "building"
+  position_m: [100.0, 50.0, 0.0]
+  height_m: 25.0
+  estimated_width_m: 15.0
+  notes: >
+    The point of interest is a building approximately 25m tall and 15m wide.
+    The orbit altitude of 35m provides a slight downward viewing angle.
+    Camera gimbal pitched to -35 degrees for optimal coverage of the
+    structure facade.
+
+# -----------------------------------------------------------------------------
+# Expected Performance
+# -----------------------------------------------------------------------------
+expected_performance:
+  radius_accuracy_m: 2.0
+  altitude_accuracy_m: 0.5
+  speed_consistency_percent: 90
+  heading_tracking_accuracy_deg: 5.0
+  poi_centering_accuracy_deg: 3.0
+  estimated_photos: 96 # 2 revolutions * 48 photos at 2s interval
+  structure_coverage_percent: 100 # full 360-degree coverage
+  total_energy_wh: 12.0
+  compatible_airframes:
+    - "5inch-fpv-freestyle"
+    - "7inch-long-range"
+    - "mapping-quad"
+    - "hex-heavy-lift"
