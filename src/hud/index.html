@@ -938,6 +938,9 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   background: var(--bg) !important;
   font-family: var(--font-data) !important;
 }
+.sat-tiles {
+  filter: brightness(0.35) saturate(0.3) contrast(1.1);
+}
 
 .leaflet-control-attribution {
   background: var(--panel) !important;
@@ -3615,10 +3618,17 @@ function initMap() {
   });
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; CARTO',
+  // Satellite base layer (darkened via CSS) for terrain visibility
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '&copy; Esri',
+    maxZoom: 19,
+    className: 'sat-tiles'
+  }).addTo(map);
+  // Dark label overlay for roads/names
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 20,
+    pane: 'overlayPane'
   }).addTo(map);
 
   // AO boundary polygons (geofences)
@@ -4824,11 +4834,13 @@ function drawMiniSparkline(canvasEl, data, color) {
   ctx.stroke();
 }
 
+let insightsRenderedAsset = null;
 function updateInsightsPanel(asset) {
   const container = document.getElementById('insights-content');
   if (!container) return;
   if (!asset) {
     container.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>';
+    insightsRenderedAsset = null;
     return;
   }
 
@@ -4982,17 +4994,17 @@ function updateInsightsPanel(asset) {
   // Section 1: Predictive Analytics
   html += '<div class="insight-section"><div class="insight-section-title">Predictive Analytics</div>';
   html += '<div class="insight-card"><div class="insight-label">Battery Depletion ETA</div>';
-  html += '<div class="insight-value">Est. ' + etaStr + ' remaining<span class="insight-trend ' + battTrend.cls + '">' + battTrend.sym + '</span></div>';
-  html += '<div class="insight-sub">Drain rate: ' + drainRate.toFixed(2) + '%/min</div></div>';
+  html += '<div class="insight-value"><span id="in-eta">' + etaStr + '</span> remaining<span id="in-batt-trend" class="insight-trend ' + battTrend.cls + '">' + battTrend.sym + '</span></div>';
+  html += '<div class="insight-sub">Drain rate: <span id="in-drain">' + drainRate.toFixed(2) + '</span>%/min</div></div>';
   html += '<div class="insight-card"><div class="insight-label">Estimated Range</div>';
-  html += '<div class="insight-value">' + rangeKm + ' km</div>';
-  html += '<div class="insight-sub">At current speed: ' + speed.toFixed(1) + ' m/s</div></div>';
+  html += '<div class="insight-value"><span id="in-range">' + rangeKm + '</span> km</div>';
+  html += '<div class="insight-sub">At current speed: <span id="in-speed">' + speed.toFixed(1) + '</span> m/s</div></div>';
   html += '<div class="insight-card"><div class="insight-label">Optimal RTB Window</div>';
-  html += '<div class="insight-value">' + rtbStr + '</div>';
+  html += '<div class="insight-value" id="in-rtb">' + rtbStr + '</div>';
   html += '<div class="insight-sub">Safety margin: 10% battery reserve</div></div>';
-  html += '<div class="insight-card' + (missionProb < 40 ? ' critical' : missionProb < 70 ? ' warning' : ' positive') + '">';
+  html += '<div class="insight-card' + (missionProb < 40 ? ' critical' : missionProb < 70 ? ' warning' : ' positive') + '" id="in-prob-card">';
   html += '<div class="insight-label">Mission Completion Probability</div>';
-  html += '<div class="insight-value">' + missionProb + '%</div>';
+  html += '<div class="insight-value" id="in-prob">' + missionProb + '%</div>';
   html += '<div class="insight-sub">Based on battery, health, signal composite</div></div>';
   html += '</div>';
 
@@ -5026,17 +5038,17 @@ function updateInsightsPanel(asset) {
 
   // Section 4: Risk Assessment
   html += '<div class="insight-section"><div class="insight-section-title">Risk Assessment</div>';
-  html += '<div class="insight-card' + (riskScore >= 60 ? ' critical' : riskScore >= 30 ? ' warning' : ' positive') + '">';
+  html += '<div class="insight-card' + (riskScore >= 60 ? ' critical' : riskScore >= 30 ? ' warning' : ' positive') + '" id="in-risk-card">';
   html += '<div class="insight-label">Composite Risk Score</div>';
-  html += '<div class="insight-value" style="color:' + riskColor + '">' + riskScore + ' / 100 \u2014 ' + riskLabel + '</div>';
-  html += '<div class="insight-risk-meter"><div class="insight-risk-fill" style="width:' + riskScore + '%;background:' + riskColor + '"></div></div>';
+  html += '<div class="insight-value" id="in-risk-val" style="color:' + riskColor + '">' + riskScore + ' / 100 \u2014 ' + riskLabel + '</div>';
+  html += '<div class="insight-risk-meter"><div class="insight-risk-fill" id="in-risk-fill" style="width:' + riskScore + '%;background:' + riskColor + '"></div></div>';
   html += '</div>';
   // Risk factors
   html += '<div style="margin-top:4px">';
-  html += '<div class="insight-correlation"><span class="insight-corr-pair">Battery depletion</span><span class="insight-corr-val" style="color:' + (battery < 30 ? 'var(--red)' : battery < 50 ? 'var(--amber)' : 'var(--green)') + '">' + (100 - battery).toFixed(0) + '%</span></div>';
-  html += '<div class="insight-correlation"><span class="insight-corr-pair">System health</span><span class="insight-corr-val" style="color:' + (healthScore < 70 ? 'var(--red)' : healthScore < 85 ? 'var(--amber)' : 'var(--green)') + '">' + healthScore.toFixed(0) + '%</span></div>';
-  html += '<div class="insight-correlation"><span class="insight-corr-pair">Signal integrity</span><span class="insight-corr-val" style="color:' + (signal < 75 ? 'var(--red)' : signal < 90 ? 'var(--amber)' : 'var(--green)') + '">' + signal.toFixed(0) + '%</span></div>';
-  html += '<div class="insight-correlation"><span class="insight-corr-pair">Active anomalies</span><span class="insight-corr-val" style="color:' + (anomalies.filter(a => a.severity !== 'ok').length > 0 ? 'var(--amber)' : 'var(--green)') + '">' + anomalies.filter(a => a.severity !== 'ok').length + '</span></div>';
+  html += '<div class="insight-correlation"><span class="insight-corr-pair">Battery depletion</span><span id="in-rf-batt" class="insight-corr-val" style="color:' + (battery < 30 ? 'var(--red)' : battery < 50 ? 'var(--amber)' : 'var(--green)') + '">' + (100 - battery).toFixed(0) + '%</span></div>';
+  html += '<div class="insight-correlation"><span class="insight-corr-pair">System health</span><span id="in-rf-health" class="insight-corr-val" style="color:' + (healthScore < 70 ? 'var(--red)' : healthScore < 85 ? 'var(--amber)' : 'var(--green)') + '">' + healthScore.toFixed(0) + '%</span></div>';
+  html += '<div class="insight-correlation"><span class="insight-corr-pair">Signal integrity</span><span id="in-rf-signal" class="insight-corr-val" style="color:' + (signal < 75 ? 'var(--red)' : signal < 90 ? 'var(--amber)' : 'var(--green)') + '">' + signal.toFixed(0) + '%</span></div>';
+  html += '<div class="insight-correlation"><span class="insight-corr-pair">Active anomalies</span><span id="in-rf-anom" class="insight-corr-val" style="color:' + (anomalies.filter(a => a.severity !== 'ok').length > 0 ? 'var(--amber)' : 'var(--green)') + '">' + anomalies.filter(a => a.severity !== 'ok').length + '</span></div>';
   html += '</div></div>';
 
   // Section 5: Decision Intelligence
@@ -5049,7 +5061,30 @@ function updateInsightsPanel(asset) {
   });
   html += '</div>';
 
-  container.innerHTML = html;
+  if (insightsRenderedAsset !== asset.id) {
+    // Full rebuild on asset switch
+    insightsRenderedAsset = asset.id;
+    container.innerHTML = html;
+  } else {
+    // Targeted DOM updates for same asset
+    const u = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    u('in-eta', etaStr);
+    u('in-drain', drainRate.toFixed(2));
+    u('in-range', rangeKm);
+    u('in-speed', speed.toFixed(1));
+    u('in-rtb', rtbStr);
+    u('in-prob', missionProb + '%');
+    u('in-risk-val', riskScore + ' / 100 \u2014 ' + riskLabel);
+    u('in-rf-batt', (100 - battery).toFixed(0) + '%');
+    u('in-rf-health', healthScore.toFixed(0) + '%');
+    u('in-rf-signal', signal.toFixed(0) + '%');
+    u('in-rf-anom', '' + anomalies.filter(a => a.severity !== 'ok').length);
+
+    const riskFill = document.getElementById('in-risk-fill');
+    if (riskFill) { riskFill.style.width = riskScore + '%'; riskFill.style.background = riskColor; }
+    const riskVal = document.getElementById('in-risk-val');
+    if (riskVal) riskVal.style.color = riskColor;
+  }
 
   // Draw sparklines after DOM update
   requestAnimationFrame(() => {
@@ -5181,8 +5216,13 @@ setMode('OBSERVE');
   window._overwatchAssets = assets; // expose for diagnostics panel
 
   // Initialize map
-  initMap();
-  setTimeout(() => map.invalidateSize(), 100);
+  try {
+    initMap();
+    setTimeout(() => map.invalidateSize(), 100);
+  } catch (e) {
+    console.error('Map initialization failed:', e);
+    document.getElementById('map').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font:12px var(--font-label)">MAP UNAVAILABLE</div>';
+  }
 
   // Initialize sparklines
   const sparkHealth = new Sparkline('spark-health', _css('--green'));
@@ -5587,20 +5627,7 @@ setMode('OBSERVE');
         opsObjCount.textContent = objectivesCompleted;
       }
 
-      // Update diagnostics panel if viewing it
-      if (currentMode === 'OBSERVE') {
-        const diagTab = document.querySelector('.inspector-tab[data-tab="diagnostics"]');
-        if (diagTab && diagTab.classList.contains('active')) {
-          const sel = drones.find(d => d.id === selectedDroneId);
-          if (sel) updateDiagnosticsPanel(sel);
-        }
-        // Update insights panel if viewing it
-        const insightsTab = document.querySelector('.inspector-tab[data-tab="insights"]');
-        if (insightsTab && insightsTab.classList.contains('active')) {
-          const sel = drones.find(d => d.id === selectedDroneId);
-          if (sel) updateInsightsPanel(sel);
-        }
-      }
+      // Diagnostics + insights are already updated by updateInspector
 
       // Update arm/disarm visual state based on actual drone state
       const selDrone = drones.find(d => d.id === selectedDroneId);
