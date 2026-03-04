@@ -3874,8 +3874,8 @@ function selectDrone(id) {
     map.panTo(latlng, { animate: true, duration: 0.5 });
 
     // Add pulse ring around selected marker
-    const drone = (typeof drones !== 'undefined') ? drones.find(d => d.id === id) : null;
-    const ringColor = drone ? drone.color : 'var(--accent)';
+    const def = ASSET_DEFS.find(d => d.id === id);
+    const ringColor = def ? def.color : _css('--accent');
     const ring = L.circleMarker(latlng, {
       radius: 16,
       color: ringColor,
@@ -3884,7 +3884,8 @@ function selectDrone(id) {
       opacity: 0.5,
       className: 'marker-pulse-ring'
     }).addTo(map);
-    ring.getElement().style.animation = 'marker-ring-pulse 2s ease-in-out infinite';
+    const el = ring.getElement();
+    if (el) el.style.animation = 'marker-ring-pulse 2s ease-in-out infinite';
     mapMarkers[id]._pulseRing = ring;
   }
   // Update FOV cone highlight for selection change
@@ -5182,6 +5183,7 @@ setMode('OBSERVE');
 
   // Initialize map
   initMap();
+  setTimeout(() => map.invalidateSize(), 100);
 
   // Initialize sparklines
   const sparkHealth = new Sparkline('spark-health', _css('--green'));
@@ -6133,6 +6135,7 @@ setMode('OBSERVE');
         videoPanel.style.display = 'none';
       }
       mapEl.style.display = '';
+      setTimeout(() => map.invalidateSize(), 50);
       videoMgr.stopTestPattern();
     }
   };
