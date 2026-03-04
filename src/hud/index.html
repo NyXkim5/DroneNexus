@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OVERWATCH // GOTHAM ISR Platform</title>
+<title>OVERWATCH // ISR Platform</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,25 +16,25 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --bg:             #0d1117;
-  --panel:          #161b22;
-  --panel-elevated: #1c2128;
-  --border:         #21262d;
-  --border-light:   #30363d;
-  --text:           #e6edf3;
-  --text-secondary: #7d8590;
-  --text-tertiary:  #484f58;
-  --text-dim:       #7d8590;
-  --text-bright:    #e6edf3;
-  --accent:         #4493f8;
-  --green:          #3fb950;
-  --amber:          #d29922;
-  --red:            #f85149;
-  --cyan:           #4493f8;
-  --blue:           #4493f8;
-  --purple:         #a371f7;
-  --classification-bg: #d29922;
-  --classification-text: #000000;
+  --bg:             #111418;
+  --panel:          #1C2127;
+  --panel-elevated: #252A31;
+  --border:         #2F343C;
+  --border-light:   #383E47;
+  --text:           #F6F7F9;
+  --text-secondary: #ABB3BF;
+  --text-tertiary:  #5F6B7C;
+  --text-dim:       #738091;
+  --text-bright:    #F6F7F9;
+  --accent:         #2D72D2;
+  --green:          #238551;
+  --amber:          #C87619;
+  --red:            #CD4246;
+  --cyan:           #4C90F0;
+  --blue:           #2D72D2;
+  --purple:         #7961DB;
+  --classification-bg: #007A33;
+  --classification-text: #ffffff;
   --sky:            #1a2a3a;
   --ground:         #3a2a1a;
   --font-data:  'JetBrains Mono', 'IBM Plex Mono', monospace;
@@ -110,7 +110,7 @@ html, body {
 }
 
 #bottom-panel {
-  height: 140px;
+  height: 120px;
   flex-shrink: 0;
   background: var(--panel);
   border-top: 1px solid var(--border);
@@ -224,8 +224,22 @@ html, body {
   text-align: right;
 }
 
-/* Classification banner — removed */
-.classification-banner { display: none; }
+/* Classification banner — Astro UXDS UNCLASSIFIED */
+.classification-banner {
+  background: var(--classification-bg);
+  color: var(--classification-text);
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 2px 0;
+  line-height: 18px;
+  flex-shrink: 0;
+  z-index: 9999;
+  width: 100%;
+}
 
 /* TF callsign */
 .tf-callsign {
@@ -246,20 +260,21 @@ html, body {
   color: var(--text-secondary);
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  padding: 12px 16px 10px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
 }
 
 /* Tree section toggle */
 .tree-section { border-bottom: 1px solid var(--border); }
 .tree-section-header {
-  display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
   font-family: var(--font-label); font-size: 11px; font-weight: 600;
   color: var(--text-secondary); letter-spacing: 0.05em; text-transform: uppercase;
   cursor: pointer; user-select: none; transition: background 0.15s;
 }
 .tree-section-header:hover { background: var(--border); }
 .tree-toggle { font-size: 10px; color: var(--text-tertiary); width: 12px; }
+.collapsed { display: none; }
 .tree-count { font-family: var(--font-data); font-size: 10px; color: var(--text-tertiary); margin-left: auto; }
 
 .asset-list {
@@ -374,7 +389,7 @@ html, body {
   z-index: 500;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 2px;
   padding: 10px 14px;
 }
 
@@ -411,7 +426,7 @@ html, body {
 }
 
 .detail-section {
-  padding: 12px 14px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -724,7 +739,7 @@ html, body {
    ============================================================ */
 .bottom-metric {
   flex: 1;
-  padding: 14px 18px;
+  padding: 10px 14px;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -790,7 +805,7 @@ html, body {
 /* Event log */
 .event-log-section {
   flex: 1.4;
-  padding: 10px 14px;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -872,7 +887,7 @@ html, body {
   font-weight: 600 !important;
   letter-spacing: 1px !important;
   padding: 2px 8px !important;
-  border-radius: 3px !important;
+  border-radius: 2px !important;
 }
 
 .leaflet-tooltip-top::before {
@@ -922,7 +937,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
    DIRECTIVE PANEL
    ============================================================ */
 .cmd-panel { padding: 0; }
-.cmd-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.cmd-section { padding: 10px 12px; border-bottom: 1px solid var(--border); }
 .cmd-section-title {
   font-family: var(--font-label); font-size: 10px; font-weight: 600;
   color: var(--text-secondary); letter-spacing: 0.05em; text-transform: uppercase;
@@ -966,7 +981,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .cmd-select {
   width: 100%; padding: 8px 10px; font-family: var(--font-data); font-size: 12px;
   background: rgba(255,255,255,0.03); border: 1px solid var(--border);
-  border-radius: 4px; color: var(--text-bright); outline: none;
+  border-radius: 2px; color: var(--text-bright); outline: none;
 }
 .cmd-select option { background: var(--panel); color: var(--text); }
 
@@ -977,7 +992,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
   z-index: 500; display: flex; gap: 8px; padding: 8px 14px; align-items: center;
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 2px;
 }
 .wp-btn {
   font-family: var(--font-label); font-size: 10px; font-weight: 600;
@@ -1006,7 +1021,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
   z-index: 500; display: flex; align-items: center; gap: 12px; padding: 10px 18px;
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: 4px; min-width: 500px;
+  border-radius: 2px; min-width: 500px;
 }
 .replay-timeline {
   flex: 1; -webkit-appearance: none; height: 4px; border-radius: 2px;
@@ -1019,7 +1034,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .replay-timestamp { font-family: var(--font-data); font-size: 12px; color: var(--text-bright); min-width: 50px; }
 .replay-speed-btn {
   font-family: var(--font-label); font-size: 10px; padding: 4px 8px;
-  border: 1px solid var(--border); border-radius: 3px; background: transparent;
+  border: 1px solid var(--border); border-radius: 2px; background: transparent;
   color: var(--text-dim); cursor: pointer;
 }
 .replay-speed-btn.active, .replay-speed-btn:hover { color: var(--amber); border-color: var(--amber); }
@@ -1029,7 +1044,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
    ============================================================ */
 .cmd-toast {
   position: fixed; bottom: 24px; right: 24px; z-index: 3000;
-  padding: 10px 18px; border-radius: 6px; font-family: var(--font-label);
+  padding: 10px 18px; border-radius: 2px; font-family: var(--font-label);
   font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
   animation: toast-in 0.3s ease-out; border: 1px solid;
   pointer-events: none;
@@ -1046,13 +1061,13 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .connection-panel {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
   z-index: 2000; width: 420px; background: var(--panel);
-  border: 1px solid var(--border-light); border-radius: 4px;
+  border: 1px solid var(--border-light); border-radius: 2px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5); padding: 24px;
 }
 .conn-input {
   width: 100%; padding: 8px 10px; font-family: var(--font-data); font-size: 12px;
   background: rgba(255,255,255,0.03); border: 1px solid var(--border);
-  border-radius: 4px; color: var(--text-bright); outline: none; margin-bottom: 8px; box-sizing: border-box;
+  border-radius: 2px; color: var(--text-bright); outline: none; margin-bottom: 8px; box-sizing: border-box;
 }
 .conn-input:focus { border-color: var(--accent); }
 .conn-input:disabled { opacity: 0.4; }
@@ -1071,7 +1086,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .goto-indicator {
   position: absolute; top: 12px; right: 12px; z-index: 500;
   background: var(--panel); border: 1px solid var(--accent);
-  border-radius: 4px; padding: 8px 14px;
+  border-radius: 2px; padding: 8px 14px;
 }
 
 /* ============================================================
@@ -1086,7 +1101,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .video-panel.pip {
   position: fixed; bottom: 160px; right: 336px;
   width: 360px; height: 240px; z-index: 1500;
-  border: 1px solid var(--border); border-radius: 6px;
+  border: 1px solid var(--border); border-radius: 2px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.8);
 }
 .video-panel.fullscreen { position: fixed; inset: 0; z-index: 2500; }
@@ -1104,7 +1119,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .dvr-badge {
   position: absolute; top: 8px; right: 8px;
   display: flex; align-items: center; gap: 6px;
-  padding: 4px 10px; border-radius: 12px;
+  padding: 4px 10px; border-radius: 2px;
   background: rgba(255,51,85,0.85); color: #fff;
   font-family: var(--font-label); font-size: 10px;
   font-weight: 600; letter-spacing: 0.5px; z-index: 20;
@@ -1122,7 +1137,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .tilt-slider-wrap input[type="range"] {
   writing-mode: vertical-lr; direction: rtl;
   width: 6px; height: 160px; -webkit-appearance: none; appearance: none;
-  background: rgba(255,255,255,0.1); border-radius: 3px; outline: none;
+  background: rgba(255,255,255,0.1); border-radius: 2px; outline: none;
 }
 .tilt-slider-wrap input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; width: 14px; height: 14px;
@@ -1140,7 +1155,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .fpv-mode-btns { display: flex; gap: 4px; flex-wrap: wrap; }
 .fpv-mode-btn {
   font-family: var(--font-label); font-size: 9px; font-weight: 600;
-  padding: 4px 8px; border: 1px solid var(--border); border-radius: 3px;
+  padding: 4px 8px; border: 1px solid var(--border); border-radius: 2px;
   background: transparent; color: var(--text-dim); cursor: pointer;
   letter-spacing: 0.5px; transition: all 0.15s;
 }
@@ -1248,7 +1263,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   right: -6px;
   min-width: 16px;
   height: 16px;
-  border-radius: 8px;
+  border-radius: 2px;
   background: var(--red);
   color: #fff;
   font-family: var(--font-data);
@@ -1492,7 +1507,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
    ============================================================ */
 .insight-section { padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .insight-section-title { font-family: var(--font-label); font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
-.insight-card { background: var(--panel-elevated); border-radius: 3px; padding: 8px 10px; margin-bottom: 6px; border-left: 3px solid var(--accent); }
+.insight-card { background: var(--panel-elevated); border-radius: 2px; padding: 8px 10px; margin-bottom: 6px; border-left: 3px solid var(--accent); }
 .insight-card.warning { border-left-color: var(--amber); }
 .insight-card.critical { border-left-color: var(--red); }
 .insight-card.positive { border-left-color: var(--green); }
@@ -1505,7 +1520,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .insight-trend.stable { color: var(--text-dim); }
 .insight-risk-meter { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 6px; overflow: hidden; }
 .insight-risk-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
-.insight-rec { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; background: var(--panel-elevated); border-radius: 3px; margin-bottom: 4px; }
+.insight-rec { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; background: var(--panel-elevated); border-radius: 2px; margin-bottom: 4px; }
 .insight-rec-icon { flex-shrink: 0; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; font-size: 10px; }
 .insight-rec-text { font-family: var(--font-data); font-size: 10px; color: var(--text); line-height: 1.4; }
 .insight-sparkline-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -1629,6 +1644,45 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   background: rgba(125,133,144,0.15);
   color: var(--text-secondary);
 }
+
+/* Command Palette */
+.cmd-palette { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: flex-start; justify-content: center; padding-top: 20vh; }
+.cmd-palette.hidden { display: none; }
+.cmd-palette-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+.cmd-palette-modal { position: relative; width: 480px; max-height: 400px; background: var(--panel); border: 1px solid var(--border-light); border-radius: 2px; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.cmd-palette-input { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 14px 16px; font-family: var(--font-data); font-size: 14px; color: var(--text); outline: none; width: 100%; box-sizing: border-box; }
+.cmd-palette-input::placeholder { color: var(--text-dim); }
+.cmd-palette-results { overflow-y: auto; max-height: 300px; padding: 4px 0; }
+.cmd-palette-category { padding: 6px 16px 4px; font-family: var(--font-label); font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-dim); }
+.cmd-palette-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; cursor: pointer; transition: background 0.1s; }
+.cmd-palette-item:hover, .cmd-palette-item.selected { background: var(--panel-elevated); }
+.cmd-palette-item-icon { width: 20px; text-align: center; font-family: var(--font-data); font-size: 12px; color: var(--accent); flex-shrink: 0; }
+.cmd-palette-item-label { font-family: var(--font-data); font-size: 12px; color: var(--text); flex: 1; }
+.cmd-palette-item-hint { font-family: var(--font-data); font-size: 10px; color: var(--text-dim); }
+.cmd-palette-footer { display: flex; gap: 16px; padding: 8px 16px; border-top: 1px solid var(--border); }
+.cmd-palette-hint { font-family: var(--font-label); font-size: 9px; color: var(--text-dim); letter-spacing: 0.3px; }
+.cmd-palette-empty { padding: 24px 16px; text-align: center; font-family: var(--font-data); font-size: 12px; color: var(--text-dim); }
+
+/* Ontology Framing */
+.ontology-breadcrumb { padding: 6px 12px; font-family: var(--font-data); font-size: 10px; color: var(--text-dim); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 4px; }
+.ontology-breadcrumb-sep { color: var(--text-tertiary); }
+.ontology-breadcrumb-type { color: var(--accent); }
+.ontology-breadcrumb-id { color: var(--text); }
+.ontology-type-badge { display: inline-block; font-family: var(--font-label); font-size: 8px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; padding: 1px 5px; border: 1px solid var(--border-light); color: var(--text-dim); margin-left: 4px; vertical-align: middle; border-radius: 1px; }
+.prop-type-tag { font-family: var(--font-data); font-size: 8px; color: var(--text-tertiary); margin-left: 4px; letter-spacing: 0.3px; }
+.ontology-source { font-family: var(--font-data); font-size: 9px; color: var(--text-tertiary); text-align: right; padding: 4px 12px; border-top: 1px solid var(--border); letter-spacing: 0.3px; }
+.link-type-label { font-family: var(--font-label); font-size: 8px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+.link-direction { color: var(--text-dim); font-family: var(--font-data); font-size: 10px; }
+.link-card { display: flex; align-items: center; gap: 6px; }
+.link-cardinality { font-family: var(--font-data); font-size: 9px; color: var(--text-tertiary); margin-left: auto; }
+/* Map Toolbar */
+.map-toolbar { position: absolute; top: 10px; right: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 2px; padding: 4px; }
+.map-tool-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; border-radius: 1px; color: var(--text-secondary); cursor: pointer; font-size: 14px; transition: all 0.15s; font-family: var(--font-data); }
+.map-tool-btn:hover { background: var(--panel-elevated); color: var(--text); border-color: var(--border); }
+.map-tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.map-tool-btn[title]:hover::after { content: attr(title); position: absolute; right: 42px; top: 50%; transform: translateY(-50%); background: var(--panel); border: 1px solid var(--border); padding: 4px 8px; font-family: var(--font-label); font-size: 9px; color: var(--text); white-space: nowrap; pointer-events: none; z-index: 1001; }
+.map-tool-sep { height: 1px; background: var(--border); margin: 2px 0; }
+.map-measurement-label { background: var(--panel); border: 1px solid var(--accent); padding: 2px 6px; font-family: var(--font-data); font-size: 10px; color: var(--text-bright); white-space: nowrap; border-radius: 1px; }
 </style>
 </head>
 <body>
@@ -1639,7 +1693,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   <!-- ==================== TOP BAR ==================== -->
   <div id="top-bar">
     <div class="brand"><span class="brand-icon">&#9670;</span> OVERWATCH</div>
-    <div class="brand-sub">GOTHAM // ISR PLATFORM</div>
+    <div class="brand-sub">OVERWATCH // ISR PLATFORM</div>
     <div class="mode-switch">
       <button class="mode-btn active" data-mode="OBSERVE" title="Observe mode (O)">OBSERVE</button>
       <button class="mode-btn" data-mode="TASK" title="Task mode (T)">TASK</button>
@@ -1673,24 +1727,54 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         <div class="asset-list" id="asset-list"></div>
       </div>
       <div class="tree-section">
-        <div class="tree-section-header" id="tree-ops-toggle">
-          <span class="tree-toggle" id="tree-ops-arrow">&#9656;</span>
-          OPERATIONS
-          <span class="tree-count">(0)</span>
+        <div class="tree-section-header" onclick="this.nextElementSibling.classList.toggle('collapsed');this.querySelector('.tree-toggle').textContent=this.nextElementSibling.classList.contains('collapsed')?'\u25B6':'\u25BC'">
+          <span class="tree-toggle">&#x25BC;</span>
+          <span class="panel-header" style="border:none;padding:0;font-size:10px">OPERATIONS</span>
+          <span class="tree-count">(<span id="ops-count">1</span>)</span>
         </div>
-        <div id="ops-list" style="display:none"></div>
+        <div id="ops-list">
+          <div style="padding:6px 10px 6px 24px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>
+              <span style="font-family:var(--font-data);font-size:11px;color:var(--text)">OP SENTINEL WATCH</span>
+              <span style="font-family:var(--font-label);font-size:8px;padding:1px 5px;border:1px solid var(--accent);color:var(--accent);margin-left:auto;letter-spacing:0.3px">ACTIVE</span>
+            </div>
+            <div style="font-family:var(--font-data);font-size:9px;color:var(--text-dim);padding-left:12px;line-height:1.6">
+              Phase: SURVEILLANCE<br>
+              Assets: <span id="ops-asset-count">6</span>/6 deployed<br>
+              Objectives: <span id="ops-obj-count">0</span> completed<br>
+              Elapsed: <span id="ops-elapsed">00:00</span>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="tree-section">
         <div class="tree-section-header" id="tree-aoi-toggle">
-          <span class="tree-toggle" id="tree-aoi-arrow">&#9656;</span>
+          <span class="tree-toggle" id="tree-aoi-arrow">&#9662;</span>
           AREAS OF INTEREST
-          <span class="tree-count">(1)</span>
+          <span class="tree-count">(4)</span>
         </div>
-        <div id="aoi-list" style="display:none">
-          <div class="asset-item" style="padding:6px 12px 6px 24px">
-            <div class="asset-item-top">
-              <span class="asset-dot" style="background:var(--amber)"></span>
-              <span class="asset-designator">AO-IRVINE</span>
+        <div id="aoi-list">
+          <div style="padding:4px 10px 4px 24px">
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
+              <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>
+              <span style="font-family:var(--font-data);font-size:10px;color:var(--text)">AO-IRVINE</span>
+              <span style="font-family:var(--font-label);font-size:8px;color:var(--accent);margin-left:auto;letter-spacing:0.3px">PRIMARY</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
+              <span style="width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
+              <span style="font-family:var(--font-data);font-size:10px;color:var(--text)">AO-CAMPUS</span>
+              <span style="font-family:var(--font-label);font-size:8px;color:var(--green);margin-left:auto;letter-spacing:0.3px">CLEAR</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
+              <span style="width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0"></span>
+              <span style="font-family:var(--font-data);font-size:10px;color:var(--text)">AO-HIGHWAY</span>
+              <span style="font-family:var(--font-label);font-size:8px;color:var(--amber);margin-left:auto;letter-spacing:0.3px">MONITOR</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
+              <span style="width:6px;height:6px;border-radius:50%;background:var(--text-dim);flex-shrink:0"></span>
+              <span style="font-family:var(--font-data);font-size:10px;color:var(--text-secondary)">AO-NORTH</span>
+              <span style="font-family:var(--font-label);font-size:8px;color:var(--text-dim);margin-left:auto;letter-spacing:0.3px">STANDBY</span>
             </div>
           </div>
         </div>
@@ -1700,6 +1784,13 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
     <!-- CENTER MAP -->
     <div id="map-container">
       <div id="map"></div>
+      <div class="map-toolbar" id="map-toolbar">
+        <button class="map-tool-btn" data-tool="measure" title="Measure Distance">&#x2195;</button>
+        <button class="map-tool-btn" data-tool="area" title="Draw Area">&#x25A1;</button>
+        <button class="map-tool-btn" data-tool="annotate" title="Add Marker">&#x271A;</button>
+        <div class="map-tool-sep"></div>
+        <button class="map-tool-btn" data-tool="clear" title="Clear All">&#x2715;</button>
+      </div>
       <!-- FPV Video Panel -->
       <div id="video-panel" class="video-panel" style="display:none">
         <video id="fpv-video" autoplay muted playsinline style="display:none"></video>
@@ -2038,9 +2129,23 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   <div class="classification-banner">UNCLASSIFIED</div>
 </div>
 
+<div id="command-palette" class="cmd-palette hidden">
+  <div class="cmd-palette-backdrop"></div>
+  <div class="cmd-palette-modal">
+    <input id="cmd-palette-input" type="text" placeholder="Search assets, commands, modes..." autocomplete="off" spellcheck="false">
+    <div id="cmd-palette-results" class="cmd-palette-results"></div>
+    <div class="cmd-palette-footer">
+      <span class="cmd-palette-hint">ESC close</span>
+      <span class="cmd-palette-hint">ARROW navigate</span>
+      <span class="cmd-palette-hint">ENTER select</span>
+      <span class="cmd-palette-hint" style="margin-left:auto">CMD+K</span>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ==============================================================
-   OVERWATCH GOTHAM ISR PLATFORM — SIMULATION & HUD ENGINE
+   OVERWATCH ISR PLATFORM — SIMULATION & HUD ENGINE
    ============================================================== */
 
 // ---- CONSTANTS ----
@@ -2071,14 +2176,14 @@ const DRONE_STATES = {
 
 // ---- ASSET DEFINITIONS ----
 const ASSET_DEFS = [
-  { id: 'ALPHA-1',   color: '#4493f8', rgb: '68,147,248',  role: 'PRIMARY',    formationOffset: { along: 0, cross: 0 } },
-  { id: 'BRAVO-2',   color: '#7d8590', rgb: '125,133,144', role: 'ESCORT',     formationOffset: { along: -1, cross: -1 } },
-  { id: 'CHARLIE-3', color: '#d29922', rgb: '210,153,34',  role: 'ISR',        formationOffset: { along: -1, cross: 1 } },
-  { id: 'DELTA-4',   color: '#7d8590', rgb: '125,133,144', role: 'ESCORT',     formationOffset: { along: -2, cross: -2 } },
-  { id: 'ECHO-5',    color: '#a371f7', rgb: '163,113,247', role: 'LOGISTICS',  formationOffset: { along: -2, cross: 2 } },
-  { id: 'FOXTROT-6', color: '#3fb950', rgb: '63,185,80',   role: 'OVERWATCH',  formationOffset: { along: -3, cross: 0 } },
+  { id: 'ALPHA-1',   color: '#2D72D2', rgb: '45,114,210',  role: 'PRIMARY',    formationOffset: { along: 0, cross: 0 } },
+  { id: 'BRAVO-2',   color: '#238551', rgb: '35,133,81',   role: 'ESCORT',     formationOffset: { along: -1, cross: -1 } },
+  { id: 'CHARLIE-3', color: '#C87619', rgb: '200,118,25',  role: 'ISR',        formationOffset: { along: -1, cross: 1 } },
+  { id: 'DELTA-4',   color: '#CD4246', rgb: '205,66,70',   role: 'ESCORT',     formationOffset: { along: -2, cross: -2 } },
+  { id: 'ECHO-5',    color: '#7961DB', rgb: '121,97,219',  role: 'LOGISTICS',  formationOffset: { along: -2, cross: 2 } },
+  { id: 'FOXTROT-6', color: '#4C90F0', rgb: '76,144,240',  role: 'OVERWATCH',  formationOffset: { along: -3, cross: 0 } },
 ];
-const DRONE_DEFS = ASSET_DEFS; // backward compat
+
 
 // ---- UTILITY ----
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -2102,15 +2207,15 @@ function utcTimeStamp() {
 }
 
 function batteryColor(pct) {
-  if (pct > 50) return '#3fb950';
-  if (pct > 25) return '#d29922';
-  return '#f85149';
+  if (pct > 50) return '#238551';
+  if (pct > 25) return '#C87619';
+  return '#CD4246';
 }
 
 function rssiColor(v) {
-  if (v > 80) return '#3fb950';
-  if (v > 50) return '#d29922';
-  return '#f85149';
+  if (v > 80) return '#238551';
+  if (v > 50) return '#C87619';
+  return '#CD4246';
 }
 
 /* ==============================================================
@@ -2335,6 +2440,28 @@ class AssetSimulator {
       this.temperature = clamp(44 + Math.sin(this.t * 0.18 + this.index * 0.5) * 6 + rand(-1, 1), 38, 52);
     }
 
+    // Failure effects
+    if (this._gpsFailureUntil && Date.now() < this._gpsFailureUntil) {
+      this.hdop = clamp(this.hdop + Math.random() * 0.5, 0.6, 3.5);
+      this.satellites = clamp(this.satellites - Math.floor(Math.random() * 2), 4, 16);
+    } else if (this._gpsFailureUntil) {
+      this._gpsFailureUntil = null;
+    }
+
+    if (this._batteryDrainUntil && Date.now() < this._batteryDrainUntil) {
+      this.battery = clamp(this.battery - 0.15 * dt, 5, 100);
+    } else if (this._batteryDrainUntil) {
+      this._batteryDrainUntil = null;
+    }
+
+    if (this._commsDegradedUntil && Date.now() < this._commsDegradedUntil) {
+      this.linkQuality = clamp(this.linkQuality - Math.random() * 8, 40, 100);
+      this.rssi = clamp(this.rssi - Math.random() * 5, 55, 95);
+      this.latency = clamp(this.latency + Math.random() * 30, 18, 200);
+    } else if (this._commsDegradedUntil) {
+      this._commsDegradedUntil = null;
+    }
+
     // Status derivation
     const activeStates = [DRONE_STATES.FLYING, DRONE_STATES.GOTO, DRONE_STATES.MISSION];
     if (activeStates.includes(this.droneState)) {
@@ -2350,6 +2477,24 @@ class AssetSimulator {
       this.trail.push({ lat: this.lat, lng: this.lng });
       if (this.trail.length > TRAIL_LENGTH) this.trail.shift();
     }
+  }
+
+  injectFailure() {
+    const roll = Math.random();
+    if (roll < 0.003) {
+      // GPS degradation: spike hdop for a few seconds
+      this._gpsFailureUntil = Date.now() + 5000 + Math.random() * 5000;
+      return 'GPS';
+    } else if (roll < 0.006) {
+      // Battery anomaly: accelerate drain for a few seconds
+      this._batteryDrainUntil = Date.now() + 8000 + Math.random() * 7000;
+      return 'BATTERY';
+    } else if (roll < 0.009) {
+      // Comms degradation
+      this._commsDegradedUntil = Date.now() + 6000 + Math.random() * 6000;
+      return 'COMMS';
+    }
+    return null;
   }
 }
 
@@ -2524,7 +2669,7 @@ class ObjectiveManager {
     this.objectives.push(obj);
 
     const marker = L.circleMarker([lat, lng], {
-      radius: 10, color: '#4493f8', fillColor: '#4493f8', fillOpacity: 0.2, weight: 2,
+      radius: 10, color: '#2D72D2', fillColor: '#2D72D2', fillOpacity: 0.2, weight: 2,
     }).addTo(this.map);
     marker.bindTooltip('OBJ-' + idx + ' ' + this.wpType, { permanent: true, direction: 'top', offset: [0, -10] });
     this.markers.push(marker);
@@ -2541,7 +2686,7 @@ class ObjectiveManager {
     if (this.objectives.length > 1) {
       this.polyline = L.polyline(
         this.objectives.map(w => [w.lat, w.lng]),
-        { color: '#4493f8', weight: 1, opacity: 0.6, dashArray: '6, 6' }
+        { color: '#2D72D2', weight: 1, opacity: 0.6, dashArray: '6, 6' }
       ).addTo(this.map);
     }
   }
@@ -2767,17 +2912,40 @@ const EVENT_TEMPLATES = [
 const WIND_DIRS = ['N', 'NE', 'NW', 'S', 'SE', 'SW', 'E', 'W'];
 
 function generateActivity(assets) {
-  const drones = assets; // compat
   const tpl = EVENT_TEMPLATES[randInt(0, EVENT_TEMPLATES.length - 1)];
   let source = tpl.source;
   if (!source) {
-    source = drones[randInt(0, drones.length - 1)].id;
+    source = assets[randInt(0, assets.length - 1)].id;
   }
   let msg = tpl.msg;
   msg = msg.replace('{n}', randInt(1, 12));
   msg = msg.replace('{w}', (rand(1, 6)).toFixed(1));
   msg = msg.replace('{dir}', WIND_DIRS[randInt(0, WIND_DIRS.length - 1)]);
   return { time: utcTimeStamp(), source, msg, severity: tpl.severity };
+}
+
+function generateStateCorrelatedEvents(assets) {
+  assets.forEach(d => {
+    // Battery warnings
+    if (d.battery < 25 && d.battery > 24.5) {
+      addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Battery below 25% — monitor required', severity: 'warn' });
+    }
+    if (d.battery < 15 && d.battery > 14.5) {
+      addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Battery critical — RTB recommended', severity: 'alert' });
+    }
+    // Signal warnings
+    if (d.linkQuality < 80 && Math.random() < 0.05) {
+      addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Signal degraded: ' + d.linkQuality.toFixed(0) + '% quality', severity: 'warn' });
+    }
+    // GPS warnings
+    if (d.hdop > 2.0 && Math.random() < 0.1) {
+      addEvent({ time: utcTimeStamp(), source: d.id, msg: 'GPS accuracy reduced — HDOP ' + d.hdop.toFixed(1), severity: 'warn' });
+    }
+    // Comms latency
+    if (d.latency > 100 && Math.random() < 0.05) {
+      addEvent({ time: utcTimeStamp(), source: d.id, msg: 'High latency: ' + d.latency.toFixed(0) + 'ms — check link', severity: 'warn' });
+    }
+  });
 }
 
 /* ==============================================================
@@ -2895,7 +3063,7 @@ function initMap() {
   // Formation lines from primary to each follower
   ASSET_DEFS.forEach((def, i) => {
     if (i === 0) return; // skip primary
-    const line = L.polyline([], { color: '#30363d', weight: 1, opacity: 0.6, dashArray: '6, 6' }).addTo(map);
+    const line = L.polyline([], { color: '#383E47', weight: 1, opacity: 0.6, dashArray: '6, 6' }).addTo(map);
     formationLines.push({ id: def.id, line });
   });
 }
@@ -2950,32 +3118,52 @@ function updateFormationLines(drones) {
    ============================================================== */
 function updateAssetExplorer(assets) {
   const container = document.getElementById('asset-list');
-  container.innerHTML = '';
   const countEl = document.getElementById('tree-assets-count');
   if (countEl) countEl.textContent = '(' + assets.length + ')';
+
   assets.forEach(asset => {
-    const item = document.createElement('div');
-    item.className = 'asset-item' + (asset.id === selectedDroneId ? ' selected' : '');
-    item.addEventListener('click', () => selectDrone(asset.id));
+    let item = container.querySelector('[data-asset-id="' + asset.id + '"]');
 
-    const roleClass = asset.role.toLowerCase();
-    const statusClass = asset.status.toLowerCase().replace(/_/g, '_');
+    if (!item) {
+      // First render: create the DOM element
+      item = document.createElement('div');
+      item.className = 'asset-item' + (asset.id === selectedDroneId ? ' selected' : '');
+      item.dataset.assetId = asset.id;
+      item.addEventListener('click', () => selectDrone(asset.id));
 
-    item.innerHTML = `
-      <div class="asset-item-top">
-        <span class="asset-dot" style="background:${asset.color}"></span>
-        <span class="asset-designator">${asset.id}</span>
-        <span class="asset-classification ${roleClass}">${asset.role}</span>
-      </div>
-      <div style="padding-left:12px;margin-top:2px">
-        <span class="asset-status ${statusClass}">${asset.status.replace(/_/g,' ')}</span>
-      </div>
-    `;
-    container.appendChild(item);
+      const roleClass = asset.role.toLowerCase();
+      const statusClass = asset.status.toLowerCase().replace(/_/g, '_');
+
+      item.innerHTML = `
+        <div class="asset-item-top">
+          <span class="asset-dot" style="background:${asset.color}"></span>
+          <span class="asset-designator">${asset.id}</span>
+          <span class="asset-classification ${roleClass}">${asset.role}</span>
+        </div>
+        <div style="padding-left:12px;margin-top:2px">
+          <span class="asset-status ${statusClass}" data-field="status">${asset.status.replace(/_/g,' ')}</span>
+        </div>
+      `;
+      container.appendChild(item);
+    } else {
+      // Update: only change what varies
+      item.className = 'asset-item' + (asset.id === selectedDroneId ? ' selected' : '');
+
+      const statusEl = item.querySelector('[data-field="status"]');
+      if (statusEl) {
+        const statusText = asset.status.replace(/_/g, ' ');
+        const statusClass = asset.status.toLowerCase().replace(/_/g, '_');
+        if (statusEl.textContent !== statusText) statusEl.textContent = statusText;
+        statusEl.className = 'asset-status ' + statusClass;
+      }
+    }
+  });
+
+  // Remove items for assets that no longer exist
+  container.querySelectorAll('[data-asset-id]').forEach(el => {
+    if (!assets.find(a => a.id === el.dataset.assetId)) el.remove();
   });
 }
-// backward compat
-function renderDroneList(drones) { updateAssetExplorer(drones); }
 
 /* ==============================================================
    RIGHT PANEL — INSPECTOR RENDERING
@@ -3015,9 +3203,15 @@ function updateInspector(asset) {
   // Properties tab
   const content = document.getElementById('detail-content');
   content.innerHTML = `
+    <div class="ontology-breadcrumb">
+      <span class="ontology-breadcrumb-type">ISR_ASSET</span>
+      <span class="ontology-breadcrumb-sep">&rsaquo;</span>
+      <span class="ontology-breadcrumb-id">${asset.id}</span>
+      <span class="ontology-type-badge">OBJECT</span>
+    </div>
     <!-- ATTITUDE -->
     <div class="detail-section">
-      <div class="detail-section-title">Attitude</div>
+      <div class="detail-section-title">Attitude <span class="prop-type-tag">FLOAT64</span></div>
       <div class="attitude-container">
         <div class="attitude-ball" id="attitude-ball" style="transform: translate(-50%, -50%) rotate(${asset.roll}deg) translateY(${-asset.pitch * 1.5}px);">
           <div class="attitude-sky"></div>
@@ -3072,7 +3266,7 @@ function updateInspector(asset) {
 
     <!-- VELOCITY -->
     <div class="detail-section">
-      <div class="detail-section-title">Velocity</div>
+      <div class="detail-section-title">Velocity <span class="prop-type-tag">FLOAT64</span></div>
       <div class="telem-grid">
         <div class="telem-cell">
           <div class="telem-cell-label">Ground Speed (m/s)</div>
@@ -3091,7 +3285,7 @@ function updateInspector(asset) {
 
     <!-- POWER STATE -->
     <div class="detail-section">
-      <div class="detail-section-title">Power State</div>
+      <div class="detail-section-title">Power State <span class="prop-type-tag">FLOAT64</span></div>
       <div class="battery-detail">
         <div class="battery-big-num" style="color:${batColor}">${asset.battery.toFixed(1)}%</div>
         <div class="battery-meta">
@@ -3106,7 +3300,7 @@ function updateInspector(asset) {
 
     <!-- POSITIONING -->
     <div class="detail-section">
-      <div class="detail-section-title">Positioning</div>
+      <div class="detail-section-title">Positioning <span class="prop-type-tag">GEO_POINT</span></div>
       <div class="gps-fix-badge">3D-RTK FIX</div>
       <div class="gps-grid">
         <div class="gps-cell">
@@ -3122,7 +3316,7 @@ function updateInspector(asset) {
 
     <!-- COMMLINK -->
     <div class="detail-section">
-      <div class="detail-section-title">Commlink</div>
+      <div class="detail-section-title">Commlink <span class="prop-type-tag">STRUCT</span></div>
       <div class="link-cards">
         <div class="link-card">
           <div class="link-card-value" style="color:${rssiC}">${asset.rssi.toFixed(0)}<span class="link-card-unit">dBm</span></div>
@@ -3141,18 +3335,38 @@ function updateInspector(asset) {
 
     <!-- STATUS -->
     <div class="detail-section">
-      <div class="detail-section-title">Status</div>
+      <div class="detail-section-title">Status <span class="prop-type-tag">ENUM</span></div>
       <div class="drone-status-badge ${asset.status.toLowerCase()}" style="display:inline-block;font-size:11px;padding:3px 10px">${asset.status.replace(/_/g,' ')}</div>
     </div>
+    <div class="ontology-source">SRC: SIM-ENGINE // CONF: HIGH // UPD: ${new Date().toISOString().substr(11, 8)}Z</div>
   `;
 
   // Relationships tab
   const relContent = document.getElementById('relationships-content');
   const isPrimary = asset.role === 'PRIMARY';
   relContent.innerHTML = `
-    <div class="relationship-card">MEMBER_OF &rarr; TF-OVERWATCH-01</div>
-    ${isPrimary ? '' : '<div class="relationship-card">REPORTS_TO &rarr; ALPHA-1</div>'}
-    <div class="relationship-card">CLASSIFICATION &rarr; ${asset.role}</div>
+    <div style="padding:8px 12px">
+      <div class="relationship-card">
+        <div class="link-type-label">Link[MEMBER_OF] <span class="link-cardinality">1:1</span></div>
+        <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> TF-OVERWATCH-01</div>
+      </div>
+      ${isPrimary ? '' : `<div class="relationship-card">
+        <div class="link-type-label">Link[REPORTS_TO] <span class="link-cardinality">N:1</span></div>
+        <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> ALPHA-1</div>
+      </div>`}
+      <div class="relationship-card">
+        <div class="link-type-label">Link[ASSIGNED_ROLE] <span class="link-cardinality">1:1</span></div>
+        <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> ${asset.role}</div>
+      </div>
+      <div class="relationship-card">
+        <div class="link-type-label">Link[OPERATES_IN] <span class="link-cardinality">N:1</span></div>
+        <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> AO-IRVINE</div>
+      </div>
+      <div class="relationship-card">
+        <div class="link-type-label">Link[COMM_LINK] <span class="link-cardinality">1:N</span></div>
+        <div class="link-direction">${asset.id} <span style="color:var(--accent)">&harr;</span> MESH-NET-01</div>
+      </div>
+    </div>
   `;
 
   // Timeline tab
@@ -3453,8 +3667,8 @@ function updateInsightsPanel(asset) {
     is.lastUpdate = now;
     is.batteryHistory.push(asset.battery);
     is.speedHistory.push(asset.speed || 0);
-    is.altHistory.push(asset.alt || 0);
-    is.signalHistory.push(asset.signal || 100);
+    is.altHistory.push(asset.altitude || 0);
+    is.signalHistory.push(asset.linkQuality || 100);
     if (is.batteryHistory.length > 30) is.batteryHistory.shift();
     if (is.speedHistory.length > 30) is.speedHistory.shift();
     if (is.altHistory.length > 30) is.altHistory.shift();
@@ -3464,8 +3678,8 @@ function updateInsightsPanel(asset) {
   // --- Compute predictive analytics ---
   const battery = asset.battery || 100;
   const speed = asset.speed || 0;
-  const alt = asset.alt || 0;
-  const signal = asset.signal || 100;
+  const alt = asset.altitude || 0;
+  const signal = asset.linkQuality || 100;
 
   // Battery drain rate estimation
   let drainRate = 0.5; // default %/min
@@ -3488,8 +3702,8 @@ function updateInsightsPanel(asset) {
   const rangeKm = ((speed * minsRemaining * 60) / 1000).toFixed(1);
 
   // Distance from origin (approximate — use lat/lng delta)
-  const originLat = asset.originLat || asset.lat;
-  const originLng = asset.originLng || asset.lng;
+  const originLat = asset.homePosition.lat;
+  const originLng = asset.homePosition.lng;
   const dLat = (asset.lat - originLat) * 111320;
   const dLng = (asset.lng - originLng) * 111320 * Math.cos(asset.lat * Math.PI / 180);
   const distFromOrigin = Math.sqrt(dLat * dLat + dLng * dLng); // meters
@@ -3501,7 +3715,7 @@ function updateInsightsPanel(asset) {
   const rtbStr = optimalRtbMins > 60 ? Math.floor(optimalRtbMins / 60) + 'h ' + Math.floor(optimalRtbMins % 60) + 'm' : Math.floor(optimalRtbMins) + 'm';
 
   // Mission completion probability
-  const healthScore = asset.health || 100;
+  const healthScore = getDiagState(asset.id).overallHealth;
   const batteryFactor = Math.min(battery / 30, 1); // <30% = reduced
   const healthFactor = Math.min(healthScore / 70, 1);
   const signalFactor = Math.min(signal / 80, 1);
@@ -3518,9 +3732,9 @@ function updateInsightsPanel(asset) {
   // Motor temp check (use diagnostics state if available)
   const ds = diagState[asset.id];
   if (ds) {
-    ds.motorTemps.forEach((t, i) => {
-      if (t > 48) {
-        anomalies.push({ msg: 'Motor ' + (i + 1) + ' temp elevated: ' + t.toFixed(1) + '\u00b0C', severity: t > 55 ? 'critical' : 'warning', icon: '\ud83c\udf21' });
+    ds.motors.forEach((m, i) => {
+      if (m.temp > 48) {
+        anomalies.push({ msg: 'Motor ' + (i + 1) + ' temp elevated: ' + m.temp.toFixed(1) + '\u00b0C', severity: m.temp > 55 ? 'critical' : 'warning', icon: '\ud83c\udf21' });
       }
     });
   }
@@ -3557,7 +3771,7 @@ function updateInsightsPanel(asset) {
     recs.push({ icon: '\ud83d\udd0b', text: 'RTB recommended in ' + rtbStr + ' \u2014 battery at ' + battery.toFixed(0) + '%' });
   }
   if (ds) {
-    const hotMotor = ds.motorTemps.findIndex(t => t > 48);
+    const hotMotor = ds.motors.findIndex(m => m.temp > 48);
     if (hotMotor >= 0) {
       recs.push({ icon: '\u26a1', text: 'Motor ' + (hotMotor + 1) + ' temperature elevated \u2014 reduce speed by 15%' });
     }
@@ -3622,9 +3836,9 @@ function updateInsightsPanel(asset) {
   // Section 3: Trend Sparklines
   html += '<div class="insight-section"><div class="insight-section-title">Telemetry Trends</div>';
   const sparkData = [
-    { label: 'Battery', data: is.batteryHistory, color: '#4493f8', val: battery.toFixed(0) + '%', trend: battTrend },
-    { label: 'Speed', data: is.speedHistory, color: '#3fb950', val: speed.toFixed(1) + ' m/s', trend: spdTrend },
-    { label: 'Alt', data: is.altHistory, color: '#d29922', val: alt.toFixed(0) + ' m', trend: altTrend },
+    { label: 'Battery', data: is.batteryHistory, color: '#2D72D2', val: battery.toFixed(0) + '%', trend: battTrend },
+    { label: 'Speed', data: is.speedHistory, color: '#238551', val: speed.toFixed(1) + ' m/s', trend: spdTrend },
+    { label: 'Alt', data: is.altHistory, color: '#C87619', val: alt.toFixed(0) + ' m', trend: altTrend },
     { label: 'Signal', data: is.signalHistory, color: '#f0f0f0', val: signal.toFixed(0) + '%', trend: sigTrend },
   ];
   sparkData.forEach((s, idx) => {
@@ -3673,8 +3887,6 @@ function updateInsightsPanel(asset) {
   });
 }
 
-// backward compat
-function renderDetailPanel(drone) { updateInspector(drone); }
 
 /* ==============================================================
    BOTTOM PANEL — ACTIVITY STREAM
@@ -3750,12 +3962,7 @@ document.getElementById('tree-assets-toggle').addEventListener('click', () => {
   if (list.style.display === 'none') { list.style.display = ''; arrow.innerHTML = '&#9662;'; }
   else { list.style.display = 'none'; arrow.innerHTML = '&#9656;'; }
 });
-document.getElementById('tree-ops-toggle').addEventListener('click', () => {
-  const list = document.getElementById('ops-list');
-  const arrow = document.getElementById('tree-ops-arrow');
-  if (list.style.display === 'none') { list.style.display = ''; arrow.innerHTML = '&#9662;'; }
-  else { list.style.display = 'none'; arrow.innerHTML = '&#9656;'; }
-});
+// Operations toggle handled via inline onclick on the section header
 document.getElementById('tree-aoi-toggle').addEventListener('click', () => {
   const list = document.getElementById('aoi-list');
   const arrow = document.getElementById('tree-aoi-arrow');
@@ -3779,9 +3986,9 @@ setMode('OBSERVE');
   initMap();
 
   // Initialize sparklines
-  const sparkHealth = new Sparkline('spark-health', '#3fb950');
-  const sparkLatency = new Sparkline('spark-latency', '#d29922');
-  const sparkBattery = new Sparkline('spark-battery', '#4493f8');
+  const sparkHealth = new Sparkline('spark-health', '#238551');
+  const sparkLatency = new Sparkline('spark-latency', '#C87619');
+  const sparkBattery = new Sparkline('spark-battery', '#2D72D2');
 
   // Initialize subsystems
   const cmdEngine = new DirectiveEngine(assets, addEvent);
@@ -4027,12 +4234,12 @@ setMode('OBSERVE');
       lastTickTime = now;
 
       // Render drone list
-      renderDroneList(drones);
+      updateAssetExplorer(drones);
 
       // Render inspector (OBSERVE mode)
       if (currentMode === 'OBSERVE') {
         const selected = drones.find(d => d.id === selectedDroneId);
-        renderDetailPanel(selected || null);
+        updateInspector(selected || null);
       }
 
       // Update command target
@@ -4086,6 +4293,14 @@ setMode('OBSERVE');
         updateDebriefPanel();
       }
 
+      // Update operations elapsed
+      const opsElapsed = document.getElementById('ops-elapsed');
+      if (opsElapsed) {
+        const opsSec = Math.floor((Date.now() - debriefTracker.startTime) / 1000);
+        const opsMin = Math.floor(opsSec / 60);
+        opsElapsed.textContent = opsMin + ':' + String(opsSec % 60).padStart(2, '0');
+      }
+
       // Update diagnostics panel if viewing it
       if (currentMode === 'OBSERVE') {
         const diagTab = document.querySelector('.inspector-tab[data-tab="diagnostics"]');
@@ -4111,6 +4326,17 @@ setMode('OBSERVE');
           updateArmDisarmVisuals();
         }
       }
+
+      // Inject random failures (rare)
+      drones.forEach(d => {
+        const failure = d.injectFailure();
+        if (failure === 'GPS') addEvent({ time: utcTimeStamp(), source: d.id, msg: 'GPS signal anomaly detected — HDOP increasing', severity: 'warn' });
+        else if (failure === 'BATTERY') addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Abnormal battery drain detected — monitoring', severity: 'warn' });
+        else if (failure === 'COMMS') addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Communication link degradation — switching antenna', severity: 'warn' });
+      });
+
+      // State-correlated event generation
+      generateStateCorrelatedEvents(drones);
     }
 
     // Random events
@@ -4151,29 +4377,29 @@ setMode('OBSERVE');
       const w = 640, h = 480;
       const draw = () => {
         this._testFrame++;
-        ctx.fillStyle = '#0d1117';
+        ctx.fillStyle = '#111418';
         ctx.fillRect(0, 0, w, h);
         // Grid lines
-        ctx.strokeStyle = 'rgba(125,133,144,0.08)';
+        ctx.strokeStyle = 'rgba(115,128,145,0.08)';
         ctx.lineWidth = 1;
         for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
         for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
         // Crosshair
-        ctx.strokeStyle = 'rgba(125,133,144,0.3)';
+        ctx.strokeStyle = 'rgba(115,128,145,0.3)';
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(w/2 - 20, h/2); ctx.lineTo(w/2 + 20, h/2); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(w/2, h/2 - 20); ctx.lineTo(w/2, h/2 + 20); ctx.stroke();
         // Text
         ctx.font = '16px JetBrains Mono';
-        ctx.fillStyle = '#7d8590';
+        ctx.fillStyle = '#ABB3BF';
         ctx.textAlign = 'center';
         ctx.fillText('OVERWATCH ISR TEST PATTERN', w/2, h/2 - 50);
         ctx.font = '12px JetBrains Mono';
-        ctx.fillStyle = '#484f58';
+        ctx.fillStyle = '#5F6B7C';
         ctx.fillText('No video source connected', w/2, h/2 + 50);
         ctx.fillText('Frame ' + this._testFrame, w/2, h/2 + 70);
         const t = new Date();
-        ctx.fillStyle = '#7d8590';
+        ctx.fillStyle = '#ABB3BF';
         ctx.fillText(t.toISOString().substr(11, 8) + 'Z', w/2, h/2 + 90);
         this._testPatternId = requestAnimationFrame(draw);
       };
@@ -4279,7 +4505,7 @@ setMode('OBSERVE');
       const fmt = (v, d) => (v || 0).toFixed(d);
 
       this.els.battery.textContent = fmt(drone.voltage, 1) + 'V  ' + fmt(drone.battery, 0) + '%';
-      this.els.battery.style.color = drone.battery < 25 ? '#f85149' : drone.battery < 50 ? '#d29922' : '#fff';
+      this.els.battery.style.color = drone.battery < 25 ? '#CD4246' : drone.battery < 50 ? '#C87619' : '#fff';
       this.els.cell.textContent = fmt(f.cell_voltage || drone.voltage / 6, 2) + 'V/cell';
       this.els.mah.textContent = (f.mah_consumed || 0).toFixed(0) + ' mAh';
 
@@ -4292,7 +4518,7 @@ setMode('OBSERVE');
       this.els.alt.textContent = fmt(drone.altitude, 1) + 'm';
       this.els.speed.textContent = fmt(drone.speed, 1) + 'm/s';
       this.els.rssi.textContent = 'RSSI ' + fmt(drone.rssi, 0);
-      this.els.rssi.style.color = drone.rssi < 50 ? '#f85149' : drone.rssi < 70 ? '#d29922' : '#fff';
+      this.els.rssi.style.color = drone.rssi < 50 ? '#CD4246' : drone.rssi < 70 ? '#C87619' : '#fff';
 
       const hd = f.home_distance_m || 0;
       const hdir = f.home_direction_deg || 0;
@@ -4666,6 +4892,301 @@ setMode('OBSERVE');
       }
     }
   }
+
+  // ---- Map Tools (Geospatial) ----
+  const mapTools = {
+    activeTool: null,
+    measurePoints: [],
+    measureLayers: L.layerGroup().addTo(map),
+    areaPoints: [],
+    areaLayers: L.layerGroup().addTo(map),
+    annotationLayers: L.layerGroup().addTo(map),
+
+    activate(tool) {
+      if (this.activeTool === tool) { this.deactivate(); return; }
+      this.deactivate();
+      this.activeTool = tool;
+      document.querySelectorAll('.map-tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+
+      if (tool === 'measure') {
+        this.measurePoints = [];
+        map.getContainer().style.cursor = 'crosshair';
+        map.on('click', this._onMeasureClick, this);
+      } else if (tool === 'area') {
+        this.areaPoints = [];
+        map.getContainer().style.cursor = 'crosshair';
+        map.on('click', this._onAreaClick, this);
+        map.on('dblclick', this._onAreaDblClick, this);
+      } else if (tool === 'annotate') {
+        map.getContainer().style.cursor = 'crosshair';
+        map.on('click', this._onAnnotateClick, this);
+      }
+    },
+
+    deactivate() {
+      this.activeTool = null;
+      document.querySelectorAll('.map-tool-btn').forEach(b => b.classList.remove('active'));
+      map.getContainer().style.cursor = '';
+      map.off('click', this._onMeasureClick, this);
+      map.off('click', this._onAreaClick, this);
+      map.off('dblclick', this._onAreaDblClick, this);
+      map.off('click', this._onAnnotateClick, this);
+    },
+
+    clearAll() {
+      this.measureLayers.clearLayers();
+      this.areaLayers.clearLayers();
+      this.annotationLayers.clearLayers();
+      this.measurePoints = [];
+      this.areaPoints = [];
+      this.deactivate();
+      if (typeof showToast === 'function') showToast('Map layers cleared');
+    },
+
+    _onMeasureClick(e) {
+      this.measurePoints.push(e.latlng);
+      // Add point marker
+      L.circleMarker(e.latlng, { radius: 4, color: '#2D72D2', fillColor: '#2D72D2', fillOpacity: 1, weight: 1 }).addTo(this.measureLayers);
+
+      if (this.measurePoints.length === 2) {
+        const p1 = this.measurePoints[0];
+        const p2 = this.measurePoints[1];
+        const distM = map.distance(p1, p2);
+        const distKm = (distM / 1000).toFixed(2);
+        const distNm = (distM / 1852).toFixed(2);
+
+        // Draw line
+        const line = L.polyline([p1, p2], { color: '#2D72D2', weight: 2, dashArray: '6,4' }).addTo(this.measureLayers);
+
+        // Add label at midpoint
+        const midLat = (p1.lat + p2.lat) / 2;
+        const midLng = (p1.lng + p2.lng) / 2;
+        L.marker([midLat, midLng], {
+          icon: L.divIcon({ className: 'map-measurement-label', html: distKm + ' km / ' + distNm + ' nm', iconSize: null })
+        }).addTo(this.measureLayers);
+
+        this.measurePoints = [];
+        this.deactivate();
+        if (typeof showToast === 'function') showToast('Distance: ' + distKm + ' km');
+      }
+    },
+
+    _onAreaClick(e) {
+      this.areaPoints.push(e.latlng);
+      L.circleMarker(e.latlng, { radius: 4, color: '#C87619', fillColor: '#C87619', fillOpacity: 1, weight: 1 }).addTo(this.areaLayers);
+
+      if (this.areaPoints.length > 1) {
+        // Draw preview line
+        this.areaLayers.eachLayer(l => { if (l instanceof L.Polyline && !(l instanceof L.Polygon)) this.areaLayers.removeLayer(l); });
+        L.polyline(this.areaPoints, { color: '#C87619', weight: 2, dashArray: '4,4' }).addTo(this.areaLayers);
+      }
+    },
+
+    _onAreaDblClick(e) {
+      e.originalEvent.preventDefault();
+      if (this.areaPoints.length < 3) { if (typeof showToast === 'function') showToast('Need at least 3 points'); return; }
+
+      // Clear preview layers
+      this.areaLayers.clearLayers();
+
+      // Draw polygon
+      const polygon = L.polygon(this.areaPoints, { color: '#C87619', fillColor: '#C87619', fillOpacity: 0.15, weight: 2 }).addTo(this.areaLayers);
+
+      // Calculate area (approximate)
+      const latlngs = this.areaPoints;
+      let area = 0;
+      for (let i = 0; i < latlngs.length; i++) {
+        const j = (i + 1) % latlngs.length;
+        area += latlngs[i].lng * latlngs[j].lat;
+        area -= latlngs[j].lng * latlngs[i].lat;
+      }
+      area = Math.abs(area) / 2;
+      const areaSqKm = (area * 111.32 * 111.32 * Math.cos(latlngs[0].lat * Math.PI / 180)).toFixed(3);
+
+      // Add label at centroid
+      const centLat = latlngs.reduce((s, p) => s + p.lat, 0) / latlngs.length;
+      const centLng = latlngs.reduce((s, p) => s + p.lng, 0) / latlngs.length;
+      L.marker([centLat, centLng], {
+        icon: L.divIcon({ className: 'map-measurement-label', html: areaSqKm + ' km\u00B2', iconSize: null })
+      }).addTo(this.areaLayers);
+
+      this.areaPoints = [];
+      this.deactivate();
+      if (typeof showToast === 'function') showToast('Area: ' + areaSqKm + ' km\u00B2');
+    },
+
+    _onAnnotateClick(e) {
+      const label = prompt('Annotation label:');
+      if (!label) { this.deactivate(); return; }
+
+      const marker = L.marker(e.latlng, {
+        icon: L.divIcon({
+          className: 'map-measurement-label',
+          html: '\u271A ' + label,
+          iconSize: null
+        })
+      }).addTo(this.annotationLayers);
+
+      this.deactivate();
+      if (typeof showToast === 'function') showToast('Marker added: ' + label);
+    }
+  };
+
+  // Bind toolbar buttons
+  document.querySelectorAll('.map-tool-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tool = btn.dataset.tool;
+      if (tool === 'clear') mapTools.clearAll();
+      else mapTools.activate(tool);
+    });
+  });
+
+  // ---- Command Palette (Cmd+K) ----
+  const cmdPalette = {
+    el: null,
+    input: null,
+    results: null,
+    items: [],
+    selectedIndex: 0,
+    visible: false,
+
+    init() {
+      this.el = document.getElementById('command-palette');
+      this.input = document.getElementById('cmd-palette-input');
+      this.results = document.getElementById('cmd-palette-results');
+
+      // Backdrop click closes
+      this.el.querySelector('.cmd-palette-backdrop').addEventListener('click', () => this.close());
+
+      // Input handler
+      this.input.addEventListener('input', () => this.search(this.input.value));
+      this.input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); this.close(); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); this.moveSelection(1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.moveSelection(-1); }
+        else if (e.key === 'Enter') { e.preventDefault(); this.executeSelected(); }
+      });
+    },
+
+    open() {
+      this.visible = true;
+      this.el.classList.remove('hidden');
+      this.input.value = '';
+      this.selectedIndex = 0;
+      this.search('');
+      setTimeout(() => this.input.focus(), 50);
+    },
+
+    close() {
+      this.visible = false;
+      this.el.classList.add('hidden');
+      this.input.blur();
+    },
+
+    toggle() {
+      if (this.visible) this.close(); else this.open();
+    },
+
+    buildItems() {
+      const items = [];
+      // Assets
+      (window._overwatchAssets || []).forEach(d => {
+        items.push({ category: 'ASSETS', icon: '\u25C6', label: d.id, hint: d.role + ' // ' + d.status, action: () => { if (typeof selectDrone === 'function') selectDrone(d.id); } });
+      });
+      // Commands
+      const cmds = [
+        { label: 'LAUNCH PREP', hint: 'Arm selected asset', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('ARM', { droneId: selectedDroneId }); } },
+        { label: 'STAND DOWN', hint: 'Disarm selected asset', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('DISARM', { droneId: selectedDroneId }); } },
+        { label: 'LAUNCH', hint: 'Takeoff to set altitude', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('TAKEOFF', { droneId: selectedDroneId }); } },
+        { label: 'RECOVER', hint: 'Land selected asset', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('LAND', { droneId: selectedDroneId }); } },
+        { label: 'RTB', hint: 'Return to base', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('RTL', { droneId: selectedDroneId }); } },
+        { label: 'ABORT', hint: 'Emergency stop all', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('EMERGENCY_STOP', {}); } },
+      ];
+      cmds.forEach(c => items.push({ category: 'COMMANDS', icon: '\u25B6', label: c.label, hint: c.hint, action: c.action }));
+      // Modes
+      const modes = [
+        { label: 'OBSERVE', hint: 'Surveillance mode', action: () => setMode('OBSERVE') },
+        { label: 'TASK', hint: 'Directive center', action: () => setMode('TASK') },
+        { label: 'DEBRIEF', hint: 'Replay & analytics', action: () => setMode('DEBRIEF') },
+        { label: 'ISR FEED', hint: 'FPV camera view', action: () => setMode('ISR') },
+      ];
+      modes.forEach(m => items.push({ category: 'MODES', icon: '\u25A0', label: m.label, hint: m.hint, action: m.action }));
+      return items;
+    },
+
+    search(query) {
+      const allItems = this.buildItems();
+      const q = query.toLowerCase().trim();
+      this.items = q ? allItems.filter(it => it.label.toLowerCase().includes(q) || it.hint.toLowerCase().includes(q) || it.category.toLowerCase().includes(q)) : allItems;
+      this.selectedIndex = 0;
+      this.render();
+    },
+
+    render() {
+      if (this.items.length === 0) {
+        this.results.innerHTML = '<div class="cmd-palette-empty">No results found</div>';
+        return;
+      }
+      let html = '';
+      let lastCat = '';
+      this.items.forEach((it, i) => {
+        if (it.category !== lastCat) {
+          html += '<div class="cmd-palette-category">' + it.category + '</div>';
+          lastCat = it.category;
+        }
+        html += '<div class="cmd-palette-item' + (i === this.selectedIndex ? ' selected' : '') + '" data-index="' + i + '">';
+        html += '<span class="cmd-palette-item-icon">' + it.icon + '</span>';
+        html += '<span class="cmd-palette-item-label">' + it.label + '</span>';
+        html += '<span class="cmd-palette-item-hint">' + it.hint + '</span>';
+        html += '</div>';
+      });
+      this.results.innerHTML = html;
+      // Click handlers
+      this.results.querySelectorAll('.cmd-palette-item').forEach(el => {
+        el.addEventListener('click', () => {
+          this.selectedIndex = parseInt(el.dataset.index);
+          this.executeSelected();
+        });
+        el.addEventListener('mouseenter', () => {
+          this.selectedIndex = parseInt(el.dataset.index);
+          this.render();
+        });
+      });
+    },
+
+    moveSelection(dir) {
+      this.selectedIndex = Math.max(0, Math.min(this.items.length - 1, this.selectedIndex + dir));
+      this.render();
+      // Scroll into view
+      const sel = this.results.querySelector('.cmd-palette-item.selected');
+      if (sel) sel.scrollIntoView({ block: 'nearest' });
+    },
+
+    executeSelected() {
+      const item = this.items[this.selectedIndex];
+      if (item && item.action) {
+        item.action();
+        this.close();
+        if (typeof showToast === 'function') showToast(item.label);
+      }
+    }
+  };
+
+  // Init palette after DOM ready
+  cmdPalette.init();
+
+  // Global Cmd+K / Ctrl+K listener
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      cmdPalette.toggle();
+    }
+    if (e.key === 'Escape' && cmdPalette.visible) {
+      e.preventDefault();
+      cmdPalette.close();
+    }
+  });
 
   // ---- Global keyboard shortcuts (Fix #3) ----
   document.addEventListener('keydown', (e) => {
