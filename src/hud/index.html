@@ -33,8 +33,6 @@
   --cyan:           #4C90F0;
   --blue:           #2D72D2;
   --purple:         #7961DB;
-  --classification-bg: #007A33;
-  --classification-text: #ffffff;
   --sky:            #1a2a3a;
   --ground:         #3a2a1a;
   --font-data:  'JetBrains Mono', 'IBM Plex Mono', monospace;
@@ -51,6 +49,10 @@ html, body {
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
 }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 
 /* ============================================================
    LAYOUT GRID
@@ -131,7 +133,7 @@ html, body {
   font-family: var(--font-ui);
   font-weight: 600;
   font-size: 16px;
-  color: #fff;
+  color: var(--text-bright);
   letter-spacing: 0.15em;
   margin-right: 4px;
   display: flex;
@@ -222,23 +224,6 @@ html, body {
   margin-left: 16px;
   min-width: 140px;
   text-align: right;
-}
-
-/* Classification banner — Astro UXDS UNCLASSIFIED */
-.classification-banner {
-  background: var(--classification-bg);
-  color: var(--classification-text);
-  font-family: var(--font-label);
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  padding: 2px 0;
-  line-height: 18px;
-  flex-shrink: 0;
-  z-index: 9999;
-  width: 100%;
 }
 
 /* TF callsign */
@@ -461,7 +446,7 @@ html, body {
   overflow: hidden;
   border: 2px solid var(--border-light);
   position: relative;
-  background: #111;
+  background: var(--bg);
 }
 
 .attitude-ball {
@@ -494,7 +479,7 @@ html, body {
   width: 100%;
   height: 1px;
   top: 50%;
-  background: #fff;
+  background: rgba(255,255,255,0.8);
   opacity: 0.6;
 }
 
@@ -937,7 +922,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
    DIRECTIVE PANEL
    ============================================================ */
 .cmd-panel { padding: 0; }
-.cmd-section { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.cmd-section { padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .cmd-section-title {
   font-family: var(--font-label); font-size: 10px; font-weight: 600;
   color: var(--text-secondary); letter-spacing: 0.05em; text-transform: uppercase;
@@ -959,11 +944,11 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .cmd-btn:active { transform: scale(0.98); }
 .cmd-btn.armed { border-color: var(--green); color: var(--green); background: rgba(63,185,80,0.08); }
 .cmd-btn.danger {
-  grid-column: 1 / -1; border-color: var(--red); color: #fff;
+  grid-column: 1 / -1; border-color: var(--red); color: var(--text-bright);
   background: var(--red); font-size: 13px; padding: 14px;
   margin-top: 6px;
 }
-.cmd-btn.danger:hover { background: #d73a49; }
+.cmd-btn.danger:hover { background: color-mix(in srgb, var(--red) 80%, black); }
 
 /* Sliders */
 .cmd-slider-group { margin: 8px 0; }
@@ -978,6 +963,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
   background: var(--accent); cursor: pointer;
 }
+.cmd-slider:focus-visible { outline: 2px solid var(--accent); }
 .cmd-select {
   width: 100%; padding: 8px 10px; font-family: var(--font-data); font-size: 12px;
   background: rgba(255,255,255,0.03); border: 1px solid var(--border);
@@ -1031,6 +1017,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
   background: var(--amber); cursor: pointer;
 }
+.replay-timeline:focus-visible { outline: 2px solid var(--accent); }
 .replay-timestamp { font-family: var(--font-data); font-size: 12px; color: var(--text-bright); min-width: 50px; }
 .replay-speed-btn {
   font-family: var(--font-label); font-size: 10px; padding: 4px 8px;
@@ -1084,7 +1071,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 
 /* GOTO indicator */
 .goto-indicator {
-  position: absolute; top: 12px; right: 12px; z-index: 500;
+  position: absolute; top: 12px; right: auto; left: 50%; transform: translateX(-50%); z-index: 500;
   background: var(--panel); border: 1px solid var(--accent);
   border-radius: 2px; padding: 8px 14px;
 }
@@ -1105,6 +1092,8 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   box-shadow: 0 4px 24px rgba(0,0,0,0.8);
 }
 .video-panel.fullscreen { position: fixed; inset: 0; z-index: 2500; }
+#pip-close-btn { display: none; position: absolute; top: 4px; right: 4px; z-index: 1002; width: 24px; height: 24px; background: rgba(0,0,0,0.6); border: 1px solid var(--border); color: var(--text); font-size: 14px; cursor: pointer; align-items: center; justify-content: center; border-radius: 2px; padding: 0; line-height: 1; }
+.video-panel.pip #pip-close-btn { display: flex; }
 .osd-overlay {
   position: absolute; inset: 0; pointer-events: none;
   font-family: var(--font-data); color: #fff;
@@ -1296,7 +1285,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
    FEATURE #4: DIAGNOSTICS PANEL
    ============================================================ */
 .diag-section {
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
 }
 .diag-section-title {
@@ -1505,7 +1494,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 /* ============================================================
    FEATURE #5: INSIGHTS PANEL (Foundry-level Analytics)
    ============================================================ */
-.insight-section { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.insight-section { padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .insight-section-title { font-family: var(--font-label); font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
 .insight-card { background: var(--panel-elevated); border-radius: 2px; padding: 8px 10px; margin-bottom: 6px; border-left: 3px solid var(--accent); }
 .insight-card.warning { border-left-color: var(--amber); }
@@ -1680,16 +1669,13 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .map-tool-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; border-radius: 1px; color: var(--text-secondary); cursor: pointer; font-size: 14px; transition: all 0.15s; font-family: var(--font-data); }
 .map-tool-btn:hover { background: var(--panel-elevated); color: var(--text); border-color: var(--border); }
 .map-tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.map-tool-btn[title]:hover::after { content: attr(title); position: absolute; right: 42px; top: 50%; transform: translateY(-50%); background: var(--panel); border: 1px solid var(--border); padding: 4px 8px; font-family: var(--font-label); font-size: 9px; color: var(--text); white-space: nowrap; pointer-events: none; z-index: 1001; }
+.map-tool-btn[data-tooltip]:hover::after { content: attr(data-tooltip); position: absolute; right: 42px; top: 50%; transform: translateY(-50%); background: var(--panel); border: 1px solid var(--border); padding: 4px 8px; font-family: var(--font-label); font-size: 9px; color: var(--text); white-space: nowrap; pointer-events: none; z-index: 1001; }
 .map-tool-sep { height: 1px; background: var(--border); margin: 2px 0; }
 .map-measurement-label { background: var(--panel); border: 1px solid var(--accent); padding: 2px 6px; font-family: var(--font-data); font-size: 10px; color: var(--text-bright); white-space: nowrap; border-radius: 1px; }
 </style>
 </head>
 <body>
 <div id="app">
-  <!-- ==================== CLASSIFICATION BANNER (TOP) ==================== -->
-  <div class="classification-banner">UNCLASSIFIED</div>
-
   <!-- ==================== TOP BAR ==================== -->
   <div id="top-bar">
     <div class="brand"><span class="brand-icon">&#9670;</span> OVERWATCH</div>
@@ -1719,7 +1705,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
     <div id="left-panel">
       <div class="panel-header">OBJECT EXPLORER</div>
       <div class="tree-section">
-        <div class="tree-section-header" id="tree-assets-toggle">
+        <div class="tree-section-header" id="tree-assets-toggle" role="button" tabindex="0" aria-expanded="true">
           <span class="tree-toggle" id="tree-assets-arrow">&#9662;</span>
           ASSETS
           <span class="tree-count" id="tree-assets-count">(6)</span>
@@ -1727,7 +1713,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         <div class="asset-list" id="asset-list"></div>
       </div>
       <div class="tree-section">
-        <div class="tree-section-header" onclick="this.nextElementSibling.classList.toggle('collapsed');this.querySelector('.tree-toggle').textContent=this.nextElementSibling.classList.contains('collapsed')?'\u25B6':'\u25BC'">
+        <div class="tree-section-header" role="button" tabindex="0" aria-expanded="true" onclick="this.nextElementSibling.classList.toggle('collapsed');this.querySelector('.tree-toggle').textContent=this.nextElementSibling.classList.contains('collapsed')?'\u25B6':'\u25BC'">
           <span class="tree-toggle">&#x25BC;</span>
           <span class="panel-header" style="border:none;padding:0;font-size:10px">OPERATIONS</span>
           <span class="tree-count">(<span id="ops-count">1</span>)</span>
@@ -1749,7 +1735,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         </div>
       </div>
       <div class="tree-section">
-        <div class="tree-section-header" id="tree-aoi-toggle">
+        <div class="tree-section-header" id="tree-aoi-toggle" role="button" tabindex="0" aria-expanded="true">
           <span class="tree-toggle" id="tree-aoi-arrow">&#9662;</span>
           AREAS OF INTEREST
           <span class="tree-count">(4)</span>
@@ -1785,14 +1771,15 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
     <div id="map-container">
       <div id="map"></div>
       <div class="map-toolbar" id="map-toolbar">
-        <button class="map-tool-btn" data-tool="measure" title="Measure Distance">&#x2195;</button>
-        <button class="map-tool-btn" data-tool="area" title="Draw Area">&#x25A1;</button>
-        <button class="map-tool-btn" data-tool="annotate" title="Add Marker">&#x271A;</button>
+        <button class="map-tool-btn" data-tool="measure" data-tooltip="Measure Distance">&#x2195;</button>
+        <button class="map-tool-btn" data-tool="area" data-tooltip="Draw Area">&#x25A1;</button>
+        <button class="map-tool-btn" data-tool="annotate" data-tooltip="Add Marker">&#x271A;</button>
         <div class="map-tool-sep"></div>
-        <button class="map-tool-btn" data-tool="clear" title="Clear All">&#x2715;</button>
+        <button class="map-tool-btn" data-tool="clear" data-tooltip="Clear All">&#x2715;</button>
       </div>
       <!-- FPV Video Panel -->
       <div id="video-panel" class="video-panel" style="display:none">
+        <button id="pip-close-btn" onclick="(function(){ var vp=document.getElementById('video-panel'); vp.style.display='none'; vp.classList.remove('pip'); })()">&times;</button>
         <video id="fpv-video" autoplay muted playsinline style="display:none"></video>
         <img id="fpv-mjpeg" style="display:none" alt="FPV Feed">
         <canvas id="fpv-canvas" width="640" height="480"></canvas>
@@ -2071,7 +2058,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       <div class="bottom-metric-header">
         <span class="bottom-metric-title notification-badge">Activity Stream<span class="badge-count hidden" id="event-badge">0</span></span>
       </div>
-      <div class="event-log-list" id="event-log"></div>
+      <div class="event-log-list" id="event-log" aria-live="polite" role="log"></div>
     </div>
     <div class="bottom-metric">
       <div class="bottom-metric-header">
@@ -2125,15 +2112,13 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
     </div>
   </div>
 
-  <!-- ==================== CLASSIFICATION BANNER (BOTTOM) ==================== -->
-  <div class="classification-banner">UNCLASSIFIED</div>
 </div>
 
-<div id="command-palette" class="cmd-palette hidden">
+<div id="command-palette" class="cmd-palette hidden" role="dialog" aria-label="Command palette">
   <div class="cmd-palette-backdrop"></div>
   <div class="cmd-palette-modal">
-    <input id="cmd-palette-input" type="text" placeholder="Search assets, commands, modes..." autocomplete="off" spellcheck="false">
-    <div id="cmd-palette-results" class="cmd-palette-results"></div>
+    <input id="cmd-palette-input" type="text" placeholder="Search assets, commands, modes..." autocomplete="off" spellcheck="false" role="combobox">
+    <div id="cmd-palette-results" class="cmd-palette-results" role="listbox" aria-label="Search results"></div>
     <div class="cmd-palette-footer">
       <span class="cmd-palette-hint">ESC close</span>
       <span class="cmd-palette-hint">ARROW navigate</span>
@@ -2147,6 +2132,9 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 /* ==============================================================
    OVERWATCH ISR PLATFORM — SIMULATION & HUD ENGINE
    ============================================================== */
+
+// ---- CSS VARIABLE HELPER ----
+const _css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
 // ---- CONSTANTS ----
 const CENTER_LAT = 33.6405;
@@ -2207,15 +2195,15 @@ function utcTimeStamp() {
 }
 
 function batteryColor(pct) {
-  if (pct > 50) return '#238551';
-  if (pct > 25) return '#C87619';
-  return '#CD4246';
+  if (pct > 50) return _css('--green');
+  if (pct > 25) return _css('--amber');
+  return _css('--red');
 }
 
 function rssiColor(v) {
-  if (v > 80) return '#238551';
-  if (v > 50) return '#C87619';
-  return '#CD4246';
+  if (v > 80) return _css('--green');
+  if (v > 50) return _css('--amber');
+  return _css('--red');
 }
 
 /* ==============================================================
@@ -2501,14 +2489,18 @@ class AssetSimulator {
 /* ==============================================================
    TOAST NOTIFICATION
    ============================================================== */
+let activeToasts = [];
 function showToast(msg, type) {
   type = type || 'success';
   const el = document.createElement('div');
   el.className = 'cmd-toast ' + type;
   el.textContent = msg;
+  const bottomOffset = 24 + activeToasts.length * 46;
+  el.style.bottom = bottomOffset + 'px';
+  activeToasts.push(el);
   document.body.appendChild(el);
   setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; }, 2000);
-  setTimeout(() => el.remove(), 2400);
+  setTimeout(() => { activeToasts = activeToasts.filter(t => t !== el); el.remove(); }, 2400);
 }
 
 /* ==============================================================
@@ -2669,7 +2661,7 @@ class ObjectiveManager {
     this.objectives.push(obj);
 
     const marker = L.circleMarker([lat, lng], {
-      radius: 10, color: '#2D72D2', fillColor: '#2D72D2', fillOpacity: 0.2, weight: 2,
+      radius: 10, color: _css('--accent'), fillColor: _css('--accent'), fillOpacity: 0.2, weight: 2,
     }).addTo(this.map);
     marker.bindTooltip('OBJ-' + idx + ' ' + this.wpType, { permanent: true, direction: 'top', offset: [0, -10] });
     this.markers.push(marker);
@@ -2686,7 +2678,7 @@ class ObjectiveManager {
     if (this.objectives.length > 1) {
       this.polyline = L.polyline(
         this.objectives.map(w => [w.lat, w.lng]),
-        { color: '#2D72D2', weight: 1, opacity: 0.6, dashArray: '6, 6' }
+        { color: _css('--accent'), weight: 1, opacity: 0.6, dashArray: '6, 6' }
       ).addTo(this.map);
     }
   }
@@ -2862,7 +2854,7 @@ class DebriefSystem {
       if (!drone) return;
       Object.assign(drone, { lat: snap.lat, lng: snap.lng, heading: snap.heading, altitude: snap.altitude,
         speed: snap.speed, battery: snap.battery, status: snap.status, roll: snap.roll, pitch: snap.pitch,
-        yaw: snap.yaw, verticalSpeed: snap.verticalSpeed });
+        yaw: snap.yaw, verticalSpeed: snap.verticalSpeed, droneState: snap.droneState });
     });
   }
 
@@ -3030,9 +3022,10 @@ function initMap() {
   map = L.map('map', {
     center: [CENTER_LAT, CENTER_LNG],
     zoom: 16,
-    zoomControl: true,
+    zoomControl: false,
     attributionControl: true,
   });
+  L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; CARTO',
@@ -3130,6 +3123,9 @@ function updateAssetExplorer(assets) {
       item.className = 'asset-item' + (asset.id === selectedDroneId ? ' selected' : '');
       item.dataset.assetId = asset.id;
       item.addEventListener('click', () => selectDrone(asset.id));
+      item.setAttribute('role', 'button');
+      item.setAttribute('tabindex', '0');
+      item.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectDrone(asset.id); } });
 
       const roleClass = asset.role.toLowerCase();
       const statusClass = asset.status.toLowerCase().replace(/_/g, '_');
@@ -3171,7 +3167,6 @@ function updateAssetExplorer(assets) {
 function selectDrone(id) {
   selectedDroneId = id;
   // Pan map to asset location (Issue #3)
-  const assetDefs = typeof assets !== 'undefined' ? assets : null;
   // We'll find the marker and pan in updateAssetExplorer's click handler
   if (map && mapMarkers[id]) {
     const latlng = mapMarkers[id].getLatLng();
@@ -3836,10 +3831,10 @@ function updateInsightsPanel(asset) {
   // Section 3: Trend Sparklines
   html += '<div class="insight-section"><div class="insight-section-title">Telemetry Trends</div>';
   const sparkData = [
-    { label: 'Battery', data: is.batteryHistory, color: '#2D72D2', val: battery.toFixed(0) + '%', trend: battTrend },
-    { label: 'Speed', data: is.speedHistory, color: '#238551', val: speed.toFixed(1) + ' m/s', trend: spdTrend },
-    { label: 'Alt', data: is.altHistory, color: '#C87619', val: alt.toFixed(0) + ' m', trend: altTrend },
-    { label: 'Signal', data: is.signalHistory, color: '#f0f0f0', val: signal.toFixed(0) + '%', trend: sigTrend },
+    { label: 'Battery', data: is.batteryHistory, color: _css('--accent'), val: battery.toFixed(0) + '%', trend: battTrend },
+    { label: 'Speed', data: is.speedHistory, color: _css('--green'), val: speed.toFixed(1) + ' m/s', trend: spdTrend },
+    { label: 'Alt', data: is.altHistory, color: _css('--amber'), val: alt.toFixed(0) + ' m', trend: altTrend },
+    { label: 'Signal', data: is.signalHistory, color: _css('--text'), val: signal.toFixed(0) + '%', trend: sigTrend },
   ];
   sparkData.forEach((s, idx) => {
     html += '<div class="insight-sparkline-row">';
@@ -3986,9 +3981,9 @@ setMode('OBSERVE');
   initMap();
 
   // Initialize sparklines
-  const sparkHealth = new Sparkline('spark-health', '#238551');
-  const sparkLatency = new Sparkline('spark-latency', '#C87619');
-  const sparkBattery = new Sparkline('spark-battery', '#2D72D2');
+  const sparkHealth = new Sparkline('spark-health', _css('--green'));
+  const sparkLatency = new Sparkline('spark-latency', _css('--amber'));
+  const sparkBattery = new Sparkline('spark-battery', _css('--accent'));
 
   // Initialize subsystems
   const cmdEngine = new DirectiveEngine(assets, addEvent);
@@ -4139,6 +4134,9 @@ setMode('OBSERVE');
     const next = speeds[(cur + 1) % speeds.length];
     replaySystem.setSpeed(next);
     this.textContent = next + 'x';
+    document.querySelectorAll('.replay-speed-btn[data-speed]').forEach(b => {
+      b.classList.toggle('active', parseFloat(b.dataset.speed) === next);
+    });
   });
   document.querySelectorAll('.replay-speed-btn[data-speed]').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -4267,16 +4265,15 @@ setMode('OBSERVE');
       meshBadge.style.color = meshOk ? 'var(--green)' : 'var(--amber)';
 
       // Power State
-      const avgBat2 = drones.reduce((s, d) => s + d.battery, 0) / drones.length;
       const minBat = Math.min(...drones.map(d => d.battery));
       const maxBat = Math.max(...drones.map(d => d.battery));
-      document.getElementById('bm-battery').textContent = avgBat2.toFixed(0);
+      document.getElementById('bm-battery').textContent = avgBat.toFixed(0);
       document.getElementById('bm-bat-spread').textContent = `Range: ${minBat.toFixed(0)} - ${maxBat.toFixed(0)}%`;
 
       // Sparklines
       sparkHealth.push(healthPct);
       sparkLatency.push(avgLat);
-      sparkBattery.push(avgBat2);
+      sparkBattery.push(avgBat);
       sparkHealth.draw();
       sparkLatency.draw();
       sparkBattery.draw();
@@ -4448,7 +4445,7 @@ setMode('OBSERVE');
         this.mediaRecorder.start(1000);
         this.recording = true;
       } catch (e) {
-        showToast('Recording not supported in this browser', 'warn');
+        showToast('Recording not supported in this browser', 'warning');
       }
     }
 
@@ -4505,7 +4502,7 @@ setMode('OBSERVE');
       const fmt = (v, d) => (v || 0).toFixed(d);
 
       this.els.battery.textContent = fmt(drone.voltage, 1) + 'V  ' + fmt(drone.battery, 0) + '%';
-      this.els.battery.style.color = drone.battery < 25 ? '#CD4246' : drone.battery < 50 ? '#C87619' : '#fff';
+      this.els.battery.style.color = drone.battery < 25 ? _css('--red') : drone.battery < 50 ? _css('--amber') : '#fff';
       this.els.cell.textContent = fmt(f.cell_voltage || drone.voltage / 6, 2) + 'V/cell';
       this.els.mah.textContent = (f.mah_consumed || 0).toFixed(0) + ' mAh';
 
@@ -4518,7 +4515,7 @@ setMode('OBSERVE');
       this.els.alt.textContent = fmt(drone.altitude, 1) + 'm';
       this.els.speed.textContent = fmt(drone.speed, 1) + 'm/s';
       this.els.rssi.textContent = 'RSSI ' + fmt(drone.rssi, 0);
-      this.els.rssi.style.color = drone.rssi < 50 ? '#CD4246' : drone.rssi < 70 ? '#C87619' : '#fff';
+      this.els.rssi.style.color = drone.rssi < 50 ? _css('--red') : drone.rssi < 70 ? _css('--amber') : '#fff';
 
       const hd = f.home_distance_m || 0;
       const hdir = f.home_direction_deg || 0;
@@ -4597,8 +4594,9 @@ setMode('OBSERVE');
   const dvrMgr = new RecordingManager(videoMgr);
 
   // ---- FPV simulation data updates (when not live) ----
+  // Note: This 100ms interval runs continuously but is a cheap no-op when not in ISR mode (early return).
   setInterval(() => {
-    if (currentMode !== 'ISR') return;
+    if (currentMode !== 'ISR') return; // intentional: lightweight no-op outside ISR mode
     drones.forEach(d => {
       if (!d.isLive) {
         const f = d.fpvData;
@@ -4615,9 +4613,9 @@ setMode('OBSERVE');
   }, 100);
 
   // ---- SOLO mode update (inside animation loop) ----
-  const origFrame = frame;
+  // Note: This 100ms interval runs continuously but is a cheap no-op when not in ISR mode (early return).
   const soloTick = setInterval(() => {
-    if (currentMode !== 'ISR') return;
+    if (currentMode !== 'ISR') return; // intentional: lightweight no-op outside ISR mode
     const sel = drones.find(d => d.id === selectedDroneId) || drones[0];
     if (!sel) return;
 
@@ -4655,7 +4653,10 @@ setMode('OBSERVE');
     });
   }, 100);
 
-  // ---- Mode switch extension ----
+  // EXTENSION: Extends setMode() to manage ISR video panel visibility.
+  // The video panel must show/hide on mode switch, and PIP mode must persist
+  // across non-ISR modes. This extends the core function rather than modifying
+  // it to keep the ISR feature isolated.
   const origSetMode = setMode;
   setMode = function(mode) {
     origSetMode(mode);
@@ -4695,7 +4696,7 @@ setMode('OBSERVE');
           break;
         } catch (e) { continue; }
       }
-      if (!connected) showToast('No OVERWATCH platform found', 'warn');
+      if (!connected) showToast('No OVERWATCH platform found', 'warning');
     } finally {
       setTimeout(() => { btn.classList.remove('scanning'); btn.textContent = 'CONNECT'; }, 2000);
     }
@@ -4729,14 +4730,14 @@ setMode('OBSERVE');
 
   // ---- FPV ARM/DISARM ----
   document.getElementById('fpv-arm').addEventListener('click', () => {
-    cmdEngine.execute('ARM', selectedDroneId);
+    cmdEngine.execute('ARM', { droneId: selectedDroneId });
   });
   document.getElementById('fpv-disarm').addEventListener('click', () => {
-    cmdEngine.execute('DISARM', selectedDroneId);
+    cmdEngine.execute('DISARM', { droneId: selectedDroneId });
   });
   document.getElementById('fpv-estop').addEventListener('click', () => {
     if (confirm('ABORT — Are you sure?')) {
-      cmdEngine.execute('EMERGENCY_STOP', selectedDroneId);
+      cmdEngine.execute('EMERGENCY_STOP', { droneId: selectedDroneId });
     }
   });
 
@@ -4782,7 +4783,8 @@ setMode('OBSERVE');
     });
   }
 
-  // Override addEvent to track unread count
+  // EXTENSION: Extends addEvent() to track unread event count for the
+  // notification badge. Shows badge with count when event log is not focused.
   const _origAddEvent = addEvent;
   addEvent = function(ev) {
     _origAddEvent(ev);
@@ -4816,7 +4818,8 @@ setMode('OBSERVE');
     },
   };
 
-  // Patch cmdEngine to track key events for debrief
+  // EXTENSION: Extends cmdEngine.execute() to track key events for the
+  // debrief analytics timeline. Records command executions with timestamps.
   const _origExecute = cmdEngine.execute.bind(cmdEngine);
   cmdEngine.execute = function(cmd, params) {
     _origExecute(cmd, params);
@@ -4946,7 +4949,7 @@ setMode('OBSERVE');
     _onMeasureClick(e) {
       this.measurePoints.push(e.latlng);
       // Add point marker
-      L.circleMarker(e.latlng, { radius: 4, color: '#2D72D2', fillColor: '#2D72D2', fillOpacity: 1, weight: 1 }).addTo(this.measureLayers);
+      L.circleMarker(e.latlng, { radius: 4, color: _css('--accent'), fillColor: _css('--accent'), fillOpacity: 1, weight: 1 }).addTo(this.measureLayers);
 
       if (this.measurePoints.length === 2) {
         const p1 = this.measurePoints[0];
@@ -4956,7 +4959,7 @@ setMode('OBSERVE');
         const distNm = (distM / 1852).toFixed(2);
 
         // Draw line
-        const line = L.polyline([p1, p2], { color: '#2D72D2', weight: 2, dashArray: '6,4' }).addTo(this.measureLayers);
+        const line = L.polyline([p1, p2], { color: _css('--accent'), weight: 2, dashArray: '6,4' }).addTo(this.measureLayers);
 
         // Add label at midpoint
         const midLat = (p1.lat + p2.lat) / 2;
@@ -4973,12 +4976,12 @@ setMode('OBSERVE');
 
     _onAreaClick(e) {
       this.areaPoints.push(e.latlng);
-      L.circleMarker(e.latlng, { radius: 4, color: '#C87619', fillColor: '#C87619', fillOpacity: 1, weight: 1 }).addTo(this.areaLayers);
+      L.circleMarker(e.latlng, { radius: 4, color: _css('--amber'), fillColor: _css('--amber'), fillOpacity: 1, weight: 1 }).addTo(this.areaLayers);
 
       if (this.areaPoints.length > 1) {
         // Draw preview line
         this.areaLayers.eachLayer(l => { if (l instanceof L.Polyline && !(l instanceof L.Polygon)) this.areaLayers.removeLayer(l); });
-        L.polyline(this.areaPoints, { color: '#C87619', weight: 2, dashArray: '4,4' }).addTo(this.areaLayers);
+        L.polyline(this.areaPoints, { color: _css('--amber'), weight: 2, dashArray: '4,4' }).addTo(this.areaLayers);
       }
     },
 
@@ -4990,7 +4993,7 @@ setMode('OBSERVE');
       this.areaLayers.clearLayers();
 
       // Draw polygon
-      const polygon = L.polygon(this.areaPoints, { color: '#C87619', fillColor: '#C87619', fillOpacity: 0.15, weight: 2 }).addTo(this.areaLayers);
+      const polygon = L.polygon(this.areaPoints, { color: _css('--amber'), fillColor: _css('--amber'), fillOpacity: 0.15, weight: 2 }).addTo(this.areaLayers);
 
       // Calculate area (approximate)
       const latlngs = this.areaPoints;
@@ -5016,19 +5019,30 @@ setMode('OBSERVE');
     },
 
     _onAnnotateClick(e) {
-      const label = prompt('Annotation label:');
-      if (!label) { this.deactivate(); return; }
+      const self = this;
+      const popup = L.popup({ closeButton: true, className: 'map-measurement-label' })
+        .setLatLng(e.latlng)
+        .setContent('<input id="annotate-input" type="text" placeholder="Label..." style="background:var(--panel);border:1px solid var(--border-light);color:var(--text);font-family:var(--font-data);font-size:11px;padding:4px 8px;outline:none;width:120px" autofocus>')
+        .openOn(map);
 
-      const marker = L.marker(e.latlng, {
-        icon: L.divIcon({
-          className: 'map-measurement-label',
-          html: '\u271A ' + label,
-          iconSize: null
-        })
-      }).addTo(this.annotationLayers);
+      setTimeout(() => {
+        const inp = document.getElementById('annotate-input');
+        if (inp) {
+          inp.focus();
+          inp.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' && inp.value.trim()) {
+              map.closePopup(popup);
+              L.marker(e.latlng, {
+                icon: L.divIcon({ className: 'map-measurement-label', html: '\u271A ' + inp.value.trim(), iconSize: null })
+              }).addTo(self.annotationLayers);
+              if (typeof showToast === 'function') showToast('Marker: ' + inp.value.trim());
+            }
+            if (ev.key === 'Escape') map.closePopup(popup);
+          });
+        }
+      }, 100);
 
       this.deactivate();
-      if (typeof showToast === 'function') showToast('Marker added: ' + label);
     }
   };
 
