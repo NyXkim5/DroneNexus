@@ -1,5 +1,5 @@
 /**
- * NEXUS — Standalone Drone Simulator
+ * OVERWATCH — Standalone Asset Simulator
  *
  * Node.js-based simulator that generates realistic telemetry data
  * and publishes it over WebSocket. Used for testing the ground
@@ -10,7 +10,7 @@
  */
 
 const WebSocket = require('ws');
-const { V_FORMATION_OFFSETS, DroneStatus, FlightMode, ProtocolType, createFPVTelemetryPacket } = require('../shared/protocol');
+const { V_FORMATION_OFFSETS, OperationalStatus, FlightMode, ProtocolType, createISRStatePacket } = require('../shared/protocol');
 
 // ============================================================
 // Configuration
@@ -24,12 +24,12 @@ const CONFIG = {
 };
 
 const DRONES = [
-  { id: 'ALPHA-1',   role: 'LEADER',  color: '#00ff88' },
-  { id: 'BRAVO-2',   role: 'WINGMAN', color: '#3388ff' },
-  { id: 'CHARLIE-3', role: 'RECON',   color: '#ffaa00' },
-  { id: 'DELTA-4',   role: 'WINGMAN', color: '#ff3355' },
-  { id: 'ECHO-5',    role: 'SUPPORT', color: '#00ccff' },
-  { id: 'FOXTROT-6', role: 'TAIL',    color: '#aa55ff' },
+  { id: 'ALPHA-1',   role: 'PRIMARY',    color: '#00ff88' },
+  { id: 'BRAVO-2',   role: 'ESCORT',     color: '#3388ff' },
+  { id: 'CHARLIE-3', role: 'ISR',        color: '#ffaa00' },
+  { id: 'DELTA-4',   role: 'ESCORT',     color: '#ff3355' },
+  { id: 'ECHO-5',    role: 'LOGISTICS',  color: '#00ccff' },
+  { id: 'FOXTROT-6', role: 'OVERWATCH',  color: '#aa55ff' },
 ];
 
 // ============================================================
@@ -94,7 +94,7 @@ class SimulatedDrone {
     this.seq++;
     const t = Date.now() / 1000;
 
-    if (this.role === 'LEADER') {
+    if (this.role === 'PRIMARY') {
       // Leader orbits the center point
       this.orbitAngle += this.orbitSpeed * dt;
       this.lat = CONFIG.centerLat + Math.cos(this.orbitAngle) * this.orbitRadius;
@@ -155,11 +155,11 @@ class SimulatedDrone {
     this.videoLinkQuality = Math.max(60, Math.min(100, this.videoLinkQuality + (Math.random() - 0.5) * 2));
 
     // Status derivation
-    let status = DroneStatus.ACTIVE;
-    if (this.battery < 25) status = DroneStatus.LOW_BATT;
-    else if (this.rssi < 60) status = DroneStatus.WEAK_SIGNAL;
+    let status = OperationalStatus.NOMINAL;
+    if (this.battery < 25) status = OperationalStatus.DEGRADED;
+    else if (this.rssi < 60) status = OperationalStatus.COMMS_DEGRADED;
 
-    return createFPVTelemetryPacket(this.id, {
+    return createISRStatePacket(this.id, {
       seq: this.seq,
       lat: this.lat,
       lon: this.lon,
@@ -209,7 +209,7 @@ function startServer() {
   const wss = new WebSocket.Server({ port: CONFIG.port });
   const drones = DRONES.slice(0, CONFIG.droneCount).map((d, i) => new SimulatedDrone(d, i));
 
-  console.log(`NEXUS Simulator — ${drones.length} drones on ws://localhost:${CONFIG.port}`);
+  console.log(`OVERWATCH Simulator — ${drones.length} drones on ws://localhost:${CONFIG.port}`);
 
   const clients = new Set();
 
@@ -242,7 +242,7 @@ function startServer() {
       heading: leaderDrone.heading,
     };
 
-    const packets = drones.map(d => d.update(intervalMs / 1000, d.role === 'LEADER' ? null : leaderState));
+    const packets = drones.map(d => d.update(intervalMs / 1000, d.role === 'PRIMARY' ? null : leaderState));
 
     const payload = JSON.stringify(packets);
     for (const client of clients) {

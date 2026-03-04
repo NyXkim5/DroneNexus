@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEXUS 3D Swarm View</title>
+<title>OVERWATCH 3D Asset View</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospace; overflow: hidden; }
@@ -78,9 +78,9 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospac
 <canvas id="canvas3d"></canvas>
 
 <div id="overlay">
-    <div class="overlay-title">NEXUS 3D SWARM VIEW</div>
+    <div class="overlay-title">OVERWATCH 3D ASSET VIEW</div>
     <div class="overlay-stats">
-        <span>DRONES: <span class="stat-val" id="stat-drones">0</span></span>
+        <span>ASSETS: <span class="stat-val" id="stat-drones">0</span></span>
         <span>FPS: <span class="stat-val" id="stat-fps">0</span></span>
         <span>FORMATION: <span class="stat-val" id="stat-formation">—</span></span>
     </div>
@@ -106,12 +106,12 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospac
 </div>
 
 <div id="legend">
-    <div class="leg-title">DRONE ROLES</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#00ff88"></div>LEADER</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#3388ff"></div>WINGMAN</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#ffaa00"></div>RECON</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#00ccff"></div>SUPPORT</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#aa55ff"></div>TAIL</div>
+    <div class="leg-title">ASSET CLASSIFICATIONS</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#00ff88"></div>PRIMARY</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#3388ff"></div>ESCORT</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#ffaa00"></div>ISR</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#00ccff"></div>LOGISTICS</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#aa55ff"></div>OVERWATCH</div>
 </div>
 
 <script type="importmap">
@@ -132,12 +132,12 @@ const ALT_SCALE = 0.3; // altitude meters to 3D units
 const TRAIL_LENGTH = 200;
 
 const ROLE_COLORS = {
-    LEADER: 0x00ff88, WINGMAN: 0x3388ff, RECON: 0xffaa00,
-    SUPPORT: 0x00ccff, TAIL: 0xaa55ff
+    PRIMARY: 0x00ff88, ESCORT: 0x3388ff, ISR: 0xffaa00,
+    LOGISTICS: 0x00ccff, OVERWATCH: 0xaa55ff
 };
 const STATUS_EMISSIVE = {
-    ACTIVE: 0x000000, LOW_BATT: 0xff8800, WEAK_SIGNAL: 0xffff00,
-    RTL: 0xff3355, LOST: 0xff0000, LANDED: 0x444444
+    NOMINAL: 0x000000, DEGRADED: 0xff8800, COMMS_DEGRADED: 0xffff00,
+    RTB: 0xff3355, OFFLINE: 0xff0000, GROUNDED: 0x444444
 };
 
 // ============================================================

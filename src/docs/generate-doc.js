@@ -1,11 +1,11 @@
 /**
- * NEXUS System Architecture Document Generator
+ * OVERWATCH System Architecture Document Generator
  *
  * Generates a professional Word document (.docx) containing the complete
- * NEXUS system architecture and protocol specification.
+ * OVERWATCH system architecture and protocol specification.
  *
  * Usage: node src/docs/generate-doc.js
- * Output: dist/nexus-architecture.docx
+ * Output: dist/overwatch-architecture.docx
  */
 
 const fs = require("fs");
@@ -281,7 +281,7 @@ function buildTitlePage() {
     new Paragraph({
       children: [
         new TextRun({
-          text: "NEXUS",
+          text: "OVERWATCH",
           font: FONT,
           size: 72, // 36pt
           bold: true,
@@ -368,15 +368,15 @@ function buildExecutiveSummary() {
     heading1("1. Executive Summary"),
 
     bodyParagraph(
-      "NEXUS is a modular, hardware-agnostic multi-UAV swarm management platform designed to provide real-time telemetry visualization, autonomous coordination, and mission-critical command and control for teams of 2 to 50 unmanned aerial vehicles operating in contested or communications-degraded environments. The system bridges the gap between individual drone autopilot firmware and fleet-scale operational awareness by introducing a layered software architecture that runs on inexpensive companion computers mounted aboard each airframe. NEXUS aggregates MAVLink telemetry from each vehicle, normalizes it into a unified JSON wire protocol, distributes state over a self-healing mesh network, and presents the consolidated picture to operators through a browser-based heads-up display (HUD) that supports map visualization, attitude indicators, battery sparklines, and formation cohesion overlays."
+      "OVERWATCH is a modular, hardware-agnostic multi-UAV swarm management platform designed to provide real-time telemetry visualization, autonomous coordination, and mission-critical command and control for teams of 2 to 50 unmanned aerial vehicles operating in contested or communications-degraded environments. The system bridges the gap between individual drone autopilot firmware and fleet-scale operational awareness by introducing a layered software architecture that runs on inexpensive companion computers mounted aboard each airframe. OVERWATCH aggregates MAVLink telemetry from each vehicle, normalizes it into a unified JSON wire protocol, distributes state over a self-healing mesh network, and presents the consolidated picture to operators through a browser-based heads-up display (HUD) that supports map visualization, attitude indicators, battery sparklines, and formation cohesion overlays."
     ),
 
     bodyParagraph(
-      "The platform is built around four core engineering principles. First, hardware agnosticism: NEXUS communicates through the MAVLink v2 standard and therefore supports any flight controller running ArduPilot or PX4, on any airframe from micro-quads to fixed-wing survey aircraft. Second, plug-and-play deployment: each companion computer ships a pre-built SD card image; the operator edits a single YAML configuration file, connects the companion to the flight controller over UART, and the drone joins the swarm automatically via mDNS peer discovery. Third, graceful degradation: when communication links deteriorate, the system falls back from high-bandwidth WiFi JSON streams to low-bandwidth binary MessagePack packets over RFD900x telemetry radios, and if all links are lost a drone autonomously executes a return-to-launch (RTL) procedure with staggered altitude separation to avoid mid-air collisions. Fourth, operator-centric design: every automated behavior can be overridden by the human operator, every critical event triggers both visual and audible alerts, and the HUD is designed for single-operator management of the entire swarm under high-workload conditions."
+      "The platform is built around four core engineering principles. First, hardware agnosticism: OVERWATCH communicates through the MAVLink v2 standard and therefore supports any flight controller running ArduPilot or PX4, on any airframe from micro-quads to fixed-wing survey aircraft. Second, plug-and-play deployment: each companion computer ships a pre-built SD card image; the operator edits a single YAML configuration file, connects the companion to the flight controller over UART, and the drone joins the swarm automatically via mDNS peer discovery. Third, graceful degradation: when communication links deteriorate, the system falls back from high-bandwidth WiFi JSON streams to low-bandwidth binary MessagePack packets over RFD900x telemetry radios, and if all links are lost a drone autonomously executes a return-to-launch (RTL) procedure with staggered altitude separation to avoid mid-air collisions. Fourth, operator-centric design: every automated behavior can be overridden by the human operator, every critical event triggers both visual and audible alerts, and the HUD is designed for single-operator management of the entire swarm under high-workload conditions."
     ),
 
     bodyParagraph(
-      "This document defines the complete technical architecture of NEXUS version 1.0. It covers the five-layer system model, the communication protocol stack including both MAVLink integration and the NEXUS Wire Protocol, swarm coordination algorithms for formation flight and leader election, the companion computer software suite, ground station server deployment options, the operator HUD interface, safety and fault-handling procedures, and the phased development roadmap from single-drone telemetry through computer-vision-assisted autonomous targeting. All specifications described herein are intended to serve as the authoritative reference for development, integration testing, and operational deployment of the NEXUS platform."
+      "This document defines the complete technical architecture of OVERWATCH version 1.0. It covers the five-layer system model, the communication protocol stack including both MAVLink integration and the OVERWATCH Wire Protocol, swarm coordination algorithms for formation flight and leader election, the companion computer software suite, ground station server deployment options, the operator HUD interface, safety and fault-handling procedures, and the phased development roadmap from single-drone telemetry through computer-vision-assisted autonomous targeting. All specifications described herein are intended to serve as the authoritative reference for development, integration testing, and operational deployment of the OVERWATCH platform."
     ),
   ];
 }
@@ -404,7 +404,7 @@ function buildSystemArchitecture() {
         "3",
         "Mesh Layer",
         "Peer-to-peer communications, message routing, transport redundancy, automatic failover",
-        "WiFi 6 mesh, RFD900x, NEXUS Wire Protocol, mDNS/zeroconf",
+        "WiFi 6 mesh, RFD900x, OVERWATCH Wire Protocol, mDNS/zeroconf",
       ],
       [
         "4",
@@ -469,7 +469,7 @@ function buildSystemArchitecture() {
     heading1("2. System Architecture"),
 
     bodyParagraph(
-      "The NEXUS platform is organized into five discrete layers, each encapsulating a well-defined set of responsibilities and communicating with adjacent layers through stable, documented interfaces. This layered design allows any single layer to be replaced or upgraded without affecting the others: a new flight controller can be swapped in at Layer 1 provided it speaks MAVLink v2; a different mesh radio can replace the WiFi link at Layer 3 provided it delivers IP packets; and the operator HUD at Layer 5 can be reskinned or replaced entirely without touching the coordination engine beneath it."
+      "The OVERWATCH platform is organized into five discrete layers, each encapsulating a well-defined set of responsibilities and communicating with adjacent layers through stable, documented interfaces. This layered design allows any single layer to be replaced or upgraded without affecting the others: a new flight controller can be swapped in at Layer 1 provided it speaks MAVLink v2; a different mesh radio can replace the WiFi link at Layer 3 provided it delivers IP packets; and the operator HUD at Layer 5 can be reskinned or replaced entirely without touching the coordination engine beneath it."
     ),
 
     heading2("2.1 Five-Layer Architecture Model"),
@@ -481,12 +481,12 @@ function buildSystemArchitecture() {
 
     heading3("Uplink (Operator to Drone)"),
     bodyParagraph(
-      "Operator commands originate in the HUD as user interactions (button clicks, map gestures, typed commands) and are translated into NEXUS Wire Protocol CMD messages by the front-end JavaScript client. These messages traverse a WebSocket connection to the ground station server, which validates the command against the current mission state, resolves the target drone or drone group, and forwards the message over the primary WiFi mesh link to the addressed companion computer. The companion computer's cmd_executor module deserializes the command, performs a secondary safety validation (checking that the requested action does not violate geofence boundaries or minimum battery thresholds), and translates the command into one or more MAVLink COMMAND_LONG messages sent to the flight controller over UART. An ACK message flows back up the chain to confirm receipt and execution status."
+      "Operator commands originate in the HUD as user interactions (button clicks, map gestures, typed commands) and are translated into OVERWATCH Wire Protocol CMD messages by the front-end JavaScript client. These messages traverse a WebSocket connection to the ground station server, which validates the command against the current mission state, resolves the target drone or drone group, and forwards the message over the primary WiFi mesh link to the addressed companion computer. The companion computer's cmd_executor module deserializes the command, performs a secondary safety validation (checking that the requested action does not violate geofence boundaries or minimum battery thresholds), and translates the command into one or more MAVLink COMMAND_LONG messages sent to the flight controller over UART. An ACK message flows back up the chain to confirm receipt and execution status."
     ),
 
     heading3("Downlink (Drone to Operator)"),
     bodyParagraph(
-      "Each drone's companion computer continuously reads MAVLink telemetry from the flight controller at the native MAVLink rate (typically 10-50 Hz depending on message type). The mavlink_bridge module parses HEARTBEAT, GLOBAL_POSITION_INT, ATTITUDE, SYS_STATUS, GPS_RAW_INT, and BATTERY_STATUS messages, normalizes units (radians to degrees, cm/s to m/s), and passes the consolidated state to the telem_publisher module. The telem_publisher assembles a NEXUS TELEM packet at 10 Hz and transmits it over the WiFi mesh to the ground station server. The server updates the in-memory Redis state store for that drone and pushes the packet to all connected HUD clients over WebSocket. If the WiFi link degrades below a configurable RSSI threshold, the failover_mgr switches the downlink to the RFD900x backup radio using a reduced-field binary MessagePack encoding to fit within the 64 kbps bandwidth constraint."
+      "Each drone's companion computer continuously reads MAVLink telemetry from the flight controller at the native MAVLink rate (typically 10-50 Hz depending on message type). The mavlink_bridge module parses HEARTBEAT, GLOBAL_POSITION_INT, ATTITUDE, SYS_STATUS, GPS_RAW_INT, and BATTERY_STATUS messages, normalizes units (radians to degrees, cm/s to m/s), and passes the consolidated state to the telem_publisher module. The telem_publisher assembles a OVERWATCH TELEM packet at 10 Hz and transmits it over the WiFi mesh to the ground station server. The server updates the in-memory Redis state store for that drone and pushes the packet to all connected HUD clients over WebSocket. If the WiFi link degrades below a configurable RSSI threshold, the failover_mgr switches the downlink to the RFD900x backup radio using a reduced-field binary MessagePack encoding to fit within the 64 kbps bandwidth constraint."
     ),
 
     heading3("Lateral (Peer-to-Peer Mesh)"),
@@ -500,7 +500,7 @@ function buildSystemArchitecture() {
     new Paragraph({ spacing: { after: 200 } }),
 
     bodyParagraph(
-      "The total hardware cost per drone unit, using the recommended components and a Holybro X500 V2 frame, is approximately $1,200-$1,800 USD depending on supplier and quantity discounts. This positions NEXUS as a cost-effective solution compared to proprietary swarm platforms that typically start at $5,000-$10,000 per vehicle. The modular component selection allows operators to scale up to more capable (and expensive) hardware only where mission requirements demand it, such as adding a Jetson Orin Nano for onboard computer vision or upgrading to a Silvus StreamCaster radio for operations beyond 10 km range."
+      "The total hardware cost per drone unit, using the recommended components and a Holybro X500 V2 frame, is approximately $1,200-$1,800 USD depending on supplier and quantity discounts. This positions OVERWATCH as a cost-effective solution compared to proprietary swarm platforms that typically start at $5,000-$10,000 per vehicle. The modular component selection allows operators to scale up to more capable (and expensive) hardware only where mission requirements demand it, such as adding a Jetson Orin Nano for onboard computer vision or upgrading to a Silvus StreamCaster radio for operations beyond 10 km range."
     ),
   ];
 }
@@ -639,26 +639,26 @@ function buildCommunicationProtocol() {
 
     heading2("3.1 MAVLink v2 Integration"),
     bodyParagraph(
-      "NEXUS interfaces with each drone's flight controller through the MAVLink v2 protocol, the de facto standard for communication with ArduPilot and PX4 autopilot firmware. The mavlink_bridge module on each companion computer establishes a serial connection to the flight controller at 921600 baud over UART (or 57600 baud over USB as a fallback) and exchanges MAVLink messages using the pymavlink library. Incoming MAVLink messages are parsed, filtered for the subset relevant to NEXUS operations, and converted into internal Python data structures. Outgoing commands from the operator are translated from NEXUS Wire Protocol format into the appropriate MAVLink message type and sent to the flight controller with automatic retry and acknowledgment tracking."
+      "OVERWATCH interfaces with each drone's flight controller through the MAVLink v2 protocol, the de facto standard for communication with ArduPilot and PX4 autopilot firmware. The mavlink_bridge module on each companion computer establishes a serial connection to the flight controller at 921600 baud over UART (or 57600 baud over USB as a fallback) and exchanges MAVLink messages using the pymavlink library. Incoming MAVLink messages are parsed, filtered for the subset relevant to OVERWATCH operations, and converted into internal Python data structures. Outgoing commands from the operator are translated from OVERWATCH Wire Protocol format into the appropriate MAVLink message type and sent to the flight controller with automatic retry and acknowledgment tracking."
     ),
     bodyParagraph(
-      "The following table lists the MAVLink v2 messages that NEXUS actively consumes or generates. While the MAVLink protocol defines hundreds of message types, NEXUS focuses on the subset required for telemetry aggregation, command execution, and mode management. Additional message types can be added by extending the mavlink_bridge module's message handler map."
+      "The following table lists the MAVLink v2 messages that OVERWATCH actively consumes or generates. While the MAVLink protocol defines hundreds of message types, OVERWATCH focuses on the subset required for telemetry aggregation, command execution, and mode management. Additional message types can be added by extending the mavlink_bridge module's message handler map."
     ),
 
     mavlinkTable,
 
     new Paragraph({ spacing: { after: 200 } }),
 
-    heading2("3.2 NEXUS Wire Protocol"),
+    heading2("3.2 OVERWATCH Wire Protocol"),
     bodyParagraph(
-      "Above the MAVLink layer, NEXUS defines its own application-level wire protocol for all communication between companion computers, the ground station server, and HUD clients. The NEXUS Wire Protocol uses JSON-encoded messages transported over WebSocket connections (RFC 6455) on the primary WiFi link. Each message is a JSON object containing a \"type\" field that identifies the message class, a \"drone_id\" field that identifies the source or target vehicle, a \"timestamp\" field in ISO 8601 format, and a \"payload\" object whose structure varies by message type. The protocol is intentionally designed for human readability during development and debugging; production deployments can optionally enable per-message gzip compression to reduce bandwidth consumption by approximately 60-70%."
+      "Above the MAVLink layer, OVERWATCH defines its own application-level wire protocol for all communication between companion computers, the ground station server, and HUD clients. The OVERWATCH Wire Protocol uses JSON-encoded messages transported over WebSocket connections (RFC 6455) on the primary WiFi link. Each message is a JSON object containing a \"type\" field that identifies the message class, a \"drone_id\" field that identifies the source or target vehicle, a \"timestamp\" field in ISO 8601 format, and a \"payload\" object whose structure varies by message type. The protocol is intentionally designed for human readability during development and debugging; production deployments can optionally enable per-message gzip compression to reduce bandwidth consumption by approximately 60-70%."
     ),
 
     heading3("Example TELEM Packet"),
     ...codeBlock([
       "{",
       '  "type": "TELEM",',
-      '  "drone_id": "NEXUS-07",',
+      '  "drone_id": "OVERWATCH-07",',
       '  "timestamp": "2026-02-10T14:32:07.482Z",',
       '  "seq": 48201,',
       '  "payload": {',
@@ -712,7 +712,7 @@ function buildCommunicationProtocol() {
 
     heading2("3.4 Transport Redundancy"),
     bodyParagraph(
-      "NEXUS implements a dual-transport architecture to maintain communication continuity in degraded radio environments. The primary transport is WiFi 6 mesh operating in the 5 GHz band, carrying full JSON-encoded NEXUS Wire Protocol messages at their native rates. The companion computer's failover_mgr module continuously monitors the WiFi link quality by tracking RSSI, packet loss rate, and round-trip latency. When the WiFi link degrades below configurable thresholds (default: RSSI below -80 dBm, packet loss above 15%, or latency above 500 ms), the failover_mgr automatically switches the downlink telemetry and uplink command streams to the RFD900x backup radio operating in the 900 MHz ISM band."
+      "OVERWATCH implements a dual-transport architecture to maintain communication continuity in degraded radio environments. The primary transport is WiFi 6 mesh operating in the 5 GHz band, carrying full JSON-encoded OVERWATCH Wire Protocol messages at their native rates. The companion computer's failover_mgr module continuously monitors the WiFi link quality by tracking RSSI, packet loss rate, and round-trip latency. When the WiFi link degrades below configurable thresholds (default: RSSI below -80 dBm, packet loss above 15%, or latency above 500 ms), the failover_mgr automatically switches the downlink telemetry and uplink command streams to the RFD900x backup radio operating in the 900 MHz ISM band."
     ),
     bodyParagraph(
       "Because the RFD900x provides only 64 kbps of usable bandwidth (compared to tens of megabits on WiFi), the fallback transport uses a compact binary encoding based on MessagePack rather than JSON. The telemetry payload is also reduced to a critical subset of fields: position (lat, lon, alt_msl), battery remaining percentage, GPS fix type, link RSSI, and status. Attitude, velocity, and formation data are omitted to fit within the bandwidth constraint. The telemetry rate is also reduced from 10 Hz to 2 Hz on the backup link. When the WiFi link recovers (RSSI above -70 dBm for 10 consecutive seconds), the failover_mgr seamlessly transitions back to the primary transport and restores full telemetry fidelity. All failover events are logged and reported to the operator via ALERT messages."
@@ -771,12 +771,12 @@ function buildSwarmCoordination() {
     heading1("4. Swarm Coordination Protocol"),
 
     bodyParagraph(
-      "The swarm coordination layer is the algorithmic heart of NEXUS, responsible for transforming a collection of independently flying drones into a coherent, collaborative unit. It runs on the ground station server's Coordination Engine with critical safety functions also executing locally on each companion computer to ensure continued safe operation during communication outages. The coordination layer implements four major subsystems: formation management, leader election, collision avoidance, and task allocation."
+      "The swarm coordination layer is the algorithmic heart of OVERWATCH, responsible for transforming a collection of independently flying drones into a coherent, collaborative unit. It runs on the ground station server's Coordination Engine with critical safety functions also executing locally on each companion computer to ensure continued safe operation during communication outages. The coordination layer implements four major subsystems: formation management, leader election, collision avoidance, and task allocation."
     ),
 
     heading2("4.1 Formation Types"),
     bodyParagraph(
-      "NEXUS supports six predefined formation types, each optimized for different operational scenarios. The operator selects a formation type through the HUD, and the coordination engine computes the required offset vector for each drone relative to the formation center or leader position. Drones transition to their assigned positions using smooth trajectory interpolation over a configurable transition period (default: 10 seconds) to avoid abrupt maneuvers."
+      "OVERWATCH supports six predefined formation types, each optimized for different operational scenarios. The operator selects a formation type through the HUD, and the coordination engine computes the required offset vector for each drone relative to the formation center or leader position. Drones transition to their assigned positions using smooth trajectory interpolation over a configurable transition period (default: 10 seconds) to avoid abrupt maneuvers."
     ),
 
     formationTable,
@@ -785,7 +785,7 @@ function buildSwarmCoordination() {
 
     heading2("4.2 Leader Election (Modified Raft Consensus)"),
     bodyParagraph(
-      "NEXUS employs a modified version of the Raft consensus algorithm to elect and maintain a swarm leader. The leader is responsible for broadcasting formation updates, serving as the reference point for offset calculations, and making authoritative decisions during split-brain scenarios. Unlike traditional Raft which assigns equal weight to all voters, NEXUS uses a weighted scoring system to ensure the most capable drone is elected leader."
+      "OVERWATCH employs a modified version of the Raft consensus algorithm to elect and maintain a swarm leader. The leader is responsible for broadcasting formation updates, serving as the reference point for offset calculations, and making authoritative decisions during split-brain scenarios. Unlike traditional Raft which assigns equal weight to all voters, OVERWATCH uses a weighted scoring system to ensure the most capable drone is elected leader."
     ),
 
     heading3("Leader Scoring Criteria"),
@@ -823,7 +823,7 @@ function buildSwarmCoordination() {
 
     heading2("4.3 Collision Avoidance"),
     bodyParagraph(
-      "Every drone in the NEXUS swarm continuously executes a collision avoidance algorithm on its local companion computer at 10 Hz, independent of the ground station link. The algorithm maintains a virtual safety bubble of 5-meter radius around each drone. Using PEER messages received from neighboring drones (and the drone's own GPS position), the algorithm computes the distance to every known peer and triggers avoidance maneuvers when any peer enters the safety bubble."
+      "Every drone in the OVERWATCH swarm continuously executes a collision avoidance algorithm on its local companion computer at 10 Hz, independent of the ground station link. The algorithm maintains a virtual safety bubble of 5-meter radius around each drone. Using PEER messages received from neighboring drones (and the drone's own GPS position), the algorithm computes the distance to every known peer and triggers avoidance maneuvers when any peer enters the safety bubble."
     ),
 
     bullet([
@@ -907,7 +907,7 @@ function buildCompanionSoftware() {
       [
         "Telemetry Publisher",
         "telem_publisher.py",
-        "Aggregates normalized telemetry from mavlink_bridge, assembles NEXUS TELEM packets at 10 Hz, publishes to ground station and peers via WebSocket",
+        "Aggregates normalized telemetry from mavlink_bridge, assembles OVERWATCH TELEM packets at 10 Hz, publishes to ground station and peers via WebSocket",
         "websockets, msgpack",
       ],
       [
@@ -931,7 +931,7 @@ function buildCompanionSoftware() {
       [
         "Config Loader",
         "config_loader.py",
-        "Reads and validates the nexus.yaml configuration file at startup, provides typed access to all config parameters, watches for live config updates",
+        "Reads and validates the overwatch.yaml configuration file at startup, provides typed access to all config parameters, watches for live config updates",
         "pyyaml",
       ],
     ],
@@ -942,7 +942,7 @@ function buildCompanionSoftware() {
     heading1("5. Companion Computer Software"),
 
     bodyParagraph(
-      "Each drone in the NEXUS swarm runs a software suite on its companion computer (Raspberry Pi 5 by default) that handles all communication bridging, telemetry processing, peer networking, and local safety enforcement. The software is written in Python 3.11 for rapid development and broad hardware compatibility, with performance-critical paths (telemetry serialization, collision avoidance math) implemented using NumPy vectorized operations. The suite is managed by systemd and starts automatically on boot, establishing communication with the flight controller and joining the swarm within 15 seconds of power-on."
+      "Each drone in the OVERWATCH swarm runs a software suite on its companion computer (Raspberry Pi 5 by default) that handles all communication bridging, telemetry processing, peer networking, and local safety enforcement. The software is written in Python 3.11 for rapid development and broad hardware compatibility, with performance-critical paths (telemetry serialization, collision avoidance math) implemented using NumPy vectorized operations. The suite is managed by systemd and starts automatically on boot, establishing communication with the flight controller and joining the swarm within 15 seconds of power-on."
     ),
 
     heading2("5.1 Software Modules"),
@@ -952,42 +952,42 @@ function buildCompanionSoftware() {
 
     heading2("5.2 Plug-and-Play Installation"),
     bodyParagraph(
-      "Deploying NEXUS on a new drone requires three steps and can be completed in under 10 minutes by a field technician with no software development experience."
+      "Deploying OVERWATCH on a new drone requires three steps and can be completed in under 10 minutes by a field technician with no software development experience."
     ),
 
     numberedItem([
       text("Flash SD Card: ", { bold: true }),
       text(
-        "Download the pre-built NEXUS companion image (based on Raspberry Pi OS Lite 64-bit) and flash it to a 32 GB or larger microSD card using balenaEtcher or the Raspberry Pi Imager. The image includes Python 3.11, all NEXUS dependencies, pre-configured systemd services, and network management tools."
+        "Download the pre-built OVERWATCH companion image (based on Raspberry Pi OS Lite 64-bit) and flash it to a 32 GB or larger microSD card using balenaEtcher or the Raspberry Pi Imager. The image includes Python 3.11, all OVERWATCH dependencies, pre-configured systemd services, and network management tools."
       ),
     ]),
     numberedItem([
-      text("Edit nexus.yaml: ", { bold: true }),
+      text("Edit overwatch.yaml: ", { bold: true }),
       text(
-        "Mount the SD card on any computer and open the /boot/nexus.yaml configuration file in a text editor. Set the drone_id to a unique identifier (e.g., NEXUS-07), assign the role (leader or follower), configure the WiFi mesh SSID and passphrase, and verify the MAVLink serial port path (default: /dev/ttyAMA0). All other settings have sensible defaults."
+        "Mount the SD card on any computer and open the /boot/overwatch.yaml configuration file in a text editor. Set the drone_id to a unique identifier (e.g., OVERWATCH-07), assign the role (leader or follower), configure the WiFi mesh SSID and passphrase, and verify the MAVLink serial port path (default: /dev/ttyAMA0). All other settings have sensible defaults."
       ),
     ]),
     numberedItem([
       text("Connect and Power On: ", { bold: true }),
       text(
-        "Insert the SD card into the Raspberry Pi 5, connect the Pi to the flight controller's TELEM2 port via a JST-GH to USB-C cable (or direct UART wiring), and power on the companion computer. The NEXUS services will start automatically, establish a MAVLink heartbeat with the flight controller, join the WiFi mesh, announce themselves via mDNS, and begin publishing telemetry within 15 seconds."
+        "Insert the SD card into the Raspberry Pi 5, connect the Pi to the flight controller's TELEM2 port via a JST-GH to USB-C cable (or direct UART wiring), and power on the companion computer. The OVERWATCH services will start automatically, establish a MAVLink heartbeat with the flight controller, join the WiFi mesh, announce themselves via mDNS, and begin publishing telemetry within 15 seconds."
       ),
     ]),
 
     new Paragraph({ spacing: { after: 200 } }),
 
-    heading2("5.3 Configuration Reference (nexus.yaml)"),
+    heading2("5.3 Configuration Reference (overwatch.yaml)"),
     bodyParagraph(
-      "The following is a complete example nexus.yaml configuration file showing all available parameters with their default or recommended values."
+      "The following is a complete example overwatch.yaml configuration file showing all available parameters with their default or recommended values."
     ),
 
     ...codeBlock([
       "# =========================================================",
-      "# NEXUS Companion Computer Configuration",
-      "# File: /boot/nexus.yaml",
+      "# OVERWATCH Companion Computer Configuration",
+      "# File: /boot/overwatch.yaml",
       "# =========================================================",
       "",
-      "drone_id: NEXUS-07",
+      "drone_id: OVERWATCH-07",
       "role: follower          # leader | follower",
       "swarm_id: ALPHA         # Swarm group identifier",
       "",
@@ -1000,7 +1000,7 @@ function buildCompanionSoftware() {
       "",
       "network:",
       "  wifi:",
-      "    ssid: NEXUS-MESH-ALPHA",
+      "    ssid: OVERWATCH-MESH-ALPHA",
       "    passphrase: s3cur3-m3sh-k3y!",
       "    channel: 36",
       "    band: 5GHz",
@@ -1059,11 +1059,11 @@ function buildCompanionSoftware() {
       "",
       "logging:",
       "  level: INFO                    # DEBUG | INFO | WARNING | ERROR",
-      "  file: /var/log/nexus/nexus.log",
+      "  file: /var/log/overwatch/overwatch.log",
       "  max_size_mb: 100",
       "  rotate_count: 5",
       "  telem_recording: true",
-      "  telem_log: /var/log/nexus/telem.jsonl",
+      "  telem_log: /var/log/overwatch/telem.jsonl",
     ]),
   ];
 }
@@ -1111,7 +1111,7 @@ function buildGroundStation() {
         "Field Laptop",
         "Single machine, all-in-one",
         "2-6 drones",
-        "A ruggedized laptop (e.g., Panasonic Toughbook) runs the complete NEXUS ground station stack: Node.js server, Redis, SQLite, and HUD browser. The laptop connects directly to the WiFi mesh network via an external USB WiFi 6 adapter with an omnidirectional antenna. Ideal for small-team operations, training exercises, and rapid deployment scenarios where setup time must be under 5 minutes. Limited by the laptop's single WiFi radio and processing power.",
+        "A ruggedized laptop (e.g., Panasonic Toughbook) runs the complete OVERWATCH ground station stack: Node.js server, Redis, SQLite, and HUD browser. The laptop connects directly to the WiFi mesh network via an external USB WiFi 6 adapter with an omnidirectional antenna. Ideal for small-team operations, training exercises, and rapid deployment scenarios where setup time must be under 5 minutes. Limited by the laptop's single WiFi radio and processing power.",
       ],
       [
         "Edge Server",
@@ -1133,7 +1133,7 @@ function buildGroundStation() {
     heading1("6. Ground Station Server"),
 
     bodyParagraph(
-      "The NEXUS ground station server is the central hub that connects all drones in the swarm to the operator. It is implemented as a Node.js application that can run on hardware ranging from a single laptop to a multi-node cloud deployment, depending on the scale of the operation. The server maintains real-time bidirectional communication with every drone via WebSocket, processes and distributes telemetry data, executes swarm coordination algorithms, serves the operator HUD interface, and provides a REST API for mission planning and system configuration."
+      "The OVERWATCH ground station server is the central hub that connects all drones in the swarm to the operator. It is implemented as a Node.js application that can run on hardware ranging from a single laptop to a multi-node cloud deployment, depending on the scale of the operation. The server maintains real-time bidirectional communication with every drone via WebSocket, processes and distributes telemetry data, executes swarm coordination algorithms, serves the operator HUD interface, and provides a REST API for mission planning and system configuration."
     ),
 
     heading2("6.1 Server Components"),
@@ -1143,7 +1143,7 @@ function buildGroundStation() {
 
     heading2("6.2 Deployment Options"),
     bodyParagraph(
-      "NEXUS supports three deployment configurations that scale from small field teams to large multi-site operations. The ground station software is identical across all configurations; only the underlying hardware and network topology change."
+      "OVERWATCH supports three deployment configurations that scale from small field teams to large multi-site operations. The ground station software is identical across all configurations; only the underlying hardware and network topology change."
     ),
 
     deploymentTable,
@@ -1160,7 +1160,7 @@ function buildOperatorHUD() {
     heading1("7. Operator Interface (HUD)"),
 
     bodyParagraph(
-      "The NEXUS Heads-Up Display (HUD) is a browser-based single-page application that provides the operator with comprehensive real-time situational awareness and full command authority over the drone swarm. It is built with vanilla HTML5, CSS3, and JavaScript (no framework dependencies) to ensure maximum compatibility, minimal load times, and reliable operation on field-deployed hardware where installing Node.js build toolchains may not be practical. The HUD connects to the ground station server via a single WebSocket connection and renders updates at 60 fps using hardware-accelerated CSS transforms and HTML5 Canvas for the map and attitude indicators."
+      "The OVERWATCH Heads-Up Display (HUD) is a browser-based single-page application that provides the operator with comprehensive real-time situational awareness and full command authority over the drone swarm. It is built with vanilla HTML5, CSS3, and JavaScript (no framework dependencies) to ensure maximum compatibility, minimal load times, and reliable operation on field-deployed hardware where installing Node.js build toolchains may not be practical. The HUD connects to the ground station server via a single WebSocket connection and renders updates at 60 fps using hardware-accelerated CSS transforms and HTML5 Canvas for the map and attitude indicators."
     ),
 
     heading2("7.1 HUD Components"),
@@ -1265,7 +1265,7 @@ function buildSafetyFaultHandling() {
     heading1("8. Safety & Fault Handling"),
 
     bodyParagraph(
-      "Safety is the paramount design consideration in NEXUS. Every automated behavior is designed to fail safe: when in doubt, a drone will hold position or return to launch rather than continue a potentially dangerous maneuver. The fault handling system operates at two levels: local safety enforcement on each companion computer (which continues to function even without a ground station link) and centralized monitoring on the ground station server (which provides the operator with comprehensive situational awareness and override capability). The following table defines the eight primary fault scenarios, their detection mechanisms, automated responses, and operator alerts."
+      "Safety is the paramount design consideration in OVERWATCH. Every automated behavior is designed to fail safe: when in doubt, a drone will hold position or return to launch rather than continue a potentially dangerous maneuver. The fault handling system operates at two levels: local safety enforcement on each companion computer (which continues to function even without a ground station link) and centralized monitoring on the ground station server (which provides the operator with comprehensive situational awareness and override capability). The following table defines the eight primary fault scenarios, their detection mechanisms, automated responses, and operator alerts."
     ),
 
     heading2("8.1 Fault Response Matrix"),
@@ -1275,7 +1275,7 @@ function buildSafetyFaultHandling() {
 
     heading2("8.2 Safety Architecture Principles"),
     bodyParagraph(
-      "The NEXUS safety architecture is built on three foundational principles. First, defense in depth: every safety-critical function is implemented at multiple levels. Collision avoidance runs locally on each companion computer, is monitored by the coordination engine on the ground station, and can be manually overridden by the operator. Battery management is enforced by the companion computer's cmd_executor (which refuses to execute commands that would violate battery thresholds), by the flight controller's own failsafe parameters, and by the operator via the HUD's battery alerts. Second, fail-safe defaults: all timeouts, thresholds, and fallback behaviors are configured to produce the safest possible outcome. A drone that loses communication returns to launch. A drone that loses GPS descends slowly. A drone that detects a collision risk stops. Third, operator authority: every automated safety response can be overridden by the operator through the HUD. If the operator determines that an automated RTL is inappropriate (for example, because the launch point is now in a danger zone), they can cancel the RTL and manually command the drone to an alternate landing site."
+      "The OVERWATCH safety architecture is built on three foundational principles. First, defense in depth: every safety-critical function is implemented at multiple levels. Collision avoidance runs locally on each companion computer, is monitored by the coordination engine on the ground station, and can be manually overridden by the operator. Battery management is enforced by the companion computer's cmd_executor (which refuses to execute commands that would violate battery thresholds), by the flight controller's own failsafe parameters, and by the operator via the HUD's battery alerts. Second, fail-safe defaults: all timeouts, thresholds, and fallback behaviors are configured to produce the safest possible outcome. A drone that loses communication returns to launch. A drone that loses GPS descends slowly. A drone that detects a collision risk stops. Third, operator authority: every automated safety response can be overridden by the operator through the HUD. If the operator determines that an automated RTL is inappropriate (for example, because the launch point is now in a danger zone), they can cancel the RTL and manually command the drone to an alternate landing site."
     ),
   ];
 }
@@ -1337,7 +1337,7 @@ function buildDevelopmentRoadmap() {
     heading1("9. Development Roadmap"),
 
     bodyParagraph(
-      "The NEXUS platform is being developed in seven phases over a 36-week timeline, each phase building incrementally on the capabilities delivered by the previous phase. This phased approach allows for continuous integration testing, regular stakeholder demonstrations, and the flexibility to adjust priorities based on operational feedback. Each phase concludes with a milestone review that includes a live demonstration of new capabilities, updated documentation, and a go/no-go decision for the next phase."
+      "The OVERWATCH platform is being developed in seven phases over a 36-week timeline, each phase building incrementally on the capabilities delivered by the previous phase. This phased approach allows for continuous integration testing, regular stakeholder demonstrations, and the flexibility to adjust priorities based on operational feedback. Each phase concludes with a milestone review that includes a live demonstration of new capabilities, updated documentation, and a go/no-go decision for the next phase."
     ),
 
     roadmapTable,
@@ -1358,7 +1358,7 @@ function buildGettingStarted() {
     heading1("10. Getting Started"),
 
     bodyParagraph(
-      "This section provides a step-by-step guide to setting up a NEXUS development environment and verifying basic telemetry connectivity with a simulated drone. The entire process can be completed on a single Ubuntu 22.04 workstation in approximately 30 minutes. No physical drone hardware is required; the ArduPilot Software-In-The-Loop (SITL) simulator provides a fully functional virtual drone that responds to MAVLink commands and generates realistic telemetry."
+      "This section provides a step-by-step guide to setting up a OVERWATCH development environment and verifying basic telemetry connectivity with a simulated drone. The entire process can be completed on a single Ubuntu 22.04 workstation in approximately 30 minutes. No physical drone hardware is required; the ArduPilot Software-In-The-Loop (SITL) simulator provides a fully functional virtual drone that responds to MAVLink commands and generates realistic telemetry."
     ),
 
     heading2("Step 1: Install ArduPilot SITL"),
@@ -1381,13 +1381,13 @@ function buildGettingStarted() {
 
     new Paragraph({ spacing: { after: 200 } }),
 
-    heading2("Step 2: Clone NEXUS Repository"),
+    heading2("Step 2: Clone OVERWATCH Repository"),
     bodyParagraph(
-      "Clone the NEXUS repository and install all Node.js and Python dependencies:"
+      "Clone the OVERWATCH repository and install all Node.js and Python dependencies:"
     ),
     ...codeBlock([
-      "git clone https://github.com/nexus-swarm/nexus.git",
-      "cd nexus",
+      "git clone https://github.com/overwatch-swarm/overwatch.git",
+      "cd overwatch",
       "npm install                    # Install Node.js dependencies",
       "pip3 install pymavlink websockets pyyaml zeroconf msgpack",
     ]),
@@ -1405,21 +1405,21 @@ function buildGettingStarted() {
       "    --out=udp:127.0.0.1:14550",
     ]),
     bodyParagraph(
-      "The --map flag opens a real-time map window showing the simulated drone's position, and --console opens a MAVProxy console for manual MAVLink interaction. The -l flag sets the simulated drone's home location to Los Angeles (latitude 34.052235, longitude -118.243683, altitude 30 m, heading 0 degrees). The --out flag forwards MAVLink messages to UDP port 14550, which the NEXUS mavlink_bridge will connect to."
+      "The --map flag opens a real-time map window showing the simulated drone's position, and --console opens a MAVProxy console for manual MAVLink interaction. The -l flag sets the simulated drone's home location to Los Angeles (latitude 34.052235, longitude -118.243683, altitude 30 m, heading 0 degrees). The --out flag forwards MAVLink messages to UDP port 14550, which the OVERWATCH mavlink_bridge will connect to."
     ),
 
     new Paragraph({ spacing: { after: 200 } }),
 
-    heading2("Step 4: Start NEXUS Ground Station"),
+    heading2("Step 4: Start OVERWATCH Ground Station"),
     bodyParagraph(
-      "In a new terminal, start the NEXUS ground station server. The server will listen for drone connections on WebSocket port 8765 and serve the HUD on HTTP port 3000:"
+      "In a new terminal, start the OVERWATCH ground station server. The server will listen for drone connections on WebSocket port 8765 and serve the HUD on HTTP port 3000:"
     ),
     ...codeBlock([
-      "cd ~/nexus",
+      "cd ~/overwatch",
       "node server/index.js",
       "",
       "# Expected output:",
-      "# [INFO] NEXUS Ground Station v1.0.0 starting...",
+      "# [INFO] OVERWATCH Ground Station v1.0.0 starting...",
       "# [INFO] WebSocket hub listening on ws://0.0.0.0:8765",
       "# [INFO] HTTP server listening on http://0.0.0.0:3000",
       "# [INFO] Redis connected (state store ready)",
@@ -1430,14 +1430,14 @@ function buildGettingStarted() {
 
     heading2("Step 5: Open HUD and Verify Telemetry"),
     bodyParagraph(
-      "Open a web browser and navigate to http://localhost:3000. The NEXUS HUD should load and display an empty map centered on the default operational area. Within a few seconds of the companion computer bridge connecting to the SITL drone, you should see:"
+      "Open a web browser and navigate to http://localhost:3000. The OVERWATCH HUD should load and display an empty map centered on the default operational area. Within a few seconds of the companion computer bridge connecting to the SITL drone, you should see:"
     ),
 
     bullet(
       "A drone icon appearing on the map at the simulated home location (Los Angeles)"
     ),
     bullet(
-      "The drone list panel showing one drone (NEXUS-01) with a green ACTIVE status badge"
+      "The drone list panel showing one drone (OVERWATCH-01) with a green ACTIVE status badge"
     ),
     bullet(
       "Battery level at 100%, GPS showing 3D Fix with 10+ satellites, and link quality at maximum"
@@ -1453,7 +1453,7 @@ function buildGettingStarted() {
     new Paragraph({ spacing: { after: 100 } }),
 
     bodyParagraph(
-      "To test command functionality, click the drone icon on the map to select it, then use the detail panel to arm the vehicle (click ARM, confirm) and issue a takeoff command (click TAKEOFF, set altitude to 20 m, confirm). The simulated drone should arm, spool up its virtual motors, and climb to 20 meters AGL. The HUD should show the altitude increasing in both the numerical readout and the altitude sparkline, and the map icon's altitude label should update in real time. Congratulations: your NEXUS development environment is operational."
+      "To test command functionality, click the drone icon on the map to select it, then use the detail panel to arm the vehicle (click ARM, confirm) and issue a takeoff command (click TAKEOFF, set altitude to 20 m, confirm). The simulated drone should arm, spool up its virtual motors, and climb to 20 meters AGL. The HUD should show the altitude increasing in both the numerical readout and the altitude sparkline, and the map icon's altitude label should update in real time. Congratulations: your OVERWATCH development environment is operational."
     ),
   ];
 }
@@ -1462,15 +1462,15 @@ function buildGettingStarted() {
 // Main: Assemble and generate document
 // ---------------------------------------------------------------------------
 async function main() {
-  console.log("NEXUS Document Generator v1.0");
-  console.log("Generating: NEXUS - System Architecture & Protocol Specification");
+  console.log("OVERWATCH Document Generator v1.0");
+  console.log("Generating: OVERWATCH - System Architecture & Protocol Specification");
   console.log("");
 
   const doc = new Document({
-    title: "NEXUS - System Architecture & Protocol Specification",
+    title: "OVERWATCH - System Architecture & Protocol Specification",
     description:
-      "Complete technical architecture document for the NEXUS multi-UAV swarm management platform.",
-    creator: "NEXUS Engineering Team",
+      "Complete technical architecture document for the OVERWATCH multi-UAV swarm management platform.",
+    creator: "OVERWATCH Engineering Team",
     styles: {
       default: {
         document: {
@@ -1563,7 +1563,7 @@ async function main() {
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: "NEXUS \u2014 System Architecture",
+                    text: "OVERWATCH \u2014 System Architecture",
                     font: FONT,
                     size: 16,
                     color: "888888",
@@ -1642,7 +1642,7 @@ async function main() {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const outputPath = path.join(outputDir, "nexus-architecture.docx");
+  const outputPath = path.join(outputDir, "overwatch-architecture.docx");
 
   const buffer = await Packer.toBuffer(doc);
   fs.writeFileSync(outputPath, buffer);
