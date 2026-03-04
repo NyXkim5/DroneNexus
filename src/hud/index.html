@@ -213,6 +213,8 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   background: var(--text);
 }
 
+.mode-btn:active { transform: scale(0.97); }
+
 .live-indicator {
   display: flex;
   align-items: center;
@@ -281,9 +283,10 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   display: flex; align-items: center; gap: 6px; padding: 6px 10px;
   font-family: var(--font-label); font-size: 11px; font-weight: 600;
   color: var(--text-secondary); letter-spacing: 0.05em; text-transform: uppercase;
-  cursor: pointer; user-select: none; transition: background 0.15s;
+  cursor: pointer; user-select: none; transition: background 0.15s, transform 0.15s;
 }
 .tree-section-header:hover { background: var(--border); }
+.tree-section-header:active { transform: scale(0.99); }
 .tree-toggle { font-size: 10px; color: var(--text-tertiary); width: 12px; }
 .collapsed { display: none; }
 .tree-count { font-family: var(--font-data); font-size: 10px; color: var(--text-tertiary); margin-left: auto; }
@@ -300,13 +303,15 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   border-left: 3px solid transparent;
   padding: 8px 12px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
   position: relative;
 }
 
 .asset-item:hover {
   background: var(--border);
 }
+
+.asset-item:active { transform: scale(0.99); }
 
 .asset-item.selected {
   border-left-color: var(--accent);
@@ -355,6 +360,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   font-weight: 500;
   margin-left: auto;
   margin-top: 2px;
+  transition: color 0.3s;
 }
 
 .asset-status.nominal { color: var(--green); }
@@ -414,6 +420,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   padding: 1px 6px;
   border-radius: 2px;
   margin-left: 4px;
+  transition: background 0.3s, color 0.3s;
 }
 
 .drone-status-badge.active, .drone-status-badge.nominal {
@@ -1064,6 +1071,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   transition: all 0.15s;
 }
 .wp-btn:hover { border-color: var(--accent); color: var(--accent); }
+.wp-btn:active { transform: scale(0.97); }
 .wp-btn.active { background: var(--accent); color: var(--text-bright); border-color: var(--accent); }
 .wp-btn.execute { border-color: var(--green); color: var(--green); }
 .wp-btn.execute:hover { background: rgba(63,185,80,0.12); }
@@ -1099,9 +1107,10 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .replay-speed-btn {
   font-family: var(--font-label); font-size: 10px; padding: 4px 8px;
   border: 1px solid var(--border); border-radius: 2px; background: transparent;
-  color: var(--text-dim); cursor: pointer;
+  color: var(--text-dim); cursor: pointer; transition: all 0.15s;
 }
 .replay-speed-btn.active, .replay-speed-btn:hover { color: var(--amber); border-color: var(--amber); }
+.replay-speed-btn:active { transform: scale(0.97); }
 
 /* ============================================================
    COMMAND TOAST
@@ -1117,16 +1126,39 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .cmd-toast.warning { background: var(--panel-elevated); border-color: var(--amber); color: var(--amber); }
 .cmd-toast.error { background: var(--panel-elevated); border-color: var(--red); color: var(--red); }
 @keyframes toast-in { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.cmd-toast.toast-exit { animation: toast-out 0.2s ease forwards; }
+@keyframes toast-out { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-10px); opacity: 0; } }
+
+/* Value pulse animation for telemetry updates */
+@keyframes value-pulse {
+  0% { opacity: 1; }
+  30% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+.value-updated { animation: value-pulse 0.3s ease; }
+
+/* Event log entry stagger animation */
+@keyframes event-enter {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 
 /* ============================================================
    CONNECTION MODAL
    ============================================================ */
-.connection-panel-backdrop { position: fixed; inset: 0; z-index: 1999; background: rgba(0,0,0,0.5); }
+.connection-panel-backdrop { position: fixed; inset: 0; z-index: 1999; background: rgba(0,0,0,0.5); transition: opacity 0.25s ease; opacity: 0; }
+.connection-panel-backdrop.visible { opacity: 1; }
 .connection-panel {
-  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(0.95);
   z-index: 2000; width: 420px; background: var(--panel);
   border: 1px solid var(--border-light); border-radius: 2px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5); padding: 24px;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  opacity: 0;
+}
+.connection-panel.visible {
+  transform: translate(-50%,-50%) scale(1);
+  opacity: 1;
 }
 .conn-input {
   width: 100%; padding: 8px 10px; font-family: var(--font-data); font-size: 12px;
@@ -1217,6 +1249,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   transition: all 0.15s;
 }
 .quick-connect-btn:hover { border-color: var(--accent); color: var(--accent); }
+.quick-connect-btn:active { transform: scale(0.97); }
 .quick-connect-btn.scanning { opacity: 0.6; }
 .fpv-mode-btns { display: flex; gap: 4px; flex-wrap: wrap; }
 .fpv-mode-btn {
@@ -1225,6 +1258,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   background: transparent; color: var(--text-dim); cursor: pointer;
   letter-spacing: 0.5px; transition: all 0.15s;
 }
+.fpv-mode-btn:active { transform: scale(0.97); }
 .fpv-mode-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(68,147,248,0.08); }
 .fpv-mode-btn:hover:not(.active) { border-color: var(--border-light); color: var(--text); }
 .fpv-telem-grid {
@@ -1251,9 +1285,10 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   font-family: var(--font-label); font-size: 10px; font-weight: 600;
   letter-spacing: 0.05em; text-transform: uppercase; padding: 8px 6px;
   border: none; border-bottom: 2px solid transparent; background: transparent;
-  color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
+  color: var(--text-secondary); cursor: pointer; transition: all 0.15s, border-bottom-color 0.2s;
   flex: 1; text-align: center; white-space: nowrap;
 }
+.inspector-tab:active { transform: scale(0.97); }
 .inspector-tab.active { color: var(--text); border-bottom-color: var(--accent); }
 .inspector-tab:hover:not(.active) { color: var(--text); }
 .inspector-tab-content { display: none; }
@@ -1304,10 +1339,11 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
    FIX #3: BOTTOM PANEL HOVER EFFECTS
    ============================================================ */
 .bottom-metric {
-  transition: background 0.2s;
+  transition: background 0.2s, transform 0.2s;
 }
 .bottom-metric:hover {
   background: var(--panel-elevated);
+  transform: translateY(-1px);
 }
 
 /* Formation overlay clickable */
@@ -1528,6 +1564,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   cursor: pointer;
   transition: all 0.2s;
 }
+.diag-run-btn:active { transform: scale(0.97); }
 .diag-run-btn:hover {
   background: rgba(68,147,248,0.15);
 }
@@ -1712,9 +1749,11 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 }
 
 /* Shortcut Help */
-.shortcut-help { position: fixed; inset: 0; z-index: 10001; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
-.shortcut-help.hidden { display: none; }
-.shortcut-help-modal { background: var(--panel); border: 1px solid var(--border-light); border-radius: 2px; padding: 20px 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+.shortcut-help { position: fixed; inset: 0; z-index: 10001; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); transition: opacity 0.2s ease; opacity: 0; pointer-events: none; }
+.shortcut-help.hidden { opacity: 0; pointer-events: none; }
+.shortcut-help.visible { opacity: 1; pointer-events: auto; }
+.shortcut-help-modal { background: var(--panel); border: 1px solid var(--border-light); border-radius: 2px; padding: 20px 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; transition: transform 0.2s ease, opacity 0.2s ease; transform: scale(0.95) translateY(10px); opacity: 0; pointer-events: none; }
+.shortcut-help.visible .shortcut-help-modal { transform: scale(1) translateY(0); opacity: 1; pointer-events: auto; }
 .shortcut-help-title { font-family: var(--font-label); font-size: 12px; font-weight: 600; color: var(--text); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 12px; }
 .shortcut-group { margin-bottom: 12px; }
 .shortcut-group-title { font-family: var(--font-label); font-size: 9px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 6px; }
@@ -1723,10 +1762,12 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .shortcut-desc { font-family: var(--font-data); font-size: 11px; color: var(--text-secondary); }
 
 /* Command Palette */
-.cmd-palette { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: flex-start; justify-content: center; padding-top: 20vh; }
-.cmd-palette.hidden { display: none; }
+.cmd-palette { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: flex-start; justify-content: center; padding-top: 20vh; transition: opacity 0.15s ease; opacity: 0; pointer-events: none; }
+.cmd-palette.hidden { opacity: 0; pointer-events: none; }
+.cmd-palette.visible { opacity: 1; pointer-events: auto; }
 .cmd-palette-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
-.cmd-palette-modal { position: relative; width: 480px; max-height: 400px; background: var(--panel); border: 1px solid var(--border-light); border-radius: 2px; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.cmd-palette-modal { position: relative; width: 480px; max-height: 400px; background: var(--panel); border: 1px solid var(--border-light); border-radius: 2px; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.5); transition: transform 0.15s ease, opacity 0.15s ease; transform: translateY(-8px); opacity: 0; }
+.cmd-palette.visible .cmd-palette-modal { transform: translateY(0); opacity: 1; }
 .cmd-palette-input { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 14px 16px; font-family: var(--font-data); font-size: 14px; color: var(--text); outline: none; width: 100%; box-sizing: border-box; }
 .cmd-palette-input::placeholder { color: var(--text-dim); }
 .cmd-palette-results { overflow-y: auto; max-height: 300px; padding: 4px 0; }
@@ -1797,7 +1838,8 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .map-toolbar { position: absolute; top: 10px; right: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 2px; padding: 4px; }
 .map-tool-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; border-radius: 1px; color: var(--text-secondary); cursor: pointer; font-size: 14px; transition: all 0.15s; font-family: var(--font-data); position: relative; }
 .map-tool-btn:hover { background: var(--panel-elevated); color: var(--text); border-color: var(--border); }
-.map-tool-btn.active { background: var(--accent); color: var(--text-bright); border-color: var(--accent); }
+.map-tool-btn:active { transform: scale(0.97); }
+.map-tool-btn.active { background: var(--accent); color: var(--text-bright); border-color: var(--accent); box-shadow: 0 0 6px var(--accent); }
 /* Override: mode button tooltips appear below the button (top bar) */
 .mode-btn[data-tooltip]::after { bottom: auto; top: calc(100% + 4px); }
 /* Override: map toolbar tooltips appear to the left of the button */
@@ -2347,7 +2389,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   </div>
 
   <!-- Connection Modal -->
-  <div id="connection-modal" style="display:none">
+  <div id="connection-modal" style="pointer-events:none">
     <div class="connection-panel-backdrop" id="conn-modal-backdrop"></div>
     <div class="connection-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -2781,8 +2823,8 @@ function showToast(msg, type) {
   el.style.bottom = bottomOffset + 'px';
   activeToasts.push(el);
   document.body.appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; }, 2000);
-  setTimeout(() => { activeToasts = activeToasts.filter(t => t !== el); el.remove(); }, 2400);
+  setTimeout(() => { el.classList.add('toast-exit'); }, 2000);
+  setTimeout(() => { activeToasts = activeToasts.filter(t => t !== el); el.remove(); }, 2200);
 }
 
 /* ==============================================================
@@ -3528,6 +3570,51 @@ function selectDrone(id) {
 // Timeline events per asset
 const assetTimelines = {};
 
+// Telemetry pulse animation helper
+const _prevTelemValues = {};
+function pulseValue(el, newText) {
+  if (el && el.textContent !== newText) {
+    el.textContent = newText;
+    el.classList.remove('value-updated');
+    void el.offsetWidth; // force reflow
+    el.classList.add('value-updated');
+  }
+}
+function pulseTelemValues(asset) {
+  const key = asset.id;
+  const prev = _prevTelemValues[key] || {};
+  const cur = {
+    lat: asset.lat.toFixed(6),
+    lon: asset.lng.toFixed(6),
+    alt: asset.altitude.toFixed(1),
+    speed: asset.speed.toFixed(1),
+    heading: asset.heading.toFixed(1),
+    battery: asset.battery.toFixed(1) + '%'
+  };
+  // Only pulse if there is a meaningful change (not just floating point noise)
+  const thresh = { lat: 0.00001, lon: 0.00001, alt: 0.3, speed: 0.2, heading: 1.0, battery: 0.2 };
+  const numPrev = {
+    lat: parseFloat(prev.lat || 0), lon: parseFloat(prev.lon || 0),
+    alt: parseFloat(prev.alt || 0), speed: parseFloat(prev.speed || 0),
+    heading: parseFloat(prev.heading || 0), battery: parseFloat(prev.battery || 0)
+  };
+  const numCur = {
+    lat: parseFloat(cur.lat), lon: parseFloat(cur.lon),
+    alt: parseFloat(cur.alt), speed: parseFloat(cur.speed),
+    heading: parseFloat(cur.heading), battery: parseFloat(cur.battery)
+  };
+  const ids = { lat: 'tv-lat', lon: 'tv-lon', alt: 'tv-alt', speed: 'tv-speed', heading: 'tv-heading', battery: 'tv-battery' };
+  for (const k of Object.keys(ids)) {
+    const el = document.getElementById(ids[k]);
+    if (el && prev[k] !== undefined && Math.abs(numCur[k] - numPrev[k]) > thresh[k]) {
+      el.classList.remove('value-updated');
+      void el.offsetWidth;
+      el.classList.add('value-updated');
+    }
+  }
+  _prevTelemValues[key] = cur;
+}
+
 function updateInspector(asset) {
   if (!asset) {
     document.getElementById('detail-header').textContent = 'INSPECTOR';
@@ -3593,19 +3680,19 @@ function updateInspector(asset) {
       <div class="telem-grid">
         <div class="telem-cell">
           <div class="telem-cell-label">Lat</div>
-          <div class="telem-cell-value" style="font-size:12px">${asset.lat.toFixed(6)}</div>
+          <div class="telem-cell-value" id="tv-lat" style="font-size:12px">${asset.lat.toFixed(6)}</div>
         </div>
         <div class="telem-cell">
           <div class="telem-cell-label">Lon</div>
-          <div class="telem-cell-value" style="font-size:12px">${asset.lng.toFixed(6)}</div>
+          <div class="telem-cell-value" id="tv-lon" style="font-size:12px">${asset.lng.toFixed(6)}</div>
         </div>
         <div class="telem-cell">
           <div class="telem-cell-label">Alt AGL (m)</div>
-          <div class="telem-cell-value">${asset.altitude.toFixed(1)}</div>
+          <div class="telem-cell-value" id="tv-alt">${asset.altitude.toFixed(1)}</div>
         </div>
         <div class="telem-cell">
           <div class="telem-cell-label">Alt MSL (m)</div>
-          <div class="telem-cell-value">${(asset.altitude + 25.0).toFixed(1)}</div>
+          <div class="telem-cell-value" id="tv-alt-msl">${(asset.altitude + 25.0).toFixed(1)}</div>
         </div>
       </div>
     </div>
@@ -3616,15 +3703,15 @@ function updateInspector(asset) {
       <div class="telem-grid">
         <div class="telem-cell">
           <div class="telem-cell-label">Ground Speed (m/s)</div>
-          <div class="telem-cell-value">${asset.speed.toFixed(1)}</div>
+          <div class="telem-cell-value" id="tv-speed">${asset.speed.toFixed(1)}</div>
         </div>
         <div class="telem-cell">
           <div class="telem-cell-label">Vert Speed (m/s)</div>
-          <div class="telem-cell-value" style="color:${vsColor}">${vsSign}${asset.verticalSpeed.toFixed(2)}</div>
+          <div class="telem-cell-value" id="tv-vspeed" style="color:${vsColor}">${vsSign}${asset.verticalSpeed.toFixed(2)}</div>
         </div>
         <div class="telem-cell" style="grid-column:1/-1">
           <div class="telem-cell-label">Heading (&deg;)</div>
-          <div class="telem-cell-value">${asset.heading.toFixed(1)}</div>
+          <div class="telem-cell-value" id="tv-heading">${asset.heading.toFixed(1)}</div>
         </div>
       </div>
     </div>
@@ -3633,7 +3720,7 @@ function updateInspector(asset) {
     <div class="detail-section">
       <div class="detail-section-title">Power State <span class="prop-type-tag">DOUBLE</span></div>
       <div class="battery-detail">
-        <div class="battery-big-num" style="color:${batColor}">${asset.battery.toFixed(1)}%</div>
+        <div class="battery-big-num" id="tv-battery" style="color:${batColor}">${asset.battery.toFixed(1)}%</div>
         <div class="battery-meta">
           <div class="battery-meta-row"><span class="battery-meta-label">Voltage</span>${asset.voltage.toFixed(1)}V</div>
           <div class="battery-meta-row"><span class="battery-meta-label">Current</span>${asset.current.toFixed(1)}A</div>
@@ -3686,6 +3773,9 @@ function updateInspector(asset) {
     </div>
     <div class="ontology-source">SRC: SIM-ENGINE // CONF: HIGH // UPD: ${new Date().toISOString().substring(11, 19)}Z</div>
   `;
+
+  // Pulse telemetry values that changed significantly
+  pulseTelemValues(asset);
 
   // Relationships tab
   const relContent = document.getElementById('relationships-content');
@@ -4259,6 +4349,7 @@ function renderActivityStream() {
   const latest = activityStream[activityStream.length - 1];
   const item = document.createElement('div');
   item.className = 'event-item';
+  item.style.animation = 'event-enter 0.2s ease';
   item.innerHTML = `
     <span class="event-time">${latest.time}</span>
     <span class="event-source severity-${latest.severity}">${latest.source}</span>
@@ -4473,14 +4564,28 @@ setMode('OBSERVE');
   });
 
   // ---- CONNECTION MODAL ----
+  function openConnectionModal() {
+    const modal = document.getElementById('connection-modal');
+    modal.style.pointerEvents = 'auto';
+    requestAnimationFrame(() => {
+      modal.querySelector('.connection-panel-backdrop').classList.add('visible');
+      modal.querySelector('.connection-panel').classList.add('visible');
+    });
+  }
+  function closeConnectionModal() {
+    const modal = document.getElementById('connection-modal');
+    modal.querySelector('.connection-panel-backdrop').classList.remove('visible');
+    modal.querySelector('.connection-panel').classList.remove('visible');
+    setTimeout(() => { modal.style.pointerEvents = 'none'; }, 250);
+  }
   document.getElementById('connection-badge').addEventListener('click', () => {
-    document.getElementById('connection-modal').style.display = '';
+    openConnectionModal();
   });
   document.getElementById('conn-modal-backdrop').addEventListener('click', () => {
-    document.getElementById('connection-modal').style.display = 'none';
+    closeConnectionModal();
   });
   document.getElementById('conn-close').addEventListener('click', () => {
-    document.getElementById('connection-modal').style.display = 'none';
+    closeConnectionModal();
   });
   document.getElementById('conn-connect').addEventListener('click', () => {
     const url = document.getElementById('conn-ws-url').value.trim();
@@ -5593,6 +5698,7 @@ setMode('OBSERVE');
     open() {
       this.visible = true;
       this.el.classList.remove('hidden');
+      requestAnimationFrame(() => { this.el.classList.add('visible'); });
       this.input.value = '';
       this.selectedIndex = 0;
       this.search('');
@@ -5601,7 +5707,8 @@ setMode('OBSERVE');
 
     close() {
       this.visible = false;
-      this.el.classList.add('hidden');
+      this.el.classList.remove('visible');
+      setTimeout(() => { this.el.classList.add('hidden'); }, 150);
       this.input.blur();
     },
 
@@ -5772,13 +5879,20 @@ setMode('OBSERVE');
     if (e.key === '?') {
       e.preventDefault();
       const help = document.getElementById('shortcut-help');
-      help.classList.toggle('hidden');
+      if (help.classList.contains('visible')) {
+        help.classList.remove('visible');
+        help.classList.add('hidden');
+      } else {
+        help.classList.remove('hidden');
+        requestAnimationFrame(() => { help.classList.add('visible'); });
+      }
     }
   });
 
   // Click backdrop to close
   document.getElementById('shortcut-help').addEventListener('click', (e) => {
     if (e.target.id === 'shortcut-help') {
+      e.target.classList.remove('visible');
       e.target.classList.add('hidden');
     }
   });
