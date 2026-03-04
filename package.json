@@ -1,10 +1,10 @@
 {
-  "name": "nexus-swarm-system",
+  "name": "overwatch-isr-platform",
   "version": "1.0.0",
-  "description": "NEXUS - Swarm Telemetry & Coordination System",
+  "description": "OVERWATCH — ISR Asset Coordination Platform (Palantir Gotham)",
   "scripts": {
     "generate-doc": "node src/docs/generate-doc.js",
-    "build": "node src/docs/generate-doc.js && cp src/hud/index.html dist/nexus-hud.html"
+    "build": "node src/docs/generate-doc.js && cp src/hud/index.html dist/overwatch-hud.html"
   },
   "dependencies": {
     "docx": "^8.5.0"

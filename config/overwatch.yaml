@@ -1,12 +1,12 @@
 # ============================================================
-# NEXUS — Swarm Telemetry & Coordination System
+# OVERWATCH — ISR Asset Coordination Platform
 # Companion Computer Configuration
 # ============================================================
-# Copy this file to /etc/nexus/nexus.yaml on each companion
-# computer and modify per-drone settings.
+# Copy this file to /etc/overwatch/overwatch.yaml on each companion
+# computer and modify per-asset settings.
 # ============================================================
 
-# --- Drone Identity ---
+# --- Asset Identity ---
 drone:
   id: "ALPHA-1"
   role: "LEADER"                    # LEADER | WINGMAN | RECON | SUPPORT | TAIL
@@ -16,9 +16,9 @@ drone:
   max_speed_ms: 18.0
   ceiling_m: 400
 
-# --- Swarm Configuration ---
+# --- Taskforce Configuration ---
 swarm:
-  swarm_id: "NEXUS-SWARM-01"
+  swarm_id: "OVERWATCH-TF-01"
   max_drones: 6
   formation:
     default: "v_formation"          # v_formation | line_abreast | column | diamond | orbit | scatter
@@ -42,12 +42,12 @@ network:
   primary:
     type: "wifi_mesh"
     interface: "wlan0"
-    ssid: "NEXUS-MESH"
+    ssid: "OVERWATCH-MESH"
     channel: 36
     frequency_mhz: 5180
     tx_power_dbm: 20
     encryption: "WPA3-SAE"
-    passphrase: "${NEXUS_WIFI_PASSPHRASE}"
+    passphrase: "${OVERWATCH_WIFI_PASSPHRASE}"
   fallback:
     type: "rfd900x"
     device: "/dev/ttyUSB0"
@@ -64,7 +64,7 @@ network:
     max_reconnect_attempts: 50
   peer_mesh:
     discovery: "zeroconf"
-    service_name: "_nexus._tcp.local."
+    service_name: "_overwatch._tcp.local."
     state_exchange_hz: 5
     timeout_ms: 3000
 
@@ -217,11 +217,11 @@ logging:
   console: true
   file:
     enabled: true
-    path: "/var/log/nexus/"
+    path: "/var/log/overwatch/"
     rotation: "daily"
     max_files: 30
   telemetry_recording:
     enabled: true
     format: "jsonl"
-    path: "/var/log/nexus/telemetry/"
+    path: "/var/log/overwatch/telemetry/"
     flush_interval_s: 5

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# NEXUS Build Script
+# OVERWATCH Build Script
 # Generates all deliverables into dist/
 # ============================================================
 set -euo pipefail
@@ -8,7 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-echo "=== NEXUS Build System ==="
+echo "=== OVERWATCH Build System ==="
 echo ""
 
 # Ensure dist directory exists
@@ -22,15 +22,15 @@ npm install --silent
 # Step 2: Generate architecture document
 echo "[2/3] Generating architecture document..."
 node src/docs/generate-doc.js
-echo "      -> dist/nexus-architecture.docx"
+echo "      -> dist/overwatch-architecture.docx"
 
 # Step 3: Copy HUD to dist
 echo "[3/3] Packaging HUD..."
-cp src/hud/index.html dist/nexus-hud.html
-echo "      -> dist/nexus-hud.html"
+cp src/hud/index.html dist/overwatch-hud.html
+echo "      -> dist/overwatch-hud.html"
 
 echo ""
 echo "=== Build complete ==="
 echo "Deliverables:"
-echo "  dist/nexus-hud.html           - Tactical HUD (open in browser)"
-echo "  dist/nexus-architecture.docx  - Architecture document"
+echo "  dist/overwatch-hud.html           - Tactical HUD (open in browser)"
+echo "  dist/overwatch-architecture.docx  - Architecture document"
