@@ -468,7 +468,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   padding: 10px 14px;
 }
 
-.formation-label {
+.pattern-label {
   font-family: var(--font-label);
   font-size: 11px;
   font-weight: 600;
@@ -477,14 +477,14 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   text-transform: uppercase;
 }
 
-.cohesion-value {
+.coverage-value {
   font-family: var(--font-data);
   font-size: 20px;
   font-weight: 700;
   color: var(--text-bright);
 }
 
-.cohesion-unit {
+.coverage-unit {
   font-size: 12px;
   color: var(--text-dim);
   margin-left: 2px;
@@ -1376,7 +1376,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   transform: translateY(-1px);
 }
 
-/* Formation overlay clickable */
+/* Collection pattern overlay clickable */
 .map-overlay.clickable {
   cursor: pointer;
   transition: border-color 0.2s;
@@ -2010,11 +2010,11 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       <div class="connection-badge-dot"></div>
       <span id="connection-label">EXERCISE</span>
     </div>
-    <div class="live-indicator" data-tooltip="Connection status">
+    <div class="live-indicator" data-tooltip="Simulated exercise mode — no live assets">
       <div class="live-dot"></div>
       <div class="live-label" id="live-label">EXERCISE</div>
     </div>
-    <span class="tf-callsign" data-tooltip="Task force callsign">TF-OVERWATCH-01</span>
+    <span class="tf-callsign" data-tooltip="Task force callsign">TF-SABER-01</span>
     <div class="utc-clock" id="utc-clock" data-tooltip="UTC mission clock">00:00:00Z</div>
   </div>
 
@@ -2041,7 +2041,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
           <div class="ops-container">
             <div class="ops-header">
               <span class="ops-dot"></span>
-              <span class="ops-name">OP SENTINEL WATCH</span>
+              <span class="ops-name">OP IRON SABER</span>
               <span class="ops-status-badge">ACTIVE</span>
             </div>
             <div class="ops-detail-rows">
@@ -2063,22 +2063,22 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
           <div class="aoi-list-inner">
             <div class="aoi-item">
               <span class="aoi-dot" style="background:var(--accent)"></span>
-              <span class="aoi-name">AO-IRVINE</span>
+              <span class="aoi-name">AO-ALPHA</span>
               <span class="aoi-class" style="color:var(--accent)">PRIMARY</span>
             </div>
             <div class="aoi-item">
               <span class="aoi-dot" style="background:var(--green)"></span>
-              <span class="aoi-name">AO-CAMPUS</span>
+              <span class="aoi-name">AO-BRAVO</span>
               <span class="aoi-class" style="color:var(--green)">CLEAR</span>
             </div>
             <div class="aoi-item">
               <span class="aoi-dot" style="background:var(--amber)"></span>
-              <span class="aoi-name">AO-HIGHWAY</span>
+              <span class="aoi-name">AO-CHARLIE</span>
               <span class="aoi-class" style="color:var(--amber)">MONITOR</span>
             </div>
             <div class="aoi-item">
               <span class="aoi-dot" style="background:var(--text-dim)"></span>
-              <span class="aoi-name-dim">AO-NORTH</span>
+              <span class="aoi-name-dim">AO-DELTA</span>
               <span class="aoi-class" style="color:var(--text-dim)">STANDBY</span>
             </div>
           </div>
@@ -2161,10 +2161,10 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
           </select>
         </div>
       </div>
-      <div class="map-overlay clickable" id="formation-overlay" title="Click to cycle formation">
-        <div class="formation-label">V-FORMATION</div>
+      <div class="map-overlay clickable" id="pattern-overlay" title="Click to cycle ISR collection pattern">
+        <div class="pattern-label">ORBIT</div>
         <div>
-          <span class="cohesion-value" id="cohesion-value">97</span><span class="cohesion-unit">% COHESION</span>
+          <span class="coverage-value" id="coverage-value">94</span><span class="coverage-unit">% COVERAGE</span>
         </div>
       </div>
       <!-- Objective toolbar (TASK mode) -->
@@ -2267,14 +2267,12 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
             <input type="range" class="cmd-slider" id="cmd-altitude" min="5" max="200" value="120" step="1">
           </div>
           <div class="cmd-slider-group" style="margin-top:10px">
-            <div class="cmd-slider-label" style="margin-bottom:6px">Formation</div>
-            <select class="cmd-select" id="cmd-formation">
-              <option value="V_FORMATION">V-Formation</option>
-              <option value="LINE_ABREAST">Line Abreast</option>
-              <option value="COLUMN">Column</option>
-              <option value="DIAMOND">Diamond</option>
+            <div class="cmd-slider-label" style="margin-bottom:6px">Collection Pattern</div>
+            <select class="cmd-select" id="cmd-pattern" data-tooltip="ISR collection pattern">
               <option value="ORBIT">Orbit</option>
-              <option value="SCATTER">Scatter</option>
+              <option value="RACETRACK">Racetrack</option>
+              <option value="SEARCH_GRID">Search Grid</option>
+              <option value="POINT_STARE">Point Stare</option>
             </select>
           </div>
         </div>
@@ -2457,6 +2455,17 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       <div class="bottom-metric-sub" id="bm-bat-spread">Range: 75 - 95%</div>
       <canvas class="sparkline-canvas" id="spark-battery"></canvas>
     </div>
+    <div class="bottom-metric" data-tooltip="Estimated sensor coverage of AO">
+      <div class="bottom-metric-header">
+        <span class="bottom-metric-title">Sensor COV</span>
+        <span class="mesh-badge" id="cov-badge" style="background:rgba(45,114,210,0.12);color:#4C90F0">ACTIVE</span>
+      </div>
+      <div>
+        <span class="bottom-metric-value" id="bm-coverage">0</span><span class="bottom-metric-unit">%</span>
+      </div>
+      <div class="bottom-metric-sub" id="bm-cov-assets">0 / 6 sensors</div>
+      <canvas class="sparkline-canvas" id="spark-coverage"></canvas>
+    </div>
   </div>
 
   <!-- Connection Modal -->
@@ -2532,8 +2541,8 @@ const _css = (v) => getComputedStyle(document.documentElement).getPropertyValue(
 const _cssRgba = (v, a) => { const h = _css(v); const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16); return `rgba(${r},${g},${b},${a})`; };
 
 // ---- CONSTANTS ----
-const CENTER_LAT = 33.6405;
-const CENTER_LNG = -117.8443;
+const CENTER_LAT = 32.9500;
+const CENTER_LNG = -106.4200;
 const ORBIT_RADIUS = 0.0025; // degrees roughly 250m
 const TRAIL_LENGTH = 60;
 const SPARKLINE_POINTS = 60;
@@ -2541,14 +2550,45 @@ const EVENT_INTERVAL_MIN = 3000;
 const EVENT_INTERVAL_MAX = 8000;
 const MAX_EVENTS = 80;
 
-// ---- FORMATION OFFSETS ----
-const FORMATION_OFFSETS = {
-  V_FORMATION: [{along:0,cross:0},{along:-1,cross:-1},{along:-1,cross:1},{along:-2,cross:-2},{along:-2,cross:2},{along:-3,cross:0}],
-  LINE_ABREAST: [{along:0,cross:0},{along:0,cross:-1},{along:0,cross:1},{along:0,cross:-2},{along:0,cross:2},{along:0,cross:-3}],
-  COLUMN: [{along:0,cross:0},{along:-1,cross:0},{along:-2,cross:0},{along:-3,cross:0},{along:-4,cross:0},{along:-5,cross:0}],
-  DIAMOND: [{along:0,cross:0},{along:-1,cross:-1},{along:-1,cross:1},{along:-2,cross:0},{along:-1,cross:-2},{along:-1,cross:2}],
-  ORBIT: null,
-  SCATTER: null,
+// ---- ISR COLLECTION PATTERN OFFSETS ----
+// Assets are positioned relative to the pattern center using {along, cross} offsets.
+// ORBIT: evenly spaced around a circle (360/N degrees apart)
+// RACETRACK: spread along an elongated oval pattern
+// SEARCH_GRID: systematic grid spacing for wide-area coverage
+// POINT_STARE: tight convergence on a single target
+const PATTERN_OFFSETS = {
+  ORBIT: [
+    {along: 0,    cross: 0},
+    {along: 1.5,  cross: 1.5},
+    {along: -1.5, cross: 1.5},
+    {along: -1.5, cross: -1.5},
+    {along: 1.5,  cross: -1.5},
+    {along: 0,    cross: -2.1}
+  ],
+  RACETRACK: [
+    {along: 0,  cross: 0},
+    {along: -2, cross: 0},
+    {along: -4, cross: 0},
+    {along: 1,  cross: 0.6},
+    {along: -1, cross: 0.6},
+    {along: -3, cross: 0.6}
+  ],
+  SEARCH_GRID: [
+    {along: 0,  cross: 0},
+    {along: 0,  cross: -2},
+    {along: 0,  cross: 2},
+    {along: -2, cross: 0},
+    {along: -2, cross: -2},
+    {along: -2, cross: 2}
+  ],
+  POINT_STARE: [
+    {along: 0,    cross: 0},
+    {along: -0.3, cross: -0.3},
+    {along: -0.3, cross: 0.3},
+    {along: 0.3,  cross: -0.3},
+    {along: 0.3,  cross: 0.3},
+    {along: -0.5, cross: 0}
+  ],
 };
 
 const DRONE_STATES = {
@@ -2559,12 +2599,12 @@ const DRONE_STATES = {
 
 // ---- ASSET DEFINITIONS ----
 const ASSET_DEFS = [
-  { id: 'ALPHA-1',   color: '#2D72D2', rgb: '45,114,210',  role: 'PRIMARY',    formationOffset: { along: 0, cross: 0 } },
-  { id: 'BRAVO-2',   color: '#238551', rgb: '35,133,81',   role: 'ESCORT',     formationOffset: { along: -1, cross: -1 } },
-  { id: 'CHARLIE-3', color: '#C87619', rgb: '200,118,25',  role: 'ISR',        formationOffset: { along: -1, cross: 1 } },
-  { id: 'DELTA-4',   color: '#CD4246', rgb: '205,66,70',   role: 'ESCORT',     formationOffset: { along: -2, cross: -2 } },
-  { id: 'ECHO-5',    color: '#7961DB', rgb: '121,97,219',  role: 'LOGISTICS',  formationOffset: { along: -2, cross: 2 } },
-  { id: 'FOXTROT-6', color: '#4C90F0', rgb: '76,144,240',  role: 'OVERWATCH',  formationOffset: { along: -3, cross: 0 } },
+  { id: 'ALPHA-1',   color: '#2D72D2', rgb: '45,114,210',  role: 'PRIMARY',    patternOffset: { along: 0, cross: 0 } },
+  { id: 'BRAVO-2',   color: '#238551', rgb: '35,133,81',   role: 'ESCORT',     patternOffset: { along: 1.5, cross: 1.5 } },
+  { id: 'CHARLIE-3', color: '#C87619', rgb: '200,118,25',  role: 'ISR',        patternOffset: { along: -1.5, cross: 1.5 } },
+  { id: 'DELTA-4',   color: '#CD4246', rgb: '205,66,70',   role: 'ESCORT',     patternOffset: { along: -1.5, cross: -1.5 } },
+  { id: 'ECHO-5',    color: '#7961DB', rgb: '121,97,219',  role: 'LOGISTICS',  patternOffset: { along: 1.5, cross: -1.5 } },
+  { id: 'FOXTROT-6', color: '#4C90F0', rgb: '76,144,240',  role: 'OVERWATCH',  patternOffset: { along: 0, cross: -2.1 } },
 ];
 
 
@@ -2576,6 +2616,35 @@ function randInt(lo, hi) { return Math.floor(rand(lo, hi + 1)); }
 function padZ(n, d) { return String(n).padStart(d, '0'); }
 function degToRad(d) { return d * Math.PI / 180; }
 function radToDeg(r) { return r * 180 / Math.PI; }
+
+// Compute a lat/lng offset given a distance (meters) and bearing (degrees)
+function offsetLatLng(lat, lng, distMeters, bearingDeg) {
+  const R = 6371000; // Earth radius in meters
+  const d = distMeters / R;
+  const brng = bearingDeg * Math.PI / 180;
+  const lat1 = lat * Math.PI / 180;
+  const lng1 = lng * Math.PI / 180;
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng));
+  const lng2 = lng1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+  return [lat2 * 180 / Math.PI, lng2 * 180 / Math.PI];
+}
+
+// Build FOV cone polygon points for a given position, heading, and range
+const FOV_HALF_ANGLE = 30;    // degrees -- 60-degree total spread
+const FOV_RANGE      = 250;   // meters forward from drone
+const FOV_ARC_STEPS  = 7;     // intermediate points along the arc
+
+function buildFovPoints(lat, lng, headingDeg) {
+  const pts = [[lat, lng]]; // apex at drone position
+  const startBearing = headingDeg - FOV_HALF_ANGLE;
+  const endBearing   = headingDeg + FOV_HALF_ANGLE;
+  const step = (endBearing - startBearing) / FOV_ARC_STEPS;
+  for (let i = 0; i <= FOV_ARC_STEPS; i++) {
+    const bearing = startBearing + step * i;
+    pts.push(offsetLatLng(lat, lng, FOV_RANGE, bearing));
+  }
+  return pts;
+}
 
 function utcString() {
   const d = new Date();
@@ -2610,7 +2679,7 @@ class AssetSimulator {
     this.color = def.color;
     this.rgb = def.rgb;
     this.role = def.role;
-    this.formationOffset = def.formationOffset;
+    this.patternOffset = def.patternOffset;
     this.index = index;
 
     // Orbital phase offset
@@ -2685,8 +2754,8 @@ class AssetSimulator {
       const spacing = 0.00035;
       const alongDir = { lat: Math.cos(hr + Math.PI / 2), lng: Math.sin(hr + Math.PI / 2) };
       const crossDir = { lat: -Math.sin(hr + Math.PI / 2), lng: Math.cos(hr + Math.PI / 2) };
-      const tLat = leaderLat + this.formationOffset.along * spacing * alongDir.lat + this.formationOffset.cross * spacing * crossDir.lat;
-      const tLng = leaderLng + this.formationOffset.along * spacing * alongDir.lng + this.formationOffset.cross * spacing * crossDir.lng;
+      const tLat = leaderLat + this.patternOffset.along * spacing * alongDir.lat + this.patternOffset.cross * spacing * crossDir.lat;
+      const tLng = leaderLng + this.patternOffset.along * spacing * alongDir.lng + this.patternOffset.cross * spacing * crossDir.lng;
       this.lat = lerp(this.lat, tLat, 0.08);
       this.lng = lerp(this.lng, tLng, 0.08);
       this.heading = leaderHeading + Math.sin(this.t * 0.7 + this.index) * 3;
@@ -2981,15 +3050,15 @@ class DirectiveEngine {
         showToast('GOTO — navigating to target');
         break;
 
-      case 'SET_FORMATION': {
-        const offsets = FORMATION_OFFSETS[params.formation];
+      case 'SET_PATTERN': {
+        const offsets = PATTERN_OFFSETS[params.pattern];
         if (offsets) {
-          this.drones.forEach((d, i) => { d.formationOffset = offsets[i] || { along: 0, cross: 0 }; });
+          this.drones.forEach((d, i) => { d.patternOffset = offsets[i] || { along: 0, cross: 0 }; });
         }
-        this._logCmd('FORMATION ' + params.formation.replace('_', ' '), 'ALL');
-        showToast('Formation: ' + params.formation.replace(/_/g, ' '));
-        const label = document.querySelector('.formation-label');
-        if (label) label.textContent = params.formation.replace(/_/g, '-');
+        this._logCmd('PATTERN ' + params.pattern.replace(/_/g, ' '), 'ALL');
+        showToast('Collection pattern: ' + params.pattern.replace(/_/g, ' '));
+        const label = document.querySelector('.pattern-label');
+        if (label) label.textContent = params.pattern.replace(/_/g, ' ');
         break;
       }
 
@@ -3303,16 +3372,16 @@ const EVENT_TEMPLATES = [
   { msg: 'Sensor calibration complete', source: null, severity: 'ok' },
   { msg: 'LIDAR sweep complete', source: null, severity: 'info' },
   { msg: 'Altitude hold adjusted', source: null, severity: 'info' },
-  { msg: 'Formation position corrected', source: null, severity: 'info' },
+  { msg: 'Orbit position corrected', source: null, severity: 'info' },
   { msg: 'COMMLINK mesh topology updated', source: 'COMMS', severity: 'ok' },
   { msg: 'Link quality restored', source: 'COMMS', severity: 'ok' },
   { msg: 'Peer handoff complete', source: 'COMMS', severity: 'info' },
   { msg: 'Navigation update applied', source: 'TASKFORCE', severity: 'info' },
   { msg: 'GPS multipath correction', source: 'TASKFORCE', severity: 'info' },
   { msg: 'Geofence check passed', source: 'TASKFORCE', severity: 'ok' },
-  { msg: 'Taskforce cohesion nominal', source: 'OVERWATCH', severity: 'ok' },
+  { msg: 'AO coverage nominal', source: 'OVERWATCH', severity: 'ok' },
   { msg: 'Telemetry snapshot archived', source: 'OVERWATCH', severity: 'info' },
-  { msg: 'Formation adjusted', source: 'OVERWATCH', severity: 'info' },
+  { msg: 'Collection pattern adjusted', source: 'OVERWATCH', severity: 'info' },
   { msg: 'Power state management optimized', source: 'OVERWATCH', severity: 'info' },
   { msg: 'Thermal updraft detected', source: null, severity: 'info' },
   { msg: 'Barometric pressure shift', source: null, severity: 'warn' },
@@ -3434,7 +3503,7 @@ class Sparkline {
 /* ==============================================================
    LEAFLET MAP SETUP
    ============================================================== */
-let map, mapMarkers = {}, mapTrails = {}, formationLines = [], selectedDroneId = null;
+let map, mapMarkers = {}, mapTrails = {}, formationLines = [], fovLayers = {}, selectedDroneId = null;
 
 function initMap() {
   map = L.map('map', {
@@ -3451,7 +3520,7 @@ function initMap() {
     maxZoom: 20,
   }).addTo(map);
 
-  // Create markers, trails, formation lines for each asset
+  // Create markers, trails, pattern lines for each asset
   ASSET_DEFS.forEach(def => {
     // SVG chevron icon
     const icon = createDroneIcon(def.color, 0);
@@ -3471,11 +3540,27 @@ function initMap() {
     mapTrails[def.id] = trailSegs;
   });
 
-  // Formation lines from primary to each follower
+  // Pattern lines from primary to each follower
   ASSET_DEFS.forEach((def, i) => {
     if (i === 0) return; // skip primary
     const line = L.polyline([], { color: _css('--border-light'), weight: 1, opacity: 0.6, dashArray: '6, 6' }).addTo(map);
     formationLines.push({ id: def.id, line });
+  });
+
+  // Sensor FOV cone polygons for each asset
+  ASSET_DEFS.forEach(def => {
+    const initialPts = buildFovPoints(CENTER_LAT, CENTER_LNG, 0);
+    const fov = L.polygon(initialPts, {
+      color: def.color,
+      weight: 1,
+      opacity: 0.15,
+      fillColor: def.color,
+      fillOpacity: 0.08,
+      interactive: false,
+      bubblingMouseEvents: false,
+      pane: 'overlayPane'
+    }).addTo(map);
+    fovLayers[def.id] = fov;
   });
 }
 
@@ -3521,6 +3606,19 @@ function updateFormationLines(drones) {
     if (follower) {
       fl.line.setLatLngs([[leader.lat, leader.lng], [follower.lat, follower.lng]]);
     }
+  });
+}
+
+function updateFovCone(drone) {
+  const fov = fovLayers[drone.id];
+  if (!fov) return;
+  const pts = buildFovPoints(drone.lat, drone.lng, drone.heading);
+  fov.setLatLngs(pts);
+  // Highlight selected asset's FOV with higher opacity
+  const isSelected = drone.id === selectedDroneId;
+  fov.setStyle({
+    fillOpacity: isSelected ? 0.15 : 0.08,
+    opacity:     isSelected ? 0.25 : 0.15
   });
 }
 
@@ -3639,6 +3737,14 @@ function selectDrone(id) {
     const latlng = mapMarkers[id].getLatLng();
     map.panTo(latlng, { animate: true, duration: 0.5 });
   }
+  // Update FOV cone highlight for selection change
+  Object.keys(fovLayers).forEach(assetId => {
+    const isSelected = assetId === id;
+    fovLayers[assetId].setStyle({
+      fillOpacity: isSelected ? 0.15 : 0.08,
+      opacity:     isSelected ? 0.25 : 0.15
+    });
+  });
 }
 
 // Timeline events per asset
@@ -3689,33 +3795,21 @@ function pulseTelemValues(asset) {
   _prevTelemValues[key] = cur;
 }
 
-function updateInspector(asset) {
-  if (!asset) {
-    document.getElementById('detail-header').textContent = 'INSPECTOR';
-    document.getElementById('detail-content').innerHTML = '<div class="no-selection">SELECT AN ASSET</div>';
-    document.getElementById('relationships-content').innerHTML = '';
-    document.getElementById('timeline-content').innerHTML = '';
-    const diagEl = document.getElementById('diagnostics-content');
-    if (diagEl) diagEl.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>';
-    const hwEl = document.getElementById('hardware-content');
-    if (hwEl) hwEl.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>';
-    return;
-  }
+// Track which asset's DOM is currently rendered in the inspector
+let inspectorRenderedAsset = null;
 
-  document.getElementById('detail-header').textContent = asset.id + ' // ' + asset.role;
-
+// Build the full properties HTML template for an asset (used on first render / asset switch)
+function buildPropsHTML(asset) {
   const batColor = batteryColor(asset.battery);
   const vsColor = asset.verticalSpeed >= 0 ? 'var(--green)' : 'var(--red)';
   const vsSign = asset.verticalSpeed >= 0 ? '+' : '';
   const rssiC = rssiColor(asset.rssi);
 
-  // Properties tab
-  const content = document.getElementById('detail-content');
-  content.innerHTML = `
-    <div class="ontology-breadcrumb">
+  return `
+    <div class="ontology-breadcrumb" id="tv-ontology-breadcrumb">
       <span class="ontology-breadcrumb-type">ISR_ASSET</span>
       <span class="ontology-breadcrumb-sep">&rsaquo;</span>
-      <span class="ontology-breadcrumb-id">${asset.id}</span>
+      <span class="ontology-breadcrumb-id" id="tv-breadcrumb-id">${asset.id}</span>
       <span class="ontology-type-badge">OBJECT</span>
     </div>
     <!-- ATTITUDE -->
@@ -3737,15 +3831,15 @@ function updateInspector(asset) {
       <div class="attitude-values">
         <div class="attitude-val">
           <div class="attitude-val-label">Roll</div>
-          <div class="attitude-val-num" style="color:var(--text-secondary)">${asset.roll.toFixed(1)}&deg;</div>
+          <div class="attitude-val-num" id="tv-roll" style="color:var(--text-secondary)">${asset.roll.toFixed(1)}&deg;</div>
         </div>
         <div class="attitude-val">
           <div class="attitude-val-label">Pitch</div>
-          <div class="attitude-val-num" style="color:var(--text-secondary)">${asset.pitch.toFixed(1)}&deg;</div>
+          <div class="attitude-val-num" id="tv-pitch" style="color:var(--text-secondary)">${asset.pitch.toFixed(1)}&deg;</div>
         </div>
         <div class="attitude-val">
           <div class="attitude-val-label">Yaw</div>
-          <div class="attitude-val-num" style="color:var(--text-secondary)">${asset.yaw.toFixed(1)}&deg;</div>
+          <div class="attitude-val-num" id="tv-yaw" style="color:var(--text-secondary)">${asset.yaw.toFixed(1)}&deg;</div>
         </div>
       </div>
     </div>
@@ -3798,12 +3892,12 @@ function updateInspector(asset) {
       <div class="battery-detail">
         <div class="battery-big-num" id="tv-battery" style="color:${batColor}">${asset.battery.toFixed(1)}%</div>
         <div class="battery-meta">
-          <div class="battery-meta-row"><span class="battery-meta-label">Voltage</span>${asset.voltage.toFixed(1)}V</div>
-          <div class="battery-meta-row"><span class="battery-meta-label">Current</span>${asset.current.toFixed(1)}A</div>
+          <div class="battery-meta-row"><span class="battery-meta-label">Voltage</span><span id="tv-voltage">${asset.voltage.toFixed(1)}V</span></div>
+          <div class="battery-meta-row"><span class="battery-meta-label">Current</span><span id="tv-current">${asset.current.toFixed(1)}A</span></div>
         </div>
       </div>
       <div class="battery-detail-bar">
-        <div class="battery-detail-bar-fill" style="width:${asset.battery}%;background:${batColor}"></div>
+        <div class="battery-detail-bar-fill" id="tv-battery-bar" style="width:${asset.battery}%;background:${batColor}"></div>
       </div>
     </div>
 
@@ -3814,11 +3908,11 @@ function updateInspector(asset) {
       <div class="gps-grid">
         <div class="gps-cell">
           <div class="gps-cell-label">Satellites</div>
-          <div class="gps-cell-value">${asset.satellites}</div>
+          <div class="gps-cell-value" id="tv-sats">${asset.satellites}</div>
         </div>
         <div class="gps-cell">
           <div class="gps-cell-label">HDOP</div>
-          <div class="gps-cell-value">${asset.hdop.toFixed(2)}</div>
+          <div class="gps-cell-value" id="tv-hdop">${asset.hdop.toFixed(2)}</div>
         </div>
       </div>
     </div>
@@ -3828,15 +3922,15 @@ function updateInspector(asset) {
       <div class="detail-section-title">Commlink</div>
       <div class="link-cards">
         <div class="link-card">
-          <div class="link-card-value" style="color:${rssiC}">${asset.rssi.toFixed(0)}</div>
+          <div class="link-card-value" id="tv-rssi" style="color:${rssiC}">${asset.rssi.toFixed(0)}</div>
           <div class="link-card-label">RSSI</div>
         </div>
         <div class="link-card">
-          <div class="link-card-value">${asset.linkQuality.toFixed(0)}<span class="link-card-unit">%</span></div>
+          <div class="link-card-value" id="tv-linkq">${asset.linkQuality.toFixed(0)}<span class="link-card-unit">%</span></div>
           <div class="link-card-label">Quality</div>
         </div>
         <div class="link-card">
-          <div class="link-card-value">${asset.latency.toFixed(0)}<span class="link-card-unit">ms</span></div>
+          <div class="link-card-value" id="tv-latency">${asset.latency.toFixed(0)}<span class="link-card-unit">ms</span></div>
           <div class="link-card-label">Latency</div>
         </div>
       </div>
@@ -3845,43 +3939,147 @@ function updateInspector(asset) {
     <!-- STATUS -->
     <div class="detail-section">
       <div class="detail-section-title">Status <span class="prop-type-tag">ENUM</span></div>
-      <div class="drone-status-badge ${asset.status.toLowerCase()}" style="display:inline-block;font-size:11px;padding:3px 10px">${asset.status.replace(/_/g,' ')}</div>
+      <div class="drone-status-badge ${asset.status.toLowerCase()}" id="tv-status" style="display:inline-block;font-size:11px;padding:3px 10px">${asset.status.replace(/_/g,' ')}</div>
     </div>
-    <div class="ontology-source">SRC: SIM-ENGINE // CONF: HIGH // UPD: ${new Date().toISOString().substring(11, 19)}Z</div>
+    <div class="ontology-source" id="tv-provenance">SRC: SIM-ENGINE // CONF: SIM // UPD: ${new Date().toISOString().substring(11, 19)}Z</div>
   `;
+}
 
-  // Pulse telemetry values that changed significantly
+function updateInspector(asset) {
+  if (!asset) {
+    document.getElementById('detail-header').textContent = 'INSPECTOR';
+    document.getElementById('detail-content').innerHTML = '<div class="no-selection">SELECT AN ASSET</div>';
+    document.getElementById('relationships-content').innerHTML = '';
+    document.getElementById('timeline-content').innerHTML = '';
+    const diagEl = document.getElementById('diagnostics-content');
+    if (diagEl) diagEl.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>';
+    const hwEl = document.getElementById('hardware-content');
+    if (hwEl) hwEl.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>';
+    inspectorRenderedAsset = null;
+    return;
+  }
+
+  document.getElementById('detail-header').textContent = asset.id + ' // ' + asset.role;
+
+  const content = document.getElementById('detail-content');
+
+  // Full DOM rebuild only when switching to a different asset
+  if (inspectorRenderedAsset !== asset.id) {
+    inspectorRenderedAsset = asset.id;
+    content.innerHTML = buildPropsHTML(asset);
+
+    // Relationships tab (rebuilt on asset switch only — static per asset)
+    const relContent = document.getElementById('relationships-content');
+    const isPrimary = asset.role === 'PRIMARY';
+    relContent.innerHTML = `
+      <div style="padding:8px 12px">
+        <div class="relationship-card">
+          <div class="link-type-label">Link[memberOf] <span class="link-cardinality">1:1</span></div>
+          <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> TF-SABER-01</div>
+        </div>
+        ${isPrimary ? '' : `<div class="relationship-card">
+          <div class="link-type-label">Link[reportsTo] <span class="link-cardinality">N:1</span></div>
+          <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> ALPHA-1</div>
+        </div>`}
+        <div class="relationship-card">
+          <div class="link-type-label">Link[assignedRole] <span class="link-cardinality">1:1</span></div>
+          <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> ${asset.role}</div>
+        </div>
+        <div class="relationship-card">
+          <div class="link-type-label">Link[operatesIn] <span class="link-cardinality">N:1</span></div>
+          <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> AO-ALPHA</div>
+        </div>
+        <div class="relationship-card">
+          <div class="link-type-label">Link[commLink] <span class="link-cardinality">1:N</span></div>
+          <div class="link-direction">${asset.id} <span style="color:var(--accent)">&harr;</span> MESH-NET-01</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // --- Targeted DOM updates for every tick (no innerHTML rebuild) ---
+  const el = (id) => document.getElementById(id);
+
+  // Attitude values
+  const rollEl = el('tv-roll');
+  if (rollEl) rollEl.textContent = asset.roll.toFixed(1) + '\u00B0';
+  const pitchEl = el('tv-pitch');
+  if (pitchEl) pitchEl.textContent = asset.pitch.toFixed(1) + '\u00B0';
+  const yawEl = el('tv-yaw');
+  if (yawEl) yawEl.textContent = asset.yaw.toFixed(1) + '\u00B0';
+
+  // Attitude ball CSS transform
+  const ball = el('attitude-ball');
+  if (ball) ball.style.transform = `translate(-50%, -50%) rotate(${asset.roll}deg) translateY(${-asset.pitch * 1.5}px)`;
+
+  // Position — use pulseValue for change-detection animation
+  pulseValue(el('tv-lat'), asset.lat.toFixed(6));
+  pulseValue(el('tv-lon'), asset.lng.toFixed(6));
+  pulseValue(el('tv-alt'), asset.altitude.toFixed(1));
+  pulseValue(el('tv-alt-msl'), (asset.altitude + 25.0).toFixed(1));
+
+  // Velocity
+  pulseValue(el('tv-speed'), asset.speed.toFixed(1));
+  const vsColor = asset.verticalSpeed >= 0 ? 'var(--green)' : 'var(--red)';
+  const vsSign = asset.verticalSpeed >= 0 ? '+' : '';
+  const vspeedEl = el('tv-vspeed');
+  if (vspeedEl) {
+    pulseValue(vspeedEl, vsSign + asset.verticalSpeed.toFixed(2));
+    vspeedEl.style.color = vsColor;
+  }
+  pulseValue(el('tv-heading'), asset.heading.toFixed(1));
+
+  // Power state — battery with color
+  const batColor = batteryColor(asset.battery);
+  const batEl = el('tv-battery');
+  if (batEl) {
+    pulseValue(batEl, asset.battery.toFixed(1) + '%');
+    batEl.style.color = batColor;
+  }
+  const voltEl = el('tv-voltage');
+  if (voltEl) voltEl.textContent = asset.voltage.toFixed(1) + 'V';
+  const curEl = el('tv-current');
+  if (curEl) curEl.textContent = asset.current.toFixed(1) + 'A';
+  const batBar = el('tv-battery-bar');
+  if (batBar) {
+    batBar.style.width = asset.battery + '%';
+    batBar.style.background = batColor;
+  }
+
+  // GPS / Positioning
+  const satsEl = el('tv-sats');
+  if (satsEl) satsEl.textContent = asset.satellites;
+  const hdopEl = el('tv-hdop');
+  if (hdopEl) hdopEl.textContent = asset.hdop.toFixed(2);
+
+  // Commlink — RSSI with color
+  const rssiC = rssiColor(asset.rssi);
+  const rssiEl = el('tv-rssi');
+  if (rssiEl) {
+    rssiEl.textContent = asset.rssi.toFixed(0);
+    rssiEl.style.color = rssiC;
+  }
+  const linkqEl = el('tv-linkq');
+  if (linkqEl) linkqEl.innerHTML = asset.linkQuality.toFixed(0) + '<span class="link-card-unit">%</span>';
+  const latencyEl = el('tv-latency');
+  if (latencyEl) latencyEl.innerHTML = asset.latency.toFixed(0) + '<span class="link-card-unit">ms</span>';
+
+  // Status badge — update class and text
+  const statusEl = el('tv-status');
+  if (statusEl) {
+    const statusLower = asset.status.toLowerCase();
+    statusEl.className = 'drone-status-badge ' + statusLower;
+    statusEl.textContent = asset.status.replace(/_/g, ' ');
+  }
+
+  // Provenance timestamp
+  const provEl = el('tv-provenance');
+  if (provEl) provEl.textContent = 'SRC: SIM-ENGINE // CONF: SIM // UPD: ' + new Date().toISOString().substring(11, 19) + 'Z';
+
+  // Pulse telemetry values that changed significantly (existing animation system)
   pulseTelemValues(asset);
 
-  // Relationships tab
-  const relContent = document.getElementById('relationships-content');
-  const isPrimary = asset.role === 'PRIMARY';
-  relContent.innerHTML = `
-    <div style="padding:8px 12px">
-      <div class="relationship-card">
-        <div class="link-type-label">Link[memberOf] <span class="link-cardinality">1:1</span></div>
-        <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> TF-OVERWATCH-01</div>
-      </div>
-      ${isPrimary ? '' : `<div class="relationship-card">
-        <div class="link-type-label">Link[reportsTo] <span class="link-cardinality">N:1</span></div>
-        <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> ALPHA-1</div>
-      </div>`}
-      <div class="relationship-card">
-        <div class="link-type-label">Link[assignedRole] <span class="link-cardinality">1:1</span></div>
-        <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> ${asset.role}</div>
-      </div>
-      <div class="relationship-card">
-        <div class="link-type-label">Link[operatesIn] <span class="link-cardinality">N:1</span></div>
-        <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> AO-IRVINE</div>
-      </div>
-      <div class="relationship-card">
-        <div class="link-type-label">Link[commLink] <span class="link-cardinality">1:N</span></div>
-        <div class="link-direction">${asset.id} <span style="color:var(--accent)">&harr;</span> MESH-NET-01</div>
-      </div>
-    </div>
-  `;
-
-  // Timeline tab
+  // Timeline tab (rebuilt every tick — lightweight, event list may change)
   const tlContent = document.getElementById('timeline-content');
   const events = assetTimelines[asset.id] || [];
   tlContent.innerHTML = events.slice(-20).reverse().map(e =>
@@ -4702,6 +4900,7 @@ setMode('OBSERVE');
   const sparkHealth = new Sparkline('spark-health', _css('--green'));
   const sparkLatency = new Sparkline('spark-latency', _css('--amber'));
   const sparkBattery = new Sparkline('spark-battery', _css('--accent'));
+  const sparkCoverage = new Sparkline('spark-coverage', _css('--cyan'));
 
   // Initialize subsystems
   const cmdEngine = new DirectiveEngine(assets, addEvent);
@@ -4793,9 +4992,9 @@ setMode('OBSERVE');
     cmdEngine.execute('SET_ALTITUDE', { altitude: parseInt(this.value) });
   });
 
-  // ---- FORMATION DROPDOWN ----
-  document.getElementById('cmd-formation').addEventListener('change', function() {
-    cmdEngine.execute('SET_FORMATION', { formation: this.value });
+  // ---- COLLECTION PATTERN DROPDOWN ----
+  document.getElementById('cmd-pattern').addEventListener('change', function() {
+    cmdEngine.execute('SET_PATTERN', { pattern: this.value });
   });
 
   // ---- MAP CLICK ----
@@ -4901,9 +5100,11 @@ setMode('OBSERVE');
   let lastTickTime = 0;
   let lastFrameTime = performance.now();
   let replayTickCounter = 0;
+  let lastFpvUpdate = 0;
+  let lastSoloUpdate = 0;
 
-  // Cohesion calculation
-  function calcCohesion() {
+  // Coverage calculation — percentage of AO area being surveilled
+  function calcCoverage() {
     const leader = drones[0];
     let totalDeviation = 0;
     let count = 0;
@@ -4914,8 +5115,8 @@ setMode('OBSERVE');
 
     for (let i = 1; i < drones.length; i++) {
       const d = drones[i];
-      const expectedLat = leader.lat + d.formationOffset.along * spacing * alongDir.lat + d.formationOffset.cross * spacing * crossDir.lat;
-      const expectedLng = leader.lng + d.formationOffset.along * spacing * alongDir.lng + d.formationOffset.cross * spacing * crossDir.lng;
+      const expectedLat = leader.lat + d.patternOffset.along * spacing * alongDir.lat + d.patternOffset.cross * spacing * crossDir.lat;
+      const expectedLng = leader.lng + d.patternOffset.along * spacing * alongDir.lng + d.patternOffset.cross * spacing * crossDir.lng;
       const dLat = d.lat - expectedLat;
       const dLng = d.lng - expectedLng;
       const dist = Math.sqrt(dLat * dLat + dLng * dLng);
@@ -4956,8 +5157,8 @@ setMode('OBSERVE');
     // Record replay frames
     replaySystem.recordFrame(now);
 
-    // Update map markers every frame (smooth movement)
-    drones.forEach(d => updateMapMarker(d));
+    // Update map markers and sensor FOV cones every frame (smooth movement)
+    drones.forEach(d => { updateMapMarker(d); updateFovCone(d); });
     updateFormationLines(drones);
 
     // 1-second tick for heavier UI updates
@@ -4976,9 +5177,9 @@ setMode('OBSERVE');
       // Update command target
       updateCmdTarget();
 
-      // Cohesion
-      const cohesion = calcCohesion();
-      document.getElementById('cohesion-value').textContent = cohesion.toFixed(0);
+      // Coverage
+      const coverage = calcCoverage();
+      document.getElementById('coverage-value').textContent = coverage.toFixed(0);
 
       // Bottom metrics
       // TF Health
@@ -5010,6 +5211,30 @@ setMode('OBSERVE');
       sparkHealth.draw();
       sparkLatency.draw();
       sparkBattery.draw();
+
+      // Sensor coverage estimation
+      const activeSensors = drones.filter(d => d.altitude > 10 && (d.status === 'NOMINAL' || d.status === 'FLYING')).length;
+      const baseCov = (activeSensors / drones.length) * 100;
+      // Add slight variance for realism, capped at useful range
+      const coveragePct = clamp(baseCov * (0.85 + Math.random() * 0.15), 0, 100);
+      document.getElementById('bm-coverage').textContent = coveragePct.toFixed(0);
+      document.getElementById('bm-cov-assets').textContent = activeSensors + ' / ' + drones.length + ' sensors';
+      const covBadge = document.getElementById('cov-badge');
+      if (activeSensors === drones.length) {
+        covBadge.textContent = 'FULL';
+        covBadge.style.background = 'rgba(35,133,81,0.12)';
+        covBadge.style.color = 'var(--green)';
+      } else if (activeSensors >= drones.length * 0.5) {
+        covBadge.textContent = 'PARTIAL';
+        covBadge.style.background = 'rgba(200,118,25,0.12)';
+        covBadge.style.color = 'var(--amber)';
+      } else {
+        covBadge.textContent = 'DEGRADED';
+        covBadge.style.background = 'rgba(205,66,70,0.12)';
+        covBadge.style.color = 'var(--red)';
+      }
+      sparkCoverage.push(coveragePct);
+      sparkCoverage.draw();
 
       // Track distance for debrief
       drones.forEach(d => {
@@ -5079,6 +5304,169 @@ setMode('OBSERVE');
     if (now >= nextEventTime) {
       addEvent(generateActivity(assets));
       nextEventTime = now + rand(EVENT_INTERVAL_MIN, EVENT_INTERVAL_MAX);
+    }
+
+    // ---- FPV simulation data updates (throttled ~100ms, replaces former setInterval) ----
+    if (now - lastFpvUpdate > 100) {
+      lastFpvUpdate = now;
+      if (currentMode === 'ISR') {
+        drones.forEach(d => {
+          if (!d.isLive) {
+            const f = d.fpvData;
+            f.mah_consumed += Math.abs(d.current) * (1/10) / 3.6;
+            f.cell_voltage = d.voltage / 6;
+            if (d.droneState !== DRONE_STATES.LANDED && d.droneState !== DRONE_STATES.IDLE && d.armed) {
+              f.flight_timer_s += 0.1;
+            }
+            if (d.armed) {
+              f.arm_timer_s += 0.1;
+            }
+            const dlat = (d.lat - CENTER_LAT) * 111320;
+            const dlng = (d.lng - CENTER_LNG) * 111320 * Math.cos(d.lat * Math.PI / 180);
+            f.home_distance_m = Math.sqrt(dlat * dlat + dlng * dlng);
+            f.home_direction_deg = ((Math.atan2(-dlng, -dlat) * 180 / Math.PI) + 360) % 360;
+          }
+        });
+      }
+    }
+
+    // ---- SOLO mode update (throttled ~100ms, replaces former setInterval) ----
+    if (now - lastSoloUpdate > 100) {
+      lastSoloUpdate = now;
+      if (currentMode === 'ISR') {
+        const sel = drones.find(d => d.id === selectedDroneId) || drones[0];
+        if (sel) {
+          // Update OSD
+          osdRenderer.update(sel);
+
+          // Update DVR
+          dvrMgr.logTelemetry(sel);
+          dvrMgr.updateTimer();
+
+          // Update right panel telemetry
+          const f = sel.fpvData || {};
+          const $ = id => document.getElementById(id);
+          $('fpv-bat').textContent = sel.battery.toFixed(0) + '%';
+          $('fpv-bat').style.color = sel.battery < 25 ? 'var(--red)' : sel.battery < 50 ? 'var(--amber)' : 'var(--green)';
+          $('fpv-cell').textContent = (f.cell_voltage || sel.voltage / 6).toFixed(2) + 'V';
+          $('fpv-alt').textContent = sel.altitude.toFixed(1) + 'm';
+          $('fpv-spd').textContent = sel.speed.toFixed(1) + 'm/s';
+          $('fpv-rssi').textContent = sel.rssi.toFixed(0);
+          $('fpv-rssi').style.color = sel.rssi < 50 ? 'var(--red)' : sel.rssi < 70 ? 'var(--amber)' : 'var(--green)';
+          $('fpv-mah').textContent = (f.mah_consumed || 0).toFixed(0);
+          $('fpv-home').textContent = (f.home_distance_m || 0).toFixed(0) + 'm';
+          $('fpv-sats').textContent = sel.satellites;
+
+          // Cell voltage bars
+          const cellBarsEl = document.getElementById('fpv-cell-bars');
+          if (cellBarsEl) {
+            const ds = typeof getDiagState === 'function' ? getDiagState(sel.id) : null;
+            if (ds && ds.cellVoltages) {
+              cellBarsEl.innerHTML = ds.cellVoltages.map((v, i) => {
+                const pct = Math.max(0, Math.min(100, ((v - 3.3) / (4.2 - 3.3)) * 100));
+                const c = v < 3.5 ? _css('--red') : v < 3.7 ? _css('--amber') : _css('--green');
+                return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">' +
+                  '<div style="width:100%;background:rgba(255,255,255,0.06);border-radius:1px;height:24px;position:relative;overflow:hidden">' +
+                  '<div style="position:absolute;bottom:0;width:100%;height:' + pct + '%;background:' + c + ';border-radius:1px;transition:height 0.3s"></div></div>' +
+                  '<span style="font-family:var(--font-data);font-size:8px;color:' + c + '">' + v.toFixed(2) + '</span></div>';
+              }).join('');
+            }
+          }
+
+          // Failsafe indicators
+          const fsEl = document.getElementById('fpv-failsafe-items');
+          if (fsEl) {
+            const items = [];
+            // Battery failsafe
+            const batPct = sel.battery;
+            const batStatus = batPct > 30 ? 'ok' : batPct > 20 ? 'warn' : 'crit';
+            const batColor = batStatus === 'ok' ? _css('--green') : batStatus === 'warn' ? _css('--amber') : _css('--red');
+            items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + batColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">RTB Battery</span><span style="font-family:var(--font-data);font-size:10px;color:' + batColor + ';margin-left:auto">' + (batStatus === 'crit' ? 'TRIGGERED' : batStatus === 'warn' ? 'WARNING' : 'OK') + '</span></div>');
+
+            // GPS failsafe
+            const gpsStatus = sel.satellites >= 8 ? 'ok' : sel.satellites >= 5 ? 'warn' : 'crit';
+            const gpsColor = gpsStatus === 'ok' ? _css('--green') : gpsStatus === 'warn' ? _css('--amber') : _css('--red');
+            items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + gpsColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">GPS Lock</span><span style="font-family:var(--font-data);font-size:10px;color:' + gpsColor + ';margin-left:auto">' + sel.satellites + ' sats</span></div>');
+
+            // Signal failsafe
+            const sigStatus = sel.linkQuality > 80 ? 'ok' : sel.linkQuality > 60 ? 'warn' : 'crit';
+            const sigColor = sigStatus === 'ok' ? _css('--green') : sigStatus === 'warn' ? _css('--amber') : _css('--red');
+            items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + sigColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">RC Link</span><span style="font-family:var(--font-data);font-size:10px;color:' + sigColor + ';margin-left:auto">' + sel.linkQuality.toFixed(0) + '%</span></div>');
+
+            // Home distance
+            const homeDist = sel.fpvData ? sel.fpvData.home_distance_m : 0;
+            const homeStatus = homeDist < 500 ? 'ok' : homeDist < 1000 ? 'warn' : 'crit';
+            const homeColor = homeStatus === 'ok' ? _css('--green') : homeStatus === 'warn' ? _css('--amber') : _css('--red');
+            items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + homeColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">Home Dist</span><span style="font-family:var(--font-data);font-size:10px;color:' + homeColor + ';margin-left:auto">' + homeDist.toFixed(0) + 'm</span></div>');
+
+            fsEl.innerHTML = items.join('');
+          }
+
+          // Stick input visualization (simulated from drone attitude)
+          const drawStick = (canvasId, x, y) => {
+            const c = document.getElementById(canvasId);
+            if (!c) return;
+            const ctx = c.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            c.width = 64 * dpr; c.height = 64 * dpr;
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, 64, 64);
+            // Grid lines
+            ctx.strokeStyle = _cssRgba('--text-bright', 0.08);
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(32, 0); ctx.lineTo(32, 64); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, 32); ctx.lineTo(64, 32); ctx.stroke();
+            // Stick position
+            const px = 32 + x * 28;
+            const py = 32 - y * 28;
+            ctx.beginPath();
+            ctx.arc(px, py, 6, 0, Math.PI * 2);
+            ctx.fillStyle = _cssRgba('--accent', 0.8);
+            ctx.fill();
+            ctx.strokeStyle = _cssRgba('--accent', 0.4);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          };
+
+          // Left stick: throttle (vertical) from speed ratio, yaw from heading change
+          const throttle = sel.speed / 15; // normalize to 0-1
+          const yaw = Math.sin(sel.heading * Math.PI / 180) * 0.3;
+          drawStick('stick-left', yaw, throttle - 0.5);
+
+          // Right stick: roll and pitch from attitude
+          const rollNorm = (sel.roll || 0) / 30; // normalize +/-30 to +/-1
+          const pitchNorm = (sel.pitch || 0) / 20; // normalize +/-20 to +/-1
+          drawStick('stick-right', rollNorm, -pitchNorm);
+
+          // Motor status
+          const motorEl = document.getElementById('fpv-motor-status');
+          if (motorEl) {
+            const ds = typeof getDiagState === 'function' ? getDiagState(sel.id) : null;
+            if (ds && ds.motors) {
+              motorEl.innerHTML = ds.motors.map((m, i) => {
+                const tempColor = m.temp > 50 ? _css('--red') : m.temp > 45 ? _css('--amber') : _css('--green');
+                const healthColor = m.health >= 90 ? _css('--green') : m.health >= 75 ? _css('--amber') : _css('--red');
+                return '<div style="text-align:center;padding:3px;background:rgba(0,0,0,0.2);border-radius:1px">' +
+                  '<div style="font-family:var(--font-data);font-size:9px;color:var(--text-dim)">M' + (i + 1) + '</div>' +
+                  '<div style="font-family:var(--font-data);font-size:10px;color:' + healthColor + '">' + m.rpm.toFixed(0) + '</div>' +
+                  '<div style="font-family:var(--font-data);font-size:8px;color:' + tempColor + '">' + m.temp.toFixed(0) + '</div></div>';
+              }).join('');
+            }
+          }
+
+          // Video link info
+          const vl = f.video_link || {};
+          $('fpv-vq').textContent = (vl.quality || 0) + '%';
+          $('fpv-vch').textContent = 'CH' + (vl.channel || '-');
+          $('fpv-vfreq').textContent = (vl.frequency_mhz || 0) + ' MHz';
+          $('fpv-proto').textContent = f.protocol || 'MAVLINK';
+
+          // Update active flight mode button
+          document.querySelectorAll('.fpv-mode-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.fmode === (f.flight_mode || 'STABILIZE'));
+          });
+        }
+      }
     }
 
     } catch(e) {
@@ -5364,168 +5752,9 @@ setMode('OBSERVE');
   const osdRenderer = new ISROverlayRenderer();
   const dvrMgr = new RecordingManager(videoMgr);
 
-  // ---- FPV simulation data updates (when not live) ----
-  // Note: This 100ms interval runs continuously but is a cheap no-op when not in ISR mode (early return).
-  setInterval(() => {
-    if (currentMode !== 'ISR') return; // intentional: lightweight no-op outside ISR mode
-    drones.forEach(d => {
-      if (!d.isLive) {
-        const f = d.fpvData;
-        f.mah_consumed += Math.abs(d.current) * (1/10) / 3.6;
-        f.cell_voltage = d.voltage / 6;
-        if (d.droneState !== DRONE_STATES.LANDED && d.droneState !== DRONE_STATES.IDLE && d.armed) {
-          f.flight_timer_s += 0.1;
-        }
-        if (d.armed) {
-          f.arm_timer_s += 0.1;
-        }
-        const dlat = (d.lat - CENTER_LAT) * 111320;
-        const dlng = (d.lng - CENTER_LNG) * 111320 * Math.cos(d.lat * Math.PI / 180);
-        f.home_distance_m = Math.sqrt(dlat * dlat + dlng * dlng);
-        f.home_direction_deg = ((Math.atan2(-dlng, -dlat) * 180 / Math.PI) + 360) % 360;
-      }
-    });
-  }, 100);
-
-  // ---- SOLO mode update (inside animation loop) ----
-  // Note: This 100ms interval runs continuously but is a cheap no-op when not in ISR mode (early return).
-  const soloTick = setInterval(() => {
-    if (currentMode !== 'ISR') return; // intentional: lightweight no-op outside ISR mode
-    const sel = drones.find(d => d.id === selectedDroneId) || drones[0];
-    if (!sel) return;
-
-    // Update OSD
-    osdRenderer.update(sel);
-
-    // Update DVR
-    dvrMgr.logTelemetry(sel);
-    dvrMgr.updateTimer();
-
-    // Update right panel telemetry
-    const f = sel.fpvData || {};
-    const $ = id => document.getElementById(id);
-    $('fpv-bat').textContent = sel.battery.toFixed(0) + '%';
-    $('fpv-bat').style.color = sel.battery < 25 ? 'var(--red)' : sel.battery < 50 ? 'var(--amber)' : 'var(--green)';
-    $('fpv-cell').textContent = (f.cell_voltage || sel.voltage / 6).toFixed(2) + 'V';
-    $('fpv-alt').textContent = sel.altitude.toFixed(1) + 'm';
-    $('fpv-spd').textContent = sel.speed.toFixed(1) + 'm/s';
-    $('fpv-rssi').textContent = sel.rssi.toFixed(0);
-    $('fpv-rssi').style.color = sel.rssi < 50 ? 'var(--red)' : sel.rssi < 70 ? 'var(--amber)' : 'var(--green)';
-    $('fpv-mah').textContent = (f.mah_consumed || 0).toFixed(0);
-    $('fpv-home').textContent = (f.home_distance_m || 0).toFixed(0) + 'm';
-    $('fpv-sats').textContent = sel.satellites;
-
-    // Cell voltage bars
-    const cellBarsEl = document.getElementById('fpv-cell-bars');
-    if (cellBarsEl && sel) {
-      const ds = typeof getDiagState === 'function' ? getDiagState(sel.id) : null;
-      if (ds && ds.cellVoltages) {
-        cellBarsEl.innerHTML = ds.cellVoltages.map((v, i) => {
-          const pct = Math.max(0, Math.min(100, ((v - 3.3) / (4.2 - 3.3)) * 100));
-          const c = v < 3.5 ? _css('--red') : v < 3.7 ? _css('--amber') : _css('--green');
-          return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">' +
-            '<div style="width:100%;background:rgba(255,255,255,0.06);border-radius:1px;height:24px;position:relative;overflow:hidden">' +
-            '<div style="position:absolute;bottom:0;width:100%;height:' + pct + '%;background:' + c + ';border-radius:1px;transition:height 0.3s"></div></div>' +
-            '<span style="font-family:var(--font-data);font-size:8px;color:' + c + '">' + v.toFixed(2) + '</span></div>';
-        }).join('');
-      }
-    }
-
-    // Failsafe indicators
-    const fsEl = document.getElementById('fpv-failsafe-items');
-    if (fsEl && sel) {
-      const items = [];
-      // Battery failsafe
-      const batPct = sel.battery;
-      const batStatus = batPct > 30 ? 'ok' : batPct > 20 ? 'warn' : 'crit';
-      const batColor = batStatus === 'ok' ? _css('--green') : batStatus === 'warn' ? _css('--amber') : _css('--red');
-      items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + batColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">RTB Battery</span><span style="font-family:var(--font-data);font-size:10px;color:' + batColor + ';margin-left:auto">' + (batStatus === 'crit' ? 'TRIGGERED' : batStatus === 'warn' ? 'WARNING' : 'OK') + '</span></div>');
-
-      // GPS failsafe
-      const gpsStatus = sel.satellites >= 8 ? 'ok' : sel.satellites >= 5 ? 'warn' : 'crit';
-      const gpsColor = gpsStatus === 'ok' ? _css('--green') : gpsStatus === 'warn' ? _css('--amber') : _css('--red');
-      items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + gpsColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">GPS Lock</span><span style="font-family:var(--font-data);font-size:10px;color:' + gpsColor + ';margin-left:auto">' + sel.satellites + ' sats</span></div>');
-
-      // Signal failsafe
-      const sigStatus = sel.linkQuality > 80 ? 'ok' : sel.linkQuality > 60 ? 'warn' : 'crit';
-      const sigColor = sigStatus === 'ok' ? _css('--green') : sigStatus === 'warn' ? _css('--amber') : _css('--red');
-      items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + sigColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">RC Link</span><span style="font-family:var(--font-data);font-size:10px;color:' + sigColor + ';margin-left:auto">' + sel.linkQuality.toFixed(0) + '%</span></div>');
-
-      // Home distance
-      const homeDist = sel.fpvData ? sel.fpvData.home_distance_m : 0;
-      const homeStatus = homeDist < 500 ? 'ok' : homeDist < 1000 ? 'warn' : 'crit';
-      const homeColor = homeStatus === 'ok' ? _css('--green') : homeStatus === 'warn' ? _css('--amber') : _css('--red');
-      items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + homeColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">Home Dist</span><span style="font-family:var(--font-data);font-size:10px;color:' + homeColor + ';margin-left:auto">' + homeDist.toFixed(0) + 'm</span></div>');
-
-      fsEl.innerHTML = items.join('');
-    }
-
-    // Stick input visualization (simulated from drone attitude)
-    if (sel) {
-      const drawStick = (canvasId, x, y) => {
-        const c = document.getElementById(canvasId);
-        if (!c) return;
-        const ctx = c.getContext('2d');
-        const dpr = window.devicePixelRatio || 1;
-        c.width = 64 * dpr; c.height = 64 * dpr;
-        ctx.scale(dpr, dpr);
-        ctx.clearRect(0, 0, 64, 64);
-        // Grid lines
-        ctx.strokeStyle = _cssRgba('--text-bright', 0.08);
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(32, 0); ctx.lineTo(32, 64); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, 32); ctx.lineTo(64, 32); ctx.stroke();
-        // Stick position
-        const px = 32 + x * 28;
-        const py = 32 - y * 28;
-        ctx.beginPath();
-        ctx.arc(px, py, 6, 0, Math.PI * 2);
-        ctx.fillStyle = _cssRgba('--accent', 0.8);
-        ctx.fill();
-        ctx.strokeStyle = _cssRgba('--accent', 0.4);
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      };
-
-      // Left stick: throttle (vertical) from speed ratio, yaw from heading change
-      const throttle = sel.speed / 15; // normalize to 0-1
-      const yaw = Math.sin(sel.heading * Math.PI / 180) * 0.3;
-      drawStick('stick-left', yaw, throttle - 0.5);
-
-      // Right stick: roll and pitch from attitude
-      const rollNorm = (sel.roll || 0) / 30; // normalize ±30 to ±1
-      const pitchNorm = (sel.pitch || 0) / 20; // normalize ±20 to ±1
-      drawStick('stick-right', rollNorm, -pitchNorm);
-    }
-
-    // Motor status
-    const motorEl = document.getElementById('fpv-motor-status');
-    if (motorEl && sel) {
-      const ds = typeof getDiagState === 'function' ? getDiagState(sel.id) : null;
-      if (ds && ds.motors) {
-        motorEl.innerHTML = ds.motors.map((m, i) => {
-          const tempColor = m.temp > 50 ? _css('--red') : m.temp > 45 ? _css('--amber') : _css('--green');
-          const healthColor = m.health >= 90 ? _css('--green') : m.health >= 75 ? _css('--amber') : _css('--red');
-          return '<div style="text-align:center;padding:3px;background:rgba(0,0,0,0.2);border-radius:1px">' +
-            '<div style="font-family:var(--font-data);font-size:9px;color:var(--text-dim)">M' + (i + 1) + '</div>' +
-            '<div style="font-family:var(--font-data);font-size:10px;color:' + healthColor + '">' + m.rpm.toFixed(0) + '</div>' +
-            '<div style="font-family:var(--font-data);font-size:8px;color:' + tempColor + '">' + m.temp.toFixed(0) + '°</div></div>';
-        }).join('');
-      }
-    }
-
-    // Video link info
-    const vl = f.video_link || {};
-    $('fpv-vq').textContent = (vl.quality || 0) + '%';
-    $('fpv-vch').textContent = 'CH' + (vl.channel || '-');
-    $('fpv-vfreq').textContent = (vl.frequency_mhz || 0) + ' MHz';
-    $('fpv-proto').textContent = f.protocol || 'MAVLINK';
-
-    // Update active flight mode button
-    document.querySelectorAll('.fpv-mode-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.fmode === (f.flight_mode || 'STABILIZE'));
-    });
-  }, 100);
+  // NOTE: FPV simulation data updates and SOLO mode updates have been consolidated
+  // into the main requestAnimationFrame loop (see frame() function) with 100ms throttling.
+  // This eliminates competing timer fires and ensures all rendering is vsync-coordinated.
 
   // EXTENSION: Extends setMode() to manage ISR video panel visibility.
   // The video panel must show/hide on mode switch, and PIP mode must persist
@@ -5630,14 +5859,14 @@ setMode('OBSERVE');
     });
   });
 
-  // ---- Formation overlay click to cycle (Fix #3) ----
-  const formationOrder = ['V_FORMATION', 'LINE_ABREAST', 'COLUMN', 'DIAMOND', 'ORBIT', 'SCATTER'];
-  let currentFormationIndex = 0;
-  document.getElementById('formation-overlay').addEventListener('click', () => {
-    currentFormationIndex = (currentFormationIndex + 1) % formationOrder.length;
-    const formation = formationOrder[currentFormationIndex];
-    cmdEngine.execute('SET_FORMATION', { formation });
-    document.getElementById('cmd-formation').value = formation;
+  // ---- Collection pattern overlay click to cycle ----
+  const patternOrder = ['ORBIT', 'RACETRACK', 'SEARCH_GRID', 'POINT_STARE'];
+  let currentPatternIndex = 0;
+  document.getElementById('pattern-overlay').addEventListener('click', () => {
+    currentPatternIndex = (currentPatternIndex + 1) % patternOrder.length;
+    const pattern = patternOrder[currentPatternIndex];
+    cmdEngine.execute('SET_PATTERN', { pattern });
+    document.getElementById('cmd-pattern').value = pattern;
   });
 
   // ---- Notification badge (Fix #3) ----
@@ -5697,7 +5926,7 @@ setMode('OBSERVE');
   const _origExecute = cmdEngine.execute.bind(cmdEngine);
   cmdEngine.execute = function(cmd, params) {
     _origExecute(cmd, params);
-    const severityMap = { ARM: 'info', DISARM: 'info', TAKEOFF: 'ok', LAND: 'warn', RTB: 'warn', GOTO: 'info', EMERGENCY_STOP: 'alert', EXECUTE_MISSION: 'ok', SET_FORMATION: 'info' };
+    const severityMap = { ARM: 'info', DISARM: 'info', TAKEOFF: 'ok', LAND: 'warn', RTB: 'warn', GOTO: 'info', EMERGENCY_STOP: 'alert', EXECUTE_MISSION: 'ok', SET_PATTERN: 'info' };
     debriefTracker.addKeyEvent(cmd + (params && params.droneId ? ' -> ' + params.droneId : ''), severityMap[cmd] || 'info');
   };
 
@@ -5994,6 +6223,14 @@ setMode('OBSERVE');
         { label: 'ABORT', hint: 'Emergency stop all', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('EMERGENCY_STOP', {}); } },
       ];
       cmds.forEach(c => items.push({ category: 'COMMANDS', icon: '\u25B6', label: c.label, hint: c.hint, action: c.action }));
+      // Collection patterns
+      const patterns = [
+        { label: 'ORBIT', hint: 'Circular orbit around a point', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('SET_PATTERN', { pattern: 'ORBIT' }); } },
+        { label: 'RACETRACK', hint: 'Elongated oval for route surveillance', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('SET_PATTERN', { pattern: 'RACETRACK' }); } },
+        { label: 'SEARCH GRID', hint: 'Systematic wide area coverage', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('SET_PATTERN', { pattern: 'SEARCH_GRID' }); } },
+        { label: 'POINT STARE', hint: 'Converge on high-value target', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('SET_PATTERN', { pattern: 'POINT_STARE' }); } },
+      ];
+      patterns.forEach(p => items.push({ category: 'COLLECTION PATTERNS', icon: '\u25CB', label: p.label, hint: p.hint, action: p.action }));
       // Modes
       const modes = [
         { label: 'OBSERVE', hint: 'Real-time fleet monitoring', action: () => setMode('OBSERVE') },
