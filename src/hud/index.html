@@ -1906,8 +1906,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   position: fixed;
   inset: 0;
   z-index: 10000;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(2px);
+  background: rgba(0,0,0,0.35);
   cursor: pointer;
   opacity: 1;
   transition: opacity 0.3s ease;
@@ -6846,6 +6845,7 @@ setMode('OBSERVE');
 
   overlay.addEventListener('click', dismiss);
   document.addEventListener('keydown', dismissOnKey, true);
+  setTimeout(dismiss, 6000);
 })();
 </script>
 </body>
