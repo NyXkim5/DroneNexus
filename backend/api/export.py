@@ -1,5 +1,5 @@
 """
-Flight Log Export — KML and CSV endpoints for telemetry data.
+OVERWATCH Flight Log Export — KML and CSV endpoints for telemetry data.
 """
 import csv
 import io
@@ -11,14 +11,14 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-logger = logging.getLogger("nexus.export")
+logger = logging.getLogger("overwatch.export")
 
 export_router = APIRouter()
 
 
 def _get_app():
-    from main import nexus_app
-    return nexus_app
+    from main import overwatch_app
+    return overwatch_app
 
 
 def _extract_position(packet: dict) -> Optional[dict]:
@@ -37,7 +37,7 @@ def _extract_position(packet: dict) -> Optional[dict]:
 
 @export_router.get("/kml")
 async def export_kml(
-    drone_id: str = Query(..., description="Drone identifier, e.g. ALPHA-1"),
+    drone_id: str = Query(..., description="Asset identifier, e.g. ALPHA-1"),
     start: str = Query(..., description="Start time ISO-8601, e.g. 2026-01-01T00:00:00Z"),
     end: str = Query(..., description="End time ISO-8601, e.g. 2026-12-31T23:59:59Z"),
 ):
@@ -71,7 +71,7 @@ async def export_kml(
     doc = SubElement(kml, "Document")
 
     name_el = SubElement(doc, "name")
-    name_el.text = f"NEXUS Flight Log \u2014 {drone_id}"
+    name_el.text = f"OVERWATCH Flight Log \u2014 {drone_id}"
 
     # Style for the flight path
     style = SubElement(doc, "Style", id="flightPath")
@@ -132,7 +132,7 @@ async def export_kml(
     xml_declaration = '<?xml version="1.0" encoding="UTF-8"?>\n'
     kml_bytes = xml_declaration.encode("utf-8") + tostring(kml, encoding="unicode").encode("utf-8")
 
-    filename = f"nexus_{drone_id}_{start[:10]}_{end[:10]}.kml"
+    filename = f"overwatch_{drone_id}_{start[:10]}_{end[:10]}.kml"
     logger.info(f"KML export: {drone_id}, {len(positions)} points, {filename}")
 
     return StreamingResponse(
@@ -144,7 +144,7 @@ async def export_kml(
 
 @export_router.get("/csv")
 async def export_csv(
-    drone_id: str = Query(..., description="Drone identifier, e.g. ALPHA-1"),
+    drone_id: str = Query(..., description="Asset identifier, e.g. ALPHA-1"),
     start: str = Query(..., description="Start time ISO-8601, e.g. 2026-01-01T00:00:00Z"),
     end: str = Query(..., description="End time ISO-8601, e.g. 2026-12-31T23:59:59Z"),
 ):
@@ -182,7 +182,7 @@ async def export_csv(
         ])
 
     csv_bytes = output.getvalue().encode("utf-8")
-    filename = f"nexus_{drone_id}_{start[:10]}_{end[:10]}.csv"
+    filename = f"overwatch_{drone_id}_{start[:10]}_{end[:10]}.csv"
     logger.info(f"CSV export: {drone_id}, {len(packets)} rows, {filename}")
 
     return StreamingResponse(

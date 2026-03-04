@@ -1,8 +1,8 @@
 """
-NEXUS JWT Authentication Module
+OVERWATCH JWT Authentication Module
 
 Provides login, token validation, and role-based access control.
-Auth is controlled by NexusSettings.auth_enabled (default: False).
+Auth is controlled by OverwatchSettings.auth_enabled (default: False).
 When disabled, all endpoints are open — existing tests are unaffected.
 """
 import os
@@ -16,12 +16,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
-logger = logging.getLogger("nexus.auth")
+logger = logging.getLogger("overwatch.auth")
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-SECRET_KEY: str = os.environ.get("NEXUS_JWT_SECRET", "nexus-dev-secret-change-in-prod")
+SECRET_KEY: str = os.environ.get("OVERWATCH_JWT_SECRET", "overwatch-dev-secret-change-in-prod")
 ALGORITHM: str = "HS256"
 TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
 
@@ -88,8 +88,8 @@ def decode_access_token(token: str) -> dict:
 def _auth_enabled() -> bool:
     """Return True when JWT enforcement is on."""
     try:
-        from config import NexusSettings
-        return NexusSettings().auth_enabled
+        from config import OverwatchSettings
+        return OverwatchSettings().auth_enabled
     except Exception:
         return False
 
@@ -178,7 +178,7 @@ async def require_viewer(
 
 
 # ---------------------------------------------------------------------------
-# Auth router (mounted at /api/auth)
+# Auth router (mounted at /api/v1/auth)
 # ---------------------------------------------------------------------------
 auth_router = APIRouter(tags=["auth"])
 

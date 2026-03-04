@@ -1,10 +1,10 @@
 """
-NEXUS Ground Control Station Backend
+OVERWATCH ISR Platform Backend
 FastAPI application with WebSocket telemetry streaming and REST control API.
 
 Usage:
-    python3 main.py                              # Simulation mode (default)
-    NEXUS_SIMULATION_MODE=false python3 main.py  # Live MAVSDK mode
+    python3 main.py                                  # Simulation mode (default)
+    OVERWATCH_SIMULATION_MODE=false python3 main.py  # Live MAVSDK mode
 """
 import asyncio
 import logging
@@ -16,15 +16,15 @@ import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import NexusSettings, DRONE_FLEET
-from protocol import FormationType, Waypoint, DroneRole
+from config import OverwatchSettings, ASSET_ROSTER
+from protocol import OverlayType, Waypoint, AssetClassification
 from telemetry.collector import DroneState
 from telemetry.aggregator import SwarmAggregator
 from api.websocket import WebSocketHandler
 from api.routes import router as api_router
 from api.auth import auth_router
 from api.export import export_router
-from db.models import NexusDB
+from db.models import OverwatchDB
 from telemetry.replay import ReplayEngine
 from missions.state_machine import MissionStateMachine
 from swarm.coordinator import SwarmCoordinator
@@ -35,13 +35,13 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     stream=sys.stdout,
 )
-logger = logging.getLogger("nexus")
+logger = logging.getLogger("overwatch")
 
 
 class CommandDispatcher:
     """Routes commands to mock drones (simulation) or MAVSDK (live)."""
 
-    def __init__(self, app: "NexusApp"):
+    def __init__(self, app: "OverwatchApp"):
         self.app = app
 
     def _get_targets(self, drone_id: Optional[str]) -> List[str]:
@@ -163,7 +163,7 @@ class CommandDispatcher:
         for sm in self.app.state_machines.values():
             sm.force_idle()
         await self._log("EMERGENCY_STOP", {})
-        logger.warning("EMERGENCY STOP — all drones")
+        logger.warning("EMERGENCY STOP — all assets")
         return True
 
     async def camera_tilt(self, angle: float, drone_id: Optional[str] = None) -> bool:
@@ -231,12 +231,12 @@ class CommandDispatcher:
         return True
 
 
-class NexusApp:
+class OverwatchApp:
     """Central application object holding all subsystems."""
 
     def __init__(self):
-        self.settings = NexusSettings()
-        self.db = NexusDB(self.settings.db_path)
+        self.settings = OverwatchSettings()
+        self.db = OverwatchDB(self.settings.db_path)
         self.aggregator = SwarmAggregator(self.settings)
         self.replay_engine = ReplayEngine(self.db, self.aggregator)
         self.mock_swarm: Optional[MockSwarm] = None
@@ -254,7 +254,7 @@ class NexusApp:
 
     async def startup(self) -> None:
         logger.info("=" * 60)
-        logger.info("NEXUS Ground Control Station — Starting")
+        logger.info("OVERWATCH ISR Platform — Starting")
         logger.info("=" * 60)
 
         # Database
@@ -268,7 +268,7 @@ class NexusApp:
                 self.aggregator.register_drone(state)
                 self.state_machines[drone_id] = MissionStateMachine(drone_id)
             await self.mock_swarm.start()
-            logger.info(f"SIMULATION mode — {len(self.mock_swarm.drones)} mock drones active")
+            logger.info(f"SIMULATION mode — {len(self.mock_swarm.drones)} mock assets active")
         else:
             logger.info("LIVE mode — MAVSDK connections")
 
@@ -319,8 +319,8 @@ class NexusApp:
             except Exception as e:
                 logger.warning(f"USB auto-detect init skipped: {e}")
 
-        logger.info(f"WebSocket: ws://0.0.0.0:{self.settings.ws_port}/telemetry/stream")
-        logger.info(f"REST API:  http://0.0.0.0:{self.settings.ws_port}/api")
+        logger.info(f"WebSocket: ws://0.0.0.0:{self.settings.ws_port}/ws/v1/stream")
+        logger.info(f"REST API:  http://0.0.0.0:{self.settings.ws_port}/api/v1")
         logger.info(f"API Docs:  http://0.0.0.0:{self.settings.ws_port}/docs")
         logger.info("=" * 60)
 
@@ -341,26 +341,26 @@ class NexusApp:
         if self.goggles_bridge:
             await self.goggles_bridge.stop()
         await self.db.close()
-        logger.info("NEXUS shutdown complete")
+        logger.info("OVERWATCH shutdown complete")
 
 
 # ---- Singleton ----
-nexus_app = NexusApp()
+overwatch_app = OverwatchApp()
 
 
 # ---- FastAPI lifespan ----
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await nexus_app.startup()
+    await overwatch_app.startup()
     yield
-    await nexus_app.shutdown()
+    await overwatch_app.shutdown()
 
 
 # ---- FastAPI application ----
 app = FastAPI(
-    title="NEXUS Ground Control Station",
+    title="OVERWATCH ISR Platform",
     version="1.0.0",
-    description="Drone swarm telemetry and command backend",
+    description="ISR asset telemetry and command backend",
     lifespan=lifespan,
 )
 
@@ -376,25 +376,25 @@ from api.middleware import RateLimiter
 app.add_middleware(RateLimiter, rate_limit=120, window_seconds=60)
 
 # Mount REST routes
-app.include_router(api_router, prefix="/api")
-app.include_router(auth_router, prefix="/api/auth")
-app.include_router(export_router, prefix="/api/export")
+app.include_router(api_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1/auth")
+app.include_router(export_router, prefix="/api/v1/products")
 
 
 # ---- WebSocket endpoints ----
-@app.websocket("/telemetry/stream")
+@app.websocket("/ws/v1/stream")
 async def telemetry_websocket(websocket: WebSocket):
-    await nexus_app.ws_handler.handle(websocket)
+    await overwatch_app.ws_handler.handle(websocket)
 
 
-@app.websocket("/ws")
+@app.websocket("/ws/v1/compat")
 async def ws_compat(websocket: WebSocket):
-    await nexus_app.ws_handler.handle(websocket)
+    await overwatch_app.ws_handler.handle(websocket)
 
 
 # ---- Entry point ----
 if __name__ == "__main__":
-    settings = NexusSettings()
+    settings = OverwatchSettings()
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

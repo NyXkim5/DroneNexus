@@ -1,7 +1,7 @@
 """
 WebSocket endpoint that the HUD connects to.
 Registers client with aggregator for telemetry broadcast.
-Receives CMD packets from HUD and dispatches them.
+Receives DIRECTIVE packets from HUD and dispatches them.
 """
 import json
 import logging
@@ -13,7 +13,7 @@ from typing import Dict
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-logger = logging.getLogger("nexus.websocket")
+logger = logging.getLogger("overwatch.websocket")
 
 
 @dataclass
@@ -64,9 +64,13 @@ class WebSocketHandler:
                 client.messages_received += 1
                 try:
                     data = json.loads(raw)
-                    if data.get("type") == "CMD":
+                    if data.get("type") == "DIRECTIVE":
                         await self._dispatch_command(data, websocket)
                         client.messages_sent += 1  # ACK sent
+                    elif data.get("type") == "CMD":
+                        # Legacy compatibility
+                        await self._dispatch_command(data, websocket)
+                        client.messages_sent += 1
                     elif data.get("type") == "PING":
                         client.last_ping = time.time()
                         await websocket.send_text(json.dumps({
@@ -106,6 +110,7 @@ class WebSocketHandler:
 
         sync_msg = {
             "type": "STATE_SYNC",
+            "assets": packets,
             "drones": packets,
             "formation": formation,
             "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -117,28 +122,28 @@ class WebSocketHandler:
         params = data.get("params", {})
         drone_id = params.get("droneId")
 
-        logger.info(f"Command received: {command} -> {drone_id or 'ALL'}")
+        logger.info(f"Directive received: {command} -> {drone_id or 'ALL'}")
 
         success = False
         message = ""
 
         try:
-            if command == "ARM":
+            if command == "LAUNCH_PREP" or command == "ARM":
                 success = await self.app.command_dispatcher.arm(drone_id)
-            elif command == "DISARM":
+            elif command == "STAND_DOWN" or command == "DISARM":
                 success = await self.app.command_dispatcher.disarm(drone_id)
-            elif command == "TAKEOFF":
+            elif command == "LAUNCH" or command == "TAKEOFF":
                 altitude = params.get("altitude", 30.0)
                 success = await self.app.command_dispatcher.takeoff(drone_id, altitude)
-            elif command == "LAND":
+            elif command == "RECOVER" or command == "LAND":
                 success = await self.app.command_dispatcher.land(drone_id)
-            elif command == "RTL":
+            elif command == "RTB" or command == "RTL":
                 success = await self.app.command_dispatcher.rtl(drone_id)
             elif command == "GOTO":
                 success = await self.app.command_dispatcher.goto(
                     params.get("lat"), params.get("lng"),
                 )
-            elif command == "SET_FORMATION":
+            elif command == "SET_OVERLAY" or command == "SET_FORMATION":
                 success = await self.app.command_dispatcher.set_formation(
                     params.get("formation"),
                 )
@@ -150,19 +155,19 @@ class WebSocketHandler:
                 success = await self.app.command_dispatcher.set_altitude(
                     params.get("altitude"), drone_id,
                 )
-            elif command == "EMERGENCY_STOP":
+            elif command == "ABORT" or command == "EMERGENCY_STOP":
                 success = await self.app.command_dispatcher.emergency_stop()
             elif command == "EXECUTE_MISSION":
                 waypoints = params.get("waypoints", [])
                 success = await self.app.command_dispatcher.execute_mission(waypoints)
-            # ---- FPV Commands ----
-            elif command == "CAMERA_TILT":
+            # ---- ISR / Sensor Commands ----
+            elif command == "SENSOR_TILT" or command == "CAMERA_TILT":
                 success = await self.app.command_dispatcher.camera_tilt(
                     params.get("angle", 0), drone_id,
                 )
-            elif command == "MSP_ARM":
+            elif command == "MSP_LAUNCH_PREP" or command == "MSP_ARM":
                 success = await self.app.command_dispatcher.msp_arm(drone_id)
-            elif command == "MSP_DISARM":
+            elif command == "MSP_STAND_DOWN" or command == "MSP_DISARM":
                 success = await self.app.command_dispatcher.msp_disarm(drone_id)
             elif command == "MSP_SET_MODE":
                 success = await self.app.command_dispatcher.msp_set_mode(
@@ -173,7 +178,7 @@ class WebSocketHandler:
 
         except Exception as e:
             message = str(e)
-            logger.error(f"Command execution error: {e}")
+            logger.error(f"Directive execution error: {e}")
 
         # Log command
         if hasattr(self.app, 'db') and self.app.db:
