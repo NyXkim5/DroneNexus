@@ -513,6 +513,8 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   letter-spacing: 1.5px;
   text-transform: uppercase;
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
 }
 
 .no-selection {
@@ -975,6 +977,11 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   100% { r: 24; opacity: 0; }
 }
 
+@keyframes marker-ring-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.15; }
+}
+
 /* ============================================================
    MODE VISIBILITY
    ============================================================ */
@@ -1152,6 +1159,16 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   100% { opacity: 1; }
 }
 .value-updated { animation: value-pulse 0.3s ease; }
+
+/* Double-click confirm pattern for dangerous actions */
+.cmd-btn.confirming, .inspector-action-btn.confirming {
+  border-color: var(--red); color: var(--red);
+  animation: confirm-pulse 0.5s ease infinite;
+}
+@keyframes confirm-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
 
 /* Event log entry stagger animation */
 @keyframes event-enter {
@@ -1819,6 +1836,11 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .ontology-type-badge { display: inline-block; font-family: var(--font-label); font-size: 8px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; padding: 1px 5px; border: 1px solid var(--border-light); color: var(--text-dim); margin-left: 4px; vertical-align: middle; border-radius: 1px; }
 .prop-type-tag { font-family: var(--font-data); font-size: 8px; color: var(--text-tertiary); margin-left: 4px; letter-spacing: 0.3px; }
 .ontology-source { font-family: var(--font-data); font-size: 9px; color: var(--text-tertiary); text-align: right; padding: 4px 12px; border-top: 1px solid var(--border); letter-spacing: 0.3px; }
+.prov-ts { color: var(--text-dim); }
+.inspector-actions { display: flex; gap: 4px; padding: 4px 12px 8px; border-bottom: 1px solid var(--border); }
+.inspector-action-btn { font: 9px var(--font-label); letter-spacing: 0.5px; padding: 3px 8px; background: transparent; border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
+.inspector-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+.inspector-action-btn:active { transform: scale(0.97); }
 .link-type-label { font-family: var(--font-label); font-size: 8px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
 .link-direction { color: var(--text-dim); font-family: var(--font-data); font-size: 10px; }
 .link-card { display: flex; align-items: center; gap: 6px; }
@@ -1991,6 +2013,36 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   font: 8px var(--font-label); fill: var(--text-dim); text-anchor: middle;
   text-transform: uppercase; letter-spacing: 0.5px;
 }
+.critical-banner {
+  display: none; height: 28px; background: rgba(205,66,70,0.12);
+  border-bottom: 1px solid rgba(205,66,70,0.3);
+  padding: 0 16px; align-items: center; gap: 8px;
+  font: 11px var(--font-label); color: var(--red); letter-spacing: 0.05em;
+  z-index: 999;
+}
+.critical-banner.visible { display: flex; }
+.critical-icon {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--red); color: var(--text-bright);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+}
+.critical-action {
+  font: 9px var(--font-label); letter-spacing: 0.5px;
+  padding: 2px 8px; background: transparent;
+  border: 1px solid var(--red); color: var(--red);
+  cursor: pointer; margin-left: auto; transition: all 0.15s;
+}
+.critical-action:hover { background: rgba(205,66,70,0.15); }
+.critical-action:active { transform: scale(0.97); }
+.critical-dismiss {
+  font: 9px var(--font-label); letter-spacing: 0.5px;
+  padding: 2px 8px; background: transparent;
+  border: 1px solid var(--border); color: var(--text-secondary);
+  cursor: pointer; transition: all 0.15s;
+}
+.critical-dismiss:hover { border-color: var(--border-light); }
+.critical-dismiss:active { transform: scale(0.97); }
 </style>
 </head>
 <body>
@@ -2015,7 +2067,15 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       <div class="live-label" id="live-label">EXERCISE</div>
     </div>
     <span class="tf-callsign" data-tooltip="Task force callsign">TF-SABER-01</span>
+    <button id="audio-toggle" class="quick-connect-btn" data-tooltip="Toggle audio alerts" style="font-size:10px;padding:2px 6px">SND</button>
     <div class="utc-clock" id="utc-clock" data-tooltip="UTC mission clock">00:00:00Z</div>
+  </div>
+
+  <div class="critical-banner" id="critical-banner">
+    <span class="critical-icon">!</span>
+    <span id="critical-msg"></span>
+    <button class="critical-action" id="critical-rtb">RTB NOW</button>
+    <button class="critical-dismiss" id="critical-dismiss">DISMISS</button>
   </div>
 
   <!-- ==================== MAIN AREA ==================== -->
@@ -2284,6 +2344,10 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       <!-- ISR FEED MODE -->
       <div class="solo-only cmd-panel" style="overflow-y:auto">
         <div class="panel-header">ISR FEED</div>
+        <div class="cmd-section" id="isr-asset-strip" style="padding:6px 12px">
+          <div style="font:8px var(--font-label);color:var(--text-dim);letter-spacing:0.5px;margin-bottom:4px">ASSET SELECT</div>
+          <div id="isr-asset-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+        </div>
         <div class="cmd-section">
           <div class="cmd-section-title">Controls</div>
           <div class="cmd-btn-grid">
@@ -2616,6 +2680,30 @@ function randInt(lo, hi) { return Math.floor(rand(lo, hi + 1)); }
 function padZ(n, d) { return String(n).padStart(d, '0'); }
 function degToRad(d) { return d * Math.PI / 180; }
 function radToDeg(r) { return r * 180 / Math.PI; }
+
+// ---- AUDIO ALERT SYSTEM ----
+let audioCtx = null;
+let audioMuted = false;
+function playAlert(type) {
+  if (audioMuted) return;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  gain.gain.value = 0.12;
+  if (type === 'critical') {
+    osc.frequency.value = 880; osc.type = 'square';
+    gain.gain.value = 0.15;
+  } else if (type === 'warning') {
+    osc.frequency.value = 660; osc.type = 'triangle';
+  } else {
+    osc.frequency.value = 440; osc.type = 'sine';
+    gain.gain.value = 0.08;
+  }
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.12);
+}
 
 // Compute a lat/lng offset given a distance (meters) and bearing (degrees)
 function offsetLatLng(lat, lng, distMeters, bearingDeg) {
@@ -2956,6 +3044,8 @@ class AssetSimulator {
 let activeToasts = [];
 function showToast(msg, type) {
   type = type || 'success';
+  if (type === 'error' || type === 'critical') playAlert('critical');
+  else if (type === 'warning') playAlert('warning');
   const el = document.createElement('div');
   el.className = 'cmd-toast ' + type;
   el.textContent = msg;
@@ -3497,6 +3587,18 @@ class Sparkline {
     ctx.closePath();
     ctx.fillStyle = grad;
     ctx.fill();
+
+    // Endpoint dot at rightmost data point
+    if (this.data.length > 1) {
+      const lastIdx = this.data.length - 1;
+      const lastX = startX + lastIdx * stepX;
+      const lastVal = this.data[lastIdx];
+      const lastY = padding + plotH - ((lastVal - minV) / range) * plotH;
+      ctx.beginPath();
+      ctx.arc(lastX, lastY, 1.5 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+    }
   }
 }
 
@@ -3519,6 +3621,34 @@ function initMap() {
     subdomains: 'abcd',
     maxZoom: 20,
   }).addTo(map);
+
+  // AO boundary polygons (geofences)
+  const aoZones = [
+    { name: 'AO-ALPHA', color: _css('--accent'), offset: [0, 0], size: 0.008 },
+    { name: 'AO-BRAVO', color: _css('--green'), offset: [0.006, -0.008], size: 0.005 },
+    { name: 'AO-CHARLIE', color: _css('--amber'), offset: [-0.006, 0.008], size: 0.004 },
+    { name: 'AO-DELTA', color: _css('--text-dim'), offset: [0.010, 0.004], size: 0.004 }
+  ];
+  aoZones.forEach(ao => {
+    const lat = CENTER_LAT + ao.offset[0];
+    const lng = CENTER_LNG + ao.offset[1];
+    const s = ao.size;
+    L.polygon([
+      [lat + s, lng - s], [lat + s, lng + s],
+      [lat - s, lng + s], [lat - s, lng - s]
+    ], {
+      color: ao.color, weight: 1, opacity: 0.35,
+      fillColor: ao.color, fillOpacity: 0.03,
+      dashArray: '6,4', interactive: false
+    }).addTo(map);
+    L.marker([lat + s + 0.0005, lng - s], {
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="font:8px var(--font-label);color:' + ao.color + ';letter-spacing:0.5px;white-space:nowrap">' + ao.name + '</div>',
+        iconAnchor: [0, 10]
+      })
+    }).addTo(map);
+  });
 
   // Create markers, trails, pattern lines for each asset
   ASSET_DEFS.forEach(def => {
@@ -3730,12 +3860,32 @@ function updateAssetExplorer(assets) {
    RIGHT PANEL — INSPECTOR RENDERING
    ============================================================== */
 function selectDrone(id) {
+  // Remove previous pulse ring
+  if (selectedDroneId && mapMarkers[selectedDroneId] && mapMarkers[selectedDroneId]._pulseRing) {
+    map.removeLayer(mapMarkers[selectedDroneId]._pulseRing);
+    mapMarkers[selectedDroneId]._pulseRing = null;
+  }
+
   selectedDroneId = id;
   // Pan map to asset location (Issue #3)
   // We'll find the marker and pan in updateAssetExplorer's click handler
   if (map && mapMarkers[id]) {
     const latlng = mapMarkers[id].getLatLng();
     map.panTo(latlng, { animate: true, duration: 0.5 });
+
+    // Add pulse ring around selected marker
+    const drone = (typeof drones !== 'undefined') ? drones.find(d => d.id === id) : null;
+    const ringColor = drone ? drone.color : 'var(--accent)';
+    const ring = L.circleMarker(latlng, {
+      radius: 16,
+      color: ringColor,
+      fill: false,
+      weight: 2,
+      opacity: 0.5,
+      className: 'marker-pulse-ring'
+    }).addTo(map);
+    ring.getElement().style.animation = 'marker-ring-pulse 2s ease-in-out infinite';
+    mapMarkers[id]._pulseRing = ring;
   }
   // Update FOV cone highlight for selection change
   Object.keys(fovLayers).forEach(assetId => {
@@ -3749,6 +3899,7 @@ function selectDrone(id) {
 
 // Timeline events per asset
 const assetTimelines = {};
+let _lastTimelineCount = {};
 
 // Telemetry pulse animation helper
 const _prevTelemValues = {};
@@ -3812,9 +3963,15 @@ function buildPropsHTML(asset) {
       <span class="ontology-breadcrumb-id" id="tv-breadcrumb-id">${asset.id}</span>
       <span class="ontology-type-badge">OBJECT</span>
     </div>
+    <div class="inspector-actions">
+      <button class="inspector-action-btn" data-action="command">COMMAND</button>
+      <button class="inspector-action-btn" data-action="isr">ISR FEED</button>
+      <button class="inspector-action-btn" data-action="focus">FOCUS MAP</button>
+      <button class="inspector-action-btn" data-action="history">HISTORY</button>
+    </div>
     <!-- ATTITUDE -->
     <div class="detail-section">
-      <div class="detail-section-title">Attitude <span class="prop-type-tag">DOUBLE</span></div>
+      <div class="detail-section-title">Attitude <span class="prop-type-tag">DOUBLE</span><span class="prop-type-tag" style="margin-left:auto;opacity:0.5">via IMU</span></div>
       <div class="attitude-container">
         <div class="attitude-ball" id="attitude-ball" style="transform: translate(-50%, -50%) rotate(${asset.roll}deg) translateY(${-asset.pitch * 1.5}px);">
           <div class="attitude-sky"></div>
@@ -3846,7 +4003,7 @@ function buildPropsHTML(asset) {
 
     <!-- POSITION -->
     <div class="detail-section">
-      <div class="detail-section-title">Position</div>
+      <div class="detail-section-title">Position<span class="prop-type-tag" style="margin-left:auto;opacity:0.5">via MAVLINK</span></div>
       <div class="telem-grid">
         <div class="telem-cell">
           <div class="telem-cell-label">Lat</div>
@@ -3869,7 +4026,7 @@ function buildPropsHTML(asset) {
 
     <!-- VELOCITY -->
     <div class="detail-section">
-      <div class="detail-section-title">Velocity <span class="prop-type-tag">DOUBLE</span></div>
+      <div class="detail-section-title">Velocity <span class="prop-type-tag">DOUBLE</span><span class="prop-type-tag" style="margin-left:auto;opacity:0.5">via MAVLINK</span></div>
       <div class="telem-grid">
         <div class="telem-cell">
           <div class="telem-cell-label">Ground Speed (m/s)</div>
@@ -3888,7 +4045,7 @@ function buildPropsHTML(asset) {
 
     <!-- POWER STATE -->
     <div class="detail-section">
-      <div class="detail-section-title">Power State <span class="prop-type-tag">DOUBLE</span></div>
+      <div class="detail-section-title">Power State <span class="prop-type-tag">DOUBLE</span><span class="prop-type-tag" style="margin-left:auto;opacity:0.5">via BMS</span></div>
       <div class="battery-detail">
         <div class="battery-big-num" id="tv-battery" style="color:${batColor}">${asset.battery.toFixed(1)}%</div>
         <div class="battery-meta">
@@ -3903,7 +4060,7 @@ function buildPropsHTML(asset) {
 
     <!-- POSITIONING -->
     <div class="detail-section">
-      <div class="detail-section-title">Positioning <span class="prop-type-tag">GEO_POINT</span></div>
+      <div class="detail-section-title">Positioning <span class="prop-type-tag">GEO_POINT</span><span class="prop-type-tag" style="margin-left:auto;opacity:0.5">via GNSS</span></div>
       <div class="gps-fix-badge">3D FIX</div>
       <div class="gps-grid">
         <div class="gps-cell">
@@ -3919,7 +4076,7 @@ function buildPropsHTML(asset) {
 
     <!-- COMMLINK -->
     <div class="detail-section">
-      <div class="detail-section-title">Commlink</div>
+      <div class="detail-section-title">Commlink<span class="prop-type-tag" style="margin-left:auto;opacity:0.5">via MESH-CTL</span></div>
       <div class="link-cards">
         <div class="link-card">
           <div class="link-card-value" id="tv-rssi" style="color:${rssiC}">${asset.rssi.toFixed(0)}</div>
@@ -3941,7 +4098,18 @@ function buildPropsHTML(asset) {
       <div class="detail-section-title">Status <span class="prop-type-tag">ENUM</span></div>
       <div class="drone-status-badge ${asset.status.toLowerCase()}" id="tv-status" style="display:inline-block;font-size:11px;padding:3px 10px">${asset.status.replace(/_/g,' ')}</div>
     </div>
-    <div class="ontology-source" id="tv-provenance">SRC: SIM-ENGINE // CONF: SIM // UPD: ${new Date().toISOString().substring(11, 19)}Z</div>
+    <div class="detail-section" style="padding:4px 12px 8px">
+      <div class="detail-section-title" id="provenance-toggle" style="cursor:pointer;user-select:none">
+        Provenance <span class="prop-type-tag">AUDIT</span>
+        <span style="float:right;font-size:8px;color:var(--text-tertiary)" id="provenance-arrow">&#9656;</span>
+      </div>
+      <div id="provenance-chain" style="display:none;font:9px var(--font-data);color:var(--text-dim);line-height:1.8;padding-top:4px">
+        <div>v4 // SIM-ENGINE // <span id="tv-provenance"></span>Z // telemetry_update</div>
+        <div>v3 // MAVLINK-BRIDGE // <span class="prov-ts">-3s</span> // position_transform</div>
+        <div>v2 // MESH-CONTROLLER // <span class="prov-ts">-5s</span> // link_quality_check</div>
+        <div>v1 // ASSET-REGISTRY // 2026-03-04T14:00:00Z // initial_registration</div>
+      </div>
+    </div>
   `;
 }
 
@@ -3967,6 +4135,35 @@ function updateInspector(asset) {
   if (inspectorRenderedAsset !== asset.id) {
     inspectorRenderedAsset = asset.id;
     content.innerHTML = buildPropsHTML(asset);
+
+    // Provenance toggle handler
+    const provToggle = document.getElementById('provenance-toggle');
+    if (provToggle) {
+      provToggle.addEventListener('click', function() {
+        const chain = document.getElementById('provenance-chain');
+        const arrow = document.getElementById('provenance-arrow');
+        if (chain && arrow) {
+          const isHidden = chain.style.display === 'none';
+          chain.style.display = isHidden ? 'block' : 'none';
+          arrow.innerHTML = isHidden ? '&#9662;' : '&#9656;';
+        }
+      });
+    }
+
+    // Action button handlers
+    const actionBtns = content.querySelectorAll('.inspector-action-btn');
+    actionBtns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const action = btn.getAttribute('data-action');
+        if (action === 'command') { setMode('TASK'); }
+        else if (action === 'isr') { setMode('ISR'); }
+        else if (action === 'focus') { map.setView([asset.lat, asset.lng], 17); }
+        else if (action === 'history') {
+          const timeTab = document.querySelector('.inspector-tab[data-tab="timeline"]');
+          if (timeTab) timeTab.click();
+        }
+      });
+    });
 
     // Relationships tab (rebuilt on asset switch only — static per asset)
     const relContent = document.getElementById('relationships-content');
@@ -4074,17 +4271,20 @@ function updateInspector(asset) {
 
   // Provenance timestamp
   const provEl = el('tv-provenance');
-  if (provEl) provEl.textContent = 'SRC: SIM-ENGINE // CONF: SIM // UPD: ' + new Date().toISOString().substring(11, 19) + 'Z';
+  if (provEl) provEl.textContent = new Date().toISOString().substring(11, 19);
 
   // Pulse telemetry values that changed significantly (existing animation system)
   pulseTelemValues(asset);
 
-  // Timeline tab (rebuilt every tick — lightweight, event list may change)
+  // Timeline tab — only rebuild when event count changes
   const tlContent = document.getElementById('timeline-content');
   const events = assetTimelines[asset.id] || [];
-  tlContent.innerHTML = events.slice(-20).reverse().map(e =>
-    '<div class="timeline-item"><span class="timeline-time">' + e.time + '</span><span class="timeline-desc">' + e.msg + '</span></div>'
-  ).join('') || '<div style="padding:14px;color:var(--text-secondary);font-size:11px">No events recorded</div>';
+  if (events.length !== _lastTimelineCount[asset.id]) {
+    _lastTimelineCount[asset.id] = events.length;
+    tlContent.innerHTML = events.slice(-20).reverse().map(e =>
+      '<div class="timeline-item"><span class="timeline-time">' + e.time + '</span><span class="timeline-desc">' + e.msg + '</span></div>'
+    ).join('') || '<div style="padding:14px;color:var(--text-secondary);font-size:11px">No events recorded</div>';
+  }
 
   // Diagnostics tab (Feature #4)
   updateDiagnosticsPanel(asset);
@@ -4099,12 +4299,30 @@ function updateInspector(asset) {
 /* ==============================================================
    HARDWARE MANIFEST PANEL RENDERER
    ============================================================== */
+let hwRenderedAsset = null;
+
 function updateHardwarePanel(asset) {
   const el = document.getElementById('hardware-content');
   if (!el) return;
-  if (!asset) { el.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>'; return; }
+  if (!asset) { el.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>'; hwRenderedAsset = null; return; }
 
   const ds = getDiagState(asset.id);
+
+  // If same asset, only update motor status badges (the only dynamic part)
+  if (hwRenderedAsset === asset.id) {
+    for (let mi = 0; mi < 4; mi++) {
+      const statusEl = document.getElementById('hw-motor-' + mi + '-status');
+      if (statusEl) {
+        const h = ds.motors[mi].health;
+        if (h > 90) { statusEl.className = 'hw-part-status nominal'; statusEl.textContent = 'NOMINAL'; }
+        else if (h >= 70) { statusEl.className = 'hw-part-status warning'; statusEl.textContent = 'DEGRADED'; }
+        else { statusEl.className = 'hw-part-status fault'; statusEl.textContent = 'FAULT'; }
+      }
+    }
+    return;
+  }
+  hwRenderedAsset = asset.id;
+
   const color = asset.color || 'var(--accent)';
 
   // Motor health color helper
@@ -4115,10 +4333,10 @@ function updateHardwarePanel(asset) {
   }
 
   // Status helpers
-  function motorStatus(health) {
-    if (health > 90) return '<span class="hw-part-status nominal">NOMINAL</span>';
-    if (health >= 70) return '<span class="hw-part-status warning">DEGRADED</span>';
-    return '<span class="hw-part-status fault">FAULT</span>';
+  function motorStatus(health, idx) {
+    if (health > 90) return '<span id="hw-motor-' + idx + '-status" class="hw-part-status nominal">NOMINAL</span>';
+    if (health >= 70) return '<span id="hw-motor-' + idx + '-status" class="hw-part-status warning">DEGRADED</span>';
+    return '<span id="hw-motor-' + idx + '-status" class="hw-part-status fault">FAULT</span>';
   }
   function subsysStatus(val) {
     if (val > 90) return '<span class="hw-part-status nominal">NOMINAL</span>';
@@ -4234,10 +4452,10 @@ function updateHardwarePanel(asset) {
     <!-- Frame & Propulsion -->
     <div class="hw-section-title">Frame &amp; Propulsion</div>
     <div class="hw-part-row"><span class="hw-part-dot" style="background:${armColor}"></span><span class="hw-part-name">Frame</span><span class="hw-part-model">Sentinel X4 Carbon 450mm</span>${subsysStatus(ds.subsystems.propulsion)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m1c}"></span><span class="hw-part-name">Motor 1</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[0].health)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m2c}"></span><span class="hw-part-name">Motor 2</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[1].health)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m3c}"></span><span class="hw-part-name">Motor 3</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[2].health)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m4c}"></span><span class="hw-part-name">Motor 4</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[3].health)}</div>
+    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m1c}"></span><span class="hw-part-name">Motor 1</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[0].health, 0)}</div>
+    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m2c}"></span><span class="hw-part-name">Motor 2</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[1].health, 1)}</div>
+    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m3c}"></span><span class="hw-part-name">Motor 3</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[2].health, 2)}</div>
+    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m4c}"></span><span class="hw-part-name">Motor 4</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[3].health, 3)}</div>
     <div class="hw-part-row"><span class="hw-part-dot" style="background:${armColor}"></span><span class="hw-part-name">ESC</span><span class="hw-part-model">Hobbywing X-Rotor 40A</span>${subsysStatus(ds.subsystems.propulsion)}</div>
     <div class="hw-part-row"><span class="hw-part-dot" style="background:${armColor}"></span><span class="hw-part-name">Propeller</span><span class="hw-part-model">T-Motor P18x6.1 CF</span><span class="hw-part-status nominal">NOMINAL</span></div>
 
@@ -4327,6 +4545,8 @@ function diagSensorDotClass(status) {
   return 'fault';
 }
 
+let diagRenderedAsset = null;
+
 function updateDiagnosticsPanel(asset) {
   const el = document.getElementById('diagnostics-content');
   if (!el) return;
@@ -4344,14 +4564,18 @@ function updateDiagnosticsPanel(asset) {
   const healthOffset = circ - (ds.overallHealth / 100) * circ;
   const healthColor = diagHealthColor(ds.overallHealth);
 
-  let html = '';
+  // Full innerHTML rebuild only when asset changes
+  if (diagRenderedAsset !== asset.id) {
+    diagRenderedAsset = asset.id;
 
-  // System Health
-  html += '<div class="diag-section"><div class="diag-section-title">System Health</div>';
+    let html = '';
+
+    // System Health
+    html += '<div class="diag-section"><div class="diag-section-title">System Health</div>';
   html += '<div class="diag-health-score">';
   html += '<div class="diag-health-ring"><svg viewBox="0 0 64 64"><circle class="ring-bg" cx="32" cy="32" r="26"/>';
-  html += '<circle class="ring-fill" cx="32" cy="32" r="26" stroke="' + healthColor + '" stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + healthOffset.toFixed(1) + '"/>';
-  html += '</svg><div class="diag-health-pct" style="color:' + healthColor + '">' + ds.overallHealth.toFixed(0) + '</div></div>';
+  html += '<circle id="dg-health-ring" class="ring-fill" cx="32" cy="32" r="26" stroke="' + healthColor + '" stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + healthOffset.toFixed(1) + '"/>';
+  html += '</svg><div id="dg-health-pct" class="diag-health-pct" style="color:' + healthColor + '">' + ds.overallHealth.toFixed(0) + '</div></div>';
   html += '<div><div class="diag-health-label">Overall System Health</div>';
   html += '<div style="font-family:var(--font-data);font-size:10px;color:var(--text-dim);margin-top:2px">' + asset.id + ' // ' + asset.role + '</div></div></div>';
 
@@ -4359,8 +4583,8 @@ function updateDiagnosticsPanel(asset) {
   Object.entries(ds.subsystems).forEach(([name, val]) => {
     const c = diagHealthColor(val);
     html += '<div class="diag-subsystem"><span class="diag-subsystem-name">' + name.charAt(0).toUpperCase() + name.slice(1) + '</span>';
-    html += '<div class="diag-subsystem-bar"><div class="diag-subsystem-bar-fill" style="width:' + val + '%;background:' + c + '"></div></div>';
-    html += '<span class="diag-subsystem-val" style="color:' + c + '">' + val.toFixed(0) + '%</span></div>';
+    html += '<div class="diag-subsystem-bar"><div id="dg-sub-' + name + '-bar" class="diag-subsystem-bar-fill" style="width:' + val + '%;background:' + c + '"></div></div>';
+    html += '<span id="dg-sub-' + name + '" class="diag-subsystem-val" style="color:' + c + '">' + val.toFixed(0) + '%</span></div>';
   });
   html += '</div>';
 
@@ -4370,9 +4594,9 @@ function updateDiagnosticsPanel(asset) {
   ds.motors.forEach((m, i) => {
     const mc = diagHealthColor(m.health);
     html += '<div class="diag-motor-card"><div class="diag-motor-label">Motor ' + (i + 1) + '</div>';
-    html += '<div class="diag-motor-stat">RPM: <span style="color:var(--text-bright)">' + m.rpm.toFixed(0) + '</span></div>';
-    html += '<div class="diag-motor-stat">Temp: <span style="color:' + (m.temp > 50 ? 'var(--amber)' : 'var(--text-bright)') + '">' + m.temp.toFixed(1) + '&deg;C</span></div>';
-    html += '<div class="diag-motor-stat">Health: <span style="color:' + mc + '">' + m.health.toFixed(0) + '%</span></div></div>';
+    html += '<div class="diag-motor-stat">RPM: <span id="dg-motor-' + i + '-rpm" style="color:var(--text-bright)">' + m.rpm.toFixed(0) + '</span></div>';
+    html += '<div class="diag-motor-stat">Temp: <span id="dg-motor-' + i + '-temp" style="color:' + (m.temp > 50 ? 'var(--amber)' : 'var(--text-bright)') + '">' + m.temp.toFixed(1) + '&deg;C</span></div>';
+    html += '<div class="diag-motor-stat">Health: <span id="dg-motor-' + i + '-health" style="color:' + mc + '">' + m.health.toFixed(0) + '%</span></div></div>';
   });
   html += '</div>';
   html += '<div style="margin-top:8px"><div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">ESC: ' + ds.escStatus + '</span></div>';
@@ -4393,13 +4617,13 @@ function updateDiagnosticsPanel(asset) {
   // Communication
   html += '<div class="diag-section"><div class="diag-section-title">Communication</div>';
   html += '<div class="diag-subsystem"><span class="diag-subsystem-name">Radio Link</span>';
-  html += '<div class="diag-subsystem-bar"><div class="diag-subsystem-bar-fill" style="width:' + ds.radioLink + '%;background:' + diagHealthColor(ds.radioLink) + '"></div></div>';
-  html += '<span class="diag-subsystem-val" style="color:' + diagHealthColor(ds.radioLink) + '">' + ds.radioLink.toFixed(0) + '%</span></div>';
+  html += '<div class="diag-subsystem-bar"><div id="dg-sub-radio-bar" class="diag-subsystem-bar-fill" style="width:' + ds.radioLink + '%;background:' + diagHealthColor(ds.radioLink) + '"></div></div>';
+  html += '<span id="dg-sub-radio" class="diag-subsystem-val" style="color:' + diagHealthColor(ds.radioLink) + '">' + ds.radioLink.toFixed(0) + '%</span></div>';
   html += '<div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">Antenna: ' + ds.antennaStatus + '</span></div>';
   html += '<div class="diag-subsystem"><span class="diag-subsystem-name">Signal Quality</span>';
   const sq = asset.linkQuality || 95;
-  html += '<div class="diag-subsystem-bar"><div class="diag-subsystem-bar-fill" style="width:' + sq + '%;background:' + diagHealthColor(sq) + '"></div></div>';
-  html += '<span class="diag-subsystem-val" style="color:' + diagHealthColor(sq) + '">' + sq.toFixed(0) + '%</span></div>';
+  html += '<div class="diag-subsystem-bar"><div id="dg-sub-signal-bar" class="diag-subsystem-bar-fill" style="width:' + sq + '%;background:' + diagHealthColor(sq) + '"></div></div>';
+  html += '<span id="dg-sub-signal" class="diag-subsystem-val" style="color:' + diagHealthColor(sq) + '">' + sq.toFixed(0) + '%</span></div>';
   html += '</div>';
 
   // Power Systems
@@ -4408,8 +4632,8 @@ function updateDiagnosticsPanel(asset) {
     const pct = clamp(((v - 3.3) / (4.2 - 3.3)) * 100, 0, 100);
     const cc = v < 3.5 ? 'var(--red)' : v < 3.7 ? 'var(--amber)' : 'var(--green)';
     html += '<div class="diag-cell-row"><span style="color:var(--text-dim);min-width:24px">C' + (i + 1) + '</span>';
-    html += '<div class="diag-cell-bar"><div class="diag-cell-bar-fill" style="width:' + pct.toFixed(0) + '%;background:' + cc + '"></div></div>';
-    html += '<span style="color:' + cc + ';min-width:40px;text-align:right">' + v.toFixed(2) + 'V</span></div>';
+    html += '<div class="diag-cell-bar"><div id="dg-cell-' + i + '-bar" class="diag-cell-bar-fill" style="width:' + pct.toFixed(0) + '%;background:' + cc + '"></div></div>';
+    html += '<span id="dg-cell-' + i + '" style="color:' + cc + ';min-width:40px;text-align:right">' + v.toFixed(2) + 'V</span></div>';
   });
   html += '<div style="margin-top:6px"><div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">BMS Health: ' + ds.bmsHealth + '%</span></div></div>';
   html += '</div>';
@@ -4431,6 +4655,68 @@ function updateDiagnosticsPanel(asset) {
   html += '</div>';
 
   el.innerHTML = html;
+    return;
+  }
+
+  // --- Targeted updates for changing values (same asset, subsequent ticks) ---
+
+  // Overall health ring
+  const ringEl = document.getElementById('dg-health-ring');
+  if (ringEl) {
+    ringEl.setAttribute('stroke', healthColor);
+    ringEl.setAttribute('stroke-dashoffset', healthOffset.toFixed(1));
+  }
+  const pctEl = document.getElementById('dg-health-pct');
+  if (pctEl) {
+    pctEl.textContent = ds.overallHealth.toFixed(0);
+    pctEl.style.color = healthColor;
+  }
+
+  // Subsystem bar widths and percentages
+  Object.entries(ds.subsystems).forEach(([name, val]) => {
+    const c = diagHealthColor(val);
+    const barEl = document.getElementById('dg-sub-' + name + '-bar');
+    if (barEl) { barEl.style.width = val + '%'; barEl.style.background = c; }
+    const valEl = document.getElementById('dg-sub-' + name);
+    if (valEl) { valEl.textContent = val.toFixed(0) + '%'; valEl.style.color = c; }
+  });
+
+  // Motor RPM, temp, health
+  ds.motors.forEach((m, i) => {
+    const mc = diagHealthColor(m.health);
+    const rpmEl = document.getElementById('dg-motor-' + i + '-rpm');
+    if (rpmEl) rpmEl.textContent = m.rpm.toFixed(0);
+    const tempEl = document.getElementById('dg-motor-' + i + '-temp');
+    if (tempEl) {
+      tempEl.innerHTML = m.temp.toFixed(1) + '&deg;C';
+      tempEl.style.color = m.temp > 50 ? 'var(--amber)' : 'var(--text-bright)';
+    }
+    const healthEl = document.getElementById('dg-motor-' + i + '-health');
+    if (healthEl) { healthEl.textContent = m.health.toFixed(0) + '%'; healthEl.style.color = mc; }
+  });
+
+  // Radio link
+  const radioBarEl = document.getElementById('dg-sub-radio-bar');
+  if (radioBarEl) { radioBarEl.style.width = ds.radioLink + '%'; radioBarEl.style.background = diagHealthColor(ds.radioLink); }
+  const radioValEl = document.getElementById('dg-sub-radio');
+  if (radioValEl) { radioValEl.textContent = ds.radioLink.toFixed(0) + '%'; radioValEl.style.color = diagHealthColor(ds.radioLink); }
+
+  // Signal quality
+  const sq = asset.linkQuality || 95;
+  const sigBarEl = document.getElementById('dg-sub-signal-bar');
+  if (sigBarEl) { sigBarEl.style.width = sq + '%'; sigBarEl.style.background = diagHealthColor(sq); }
+  const sigValEl = document.getElementById('dg-sub-signal');
+  if (sigValEl) { sigValEl.textContent = sq.toFixed(0) + '%'; sigValEl.style.color = diagHealthColor(sq); }
+
+  // Cell voltages
+  ds.cellVoltages.forEach((v, i) => {
+    const pct = clamp(((v - 3.3) / (4.2 - 3.3)) * 100, 0, 100);
+    const cc = v < 3.5 ? 'var(--red)' : v < 3.7 ? 'var(--amber)' : 'var(--green)';
+    const cellBarEl = document.getElementById('dg-cell-' + i + '-bar');
+    if (cellBarEl) { cellBarEl.style.width = pct.toFixed(0) + '%'; cellBarEl.style.background = cc; }
+    const cellValEl = document.getElementById('dg-cell-' + i);
+    if (cellValEl) { cellValEl.textContent = v.toFixed(2) + 'V'; cellValEl.style.color = cc; }
+  });
 }
 
 function runDiagnosticScan(assetId) {
@@ -4484,7 +4770,8 @@ function runDiagnosticScan(assetId) {
         btn.textContent = ds.scanning ? 'SCANNING... ' + ds.scanProgress.toFixed(0) + '%' : 'RUN DIAGNOSTICS';
       }
       if (!ds.scanning && ds.lastScanResults) {
-        // Full re-render to show results
+        // Full re-render to show results (reset tracking so full rebuild fires)
+        diagRenderedAsset = null;
         const allAssets = window._overwatchAssets || [];
         const asset = allAssets.find(a => a.id === assetId);
         if (asset) updateDiagnosticsPanel(asset);
@@ -4969,9 +5256,22 @@ setMode('OBSERVE');
   document.getElementById('cmd-goto').addEventListener('click', () => {
     if (gotoMode) disableGotoMode(); else enableGotoMode();
   });
-  document.getElementById('cmd-estop').addEventListener('click', () => {
-    if (confirm('ABORT — all assets will execute emergency descent. Confirm?')) {
+  document.getElementById('cmd-estop').addEventListener('click', function() {
+    const btn = this;
+    if (btn.classList.contains('confirming')) {
+      // Second click within timeout — execute
+      clearTimeout(btn._confirmTimer);
+      btn.classList.remove('confirming');
+      btn.textContent = 'ABORT';
       cmdEngine.execute('EMERGENCY_STOP');
+    } else {
+      // First click — enter confirm state
+      btn.classList.add('confirming');
+      btn.textContent = 'CONFIRM (3s)';
+      btn._confirmTimer = setTimeout(() => {
+        btn.classList.remove('confirming');
+        btn.textContent = 'ABORT';
+      }, 3000);
     }
   });
 
@@ -4980,16 +5280,22 @@ setMode('OBSERVE');
     document.getElementById('takeoff-alt-val').textContent = this.value + 'm';
   });
   document.getElementById('cmd-speed').addEventListener('input', function() {
-    document.getElementById('speed-val').textContent = this.value + ' m/s';
+    const valEl = document.getElementById('speed-val');
+    valEl.textContent = this.value + ' m/s';
+    valEl.style.color = 'var(--amber)';
   });
   document.getElementById('cmd-speed').addEventListener('change', function() {
     cmdEngine.execute('SET_SPEED', { speed: parseFloat(this.value) });
+    document.getElementById('speed-val').style.color = '';
   });
   document.getElementById('cmd-altitude').addEventListener('input', function() {
-    document.getElementById('alt-val').textContent = this.value + 'm';
+    const valEl = document.getElementById('alt-val');
+    valEl.textContent = this.value + 'm';
+    valEl.style.color = 'var(--amber)';
   });
   document.getElementById('cmd-altitude').addEventListener('change', function() {
     cmdEngine.execute('SET_ALTITUDE', { altitude: parseInt(this.value) });
+    document.getElementById('alt-val').style.color = '';
   });
 
   // ---- COLLECTION PATTERN DROPDOWN ----
@@ -5158,7 +5464,14 @@ setMode('OBSERVE');
     replaySystem.recordFrame(now);
 
     // Update map markers and sensor FOV cones every frame (smooth movement)
-    drones.forEach(d => { updateMapMarker(d); updateFovCone(d); });
+    drones.forEach(d => {
+      updateMapMarker(d);
+      updateFovCone(d);
+      // Update pulse ring position for selected drone
+      if (d.id === selectedDroneId && mapMarkers[d.id] && mapMarkers[d.id]._pulseRing) {
+        mapMarkers[d.id]._pulseRing.setLatLng([d.lat, d.lng]);
+      }
+    });
     updateFormationLines(drones);
 
     // 1-second tick for heavier UI updates
@@ -5208,9 +5521,6 @@ setMode('OBSERVE');
       sparkHealth.push(healthPct);
       sparkLatency.push(avgLat);
       sparkBattery.push(avgBat);
-      sparkHealth.draw();
-      sparkLatency.draw();
-      sparkBattery.draw();
 
       // Sensor coverage estimation
       const activeSensors = drones.filter(d => d.altitude > 10 && (d.status === 'NOMINAL' || d.status === 'FLYING')).length;
@@ -5234,7 +5544,21 @@ setMode('OBSERVE');
         covBadge.style.color = 'var(--red)';
       }
       sparkCoverage.push(coveragePct);
-      sparkCoverage.draw();
+
+      // Draw sparklines via requestIdleCallback to avoid blocking the main thread
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => {
+          sparkHealth.draw();
+          sparkLatency.draw();
+          sparkBattery.draw();
+          if (sparkCoverage) sparkCoverage.draw();
+        }, { timeout: 500 });
+      } else {
+        sparkHealth.draw();
+        sparkLatency.draw();
+        sparkBattery.draw();
+        if (sparkCoverage) sparkCoverage.draw();
+      }
 
       // Track distance for debrief
       drones.forEach(d => {
@@ -5298,6 +5622,17 @@ setMode('OBSERVE');
 
       // State-correlated event generation
       generateStateCorrelatedEvents(drones);
+
+      // Critical banner check
+      const criticalDrone = drones.find(d => d.battery < 20 && d.armed && d.droneState !== 'LANDED');
+      const banner = document.getElementById('critical-banner');
+      if (criticalDrone && !banner.classList.contains('dismissed')) {
+        document.getElementById('critical-msg').textContent =
+          criticalDrone.id + ' BATTERY CRITICAL (' + criticalDrone.battery.toFixed(0) + '%) -- RTB RECOMMENDED';
+        banner.classList.add('visible');
+      } else if (!criticalDrone) {
+        banner.classList.remove('visible', 'dismissed');
+      }
     }
 
     // Random events
@@ -5334,6 +5669,26 @@ setMode('OBSERVE');
     if (now - lastSoloUpdate > 100) {
       lastSoloUpdate = now;
       if (currentMode === 'ISR') {
+        // ISR asset selector pills
+        const pillContainer = document.getElementById('isr-asset-pills');
+        if (pillContainer && pillContainer.children.length === 0) {
+          drones.forEach(d => {
+            const pill = document.createElement('button');
+            pill.className = 'fpv-mode-btn';
+            pill.style.cssText = 'font-size:9px;padding:2px 6px;min-width:0';
+            pill.textContent = d.id.split('-')[0]; // ALPHA, BRAVO, etc.
+            pill.dataset.assetId = d.id;
+            pill.addEventListener('click', () => selectDrone(d.id));
+            pillContainer.appendChild(pill);
+          });
+        }
+        // Update active state
+        if (pillContainer) {
+          pillContainer.querySelectorAll('.fpv-mode-btn').forEach(p => {
+            p.classList.toggle('active', p.dataset.assetId === selectedDroneId);
+          });
+        }
+
         const sel = drones.find(d => d.id === selectedDroneId) || drones[0];
         if (sel) {
           // Update OSD
@@ -5782,6 +6137,24 @@ setMode('OBSERVE');
     }
   };
 
+  // ---- Audio Toggle ----
+  document.getElementById('audio-toggle').addEventListener('click', function() {
+    audioMuted = !audioMuted;
+    this.style.opacity = audioMuted ? '0.4' : '1';
+    this.textContent = audioMuted ? 'MUTE' : 'SND';
+  });
+
+  // ---- Critical Banner Dismiss / RTB ----
+  document.getElementById('critical-dismiss').addEventListener('click', () => {
+    document.getElementById('critical-banner').classList.remove('visible');
+    document.getElementById('critical-banner').classList.add('dismissed');
+  });
+  document.getElementById('critical-rtb').addEventListener('click', () => {
+    const crit = drones.find(d => d.battery < 20 && d.armed);
+    if (crit) cmdEngine.execute('RTB', { droneId: crit.id });
+    document.getElementById('critical-banner').classList.remove('visible');
+  });
+
   // ---- Quick Connect ----
   document.getElementById('quick-connect-btn').addEventListener('click', async () => {
     const btn = document.getElementById('quick-connect-btn');
@@ -5838,9 +6211,22 @@ setMode('OBSERVE');
   document.getElementById('fpv-disarm').addEventListener('click', () => {
     cmdEngine.execute('DISARM', { droneId: selectedDroneId });
   });
-  document.getElementById('fpv-estop').addEventListener('click', () => {
-    if (confirm('ABORT — selected asset will execute emergency descent. Confirm?')) {
+  document.getElementById('fpv-estop').addEventListener('click', function() {
+    const btn = this;
+    if (btn.classList.contains('confirming')) {
+      // Second click within timeout — execute
+      clearTimeout(btn._confirmTimer);
+      btn.classList.remove('confirming');
+      btn.textContent = 'ABORT';
       cmdEngine.execute('EMERGENCY_STOP', { droneId: selectedDroneId });
+    } else {
+      // First click — enter confirm state
+      btn.classList.add('confirming');
+      btn.textContent = 'CONFIRM (3s)';
+      btn._confirmTimer = setTimeout(() => {
+        btn.classList.remove('confirming');
+        btn.textContent = 'ABORT';
+      }, 3000);
     }
   });
 
