@@ -291,6 +291,22 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
 .collapsed { display: none; }
 .tree-count { font-family: var(--font-data); font-size: 10px; color: var(--text-tertiary); margin-left: auto; }
 
+/* Operations section */
+.ops-container { padding: 6px 10px 6px 24px; }
+.ops-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.ops-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.ops-name { font-family: var(--font-data); font-size: 11px; color: var(--text); }
+.ops-status-badge { font-family: var(--font-label); font-size: 8px; padding: 1px 5px; border: 1px solid var(--accent); color: var(--accent); margin-left: auto; letter-spacing: 0.3px; }
+.ops-detail-rows { font-family: var(--font-data); font-size: 9px; color: var(--text-dim); padding-left: 12px; line-height: 1.6; }
+
+/* Areas of Interest section */
+.aoi-list-inner { padding: 4px 10px 4px 24px; }
+.aoi-item { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+.aoi-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.aoi-name { font-family: var(--font-data); font-size: 10px; color: var(--text); }
+.aoi-name-dim { font-family: var(--font-data); font-size: 10px; color: var(--text-secondary); }
+.aoi-class { font-family: var(--font-label); font-size: 8px; margin-left: auto; letter-spacing: 0.3px; }
+
 .asset-list {
   flex: 1;
   overflow-y: auto;
@@ -1273,6 +1289,20 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .fpv-link-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .fpv-link-label { font-family: var(--font-label); font-size: 9px; color: var(--text-dim); }
 .fpv-link-value { font-family: var(--font-data); font-size: 11px; color: var(--text-bright); }
+
+/* FPV panel sub-sections */
+.fpv-sub-section { padding: 6px 12px; }
+.fpv-sub-section-bordered { padding: 6px 12px; border-top: 1px solid var(--border); }
+.fpv-sub-title { font-family: var(--font-label); font-size: 8px; color: var(--text-dim); letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 4px; }
+.fpv-cell-grid { display: flex; gap: 3px; align-items: flex-end; height: 24px; }
+.fpv-failsafe-grid { display: flex; flex-direction: column; gap: 3px; }
+.fpv-stick-container { display: flex; gap: 12px; justify-content: center; }
+.fpv-stick-group { text-align: center; }
+.fpv-stick-canvas { width: 64px; height: 64px; border: 1px solid var(--border); border-radius: 2px; background: rgba(0,0,0,0.3); }
+.fpv-stick-label { font-family: var(--font-data); font-size: 8px; color: var(--text-dim); margin-top: 2px; }
+.fpv-motor-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; }
+.fpv-shortcuts { font-family: var(--font-label); font-size: 9px; color: var(--text-dim); line-height: 1.6; }
+
 .solo-only, .isr-only { display: none; }
 body[data-mode="ISR"] .solo-only,
 body[data-mode="ISR"] .isr-only { display: block !important; }
@@ -2002,19 +2032,19 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         <div class="asset-list" id="asset-list"></div>
       </div>
       <div class="tree-section">
-        <div class="tree-section-header" role="button" tabindex="0" aria-expanded="true" onclick="this.nextElementSibling.classList.toggle('collapsed');this.querySelector('.tree-toggle').textContent=this.nextElementSibling.classList.contains('collapsed')?'\u25B6':'\u25BC'">
-          <span class="tree-toggle">&#x25BC;</span>
+        <div class="tree-section-header" id="tree-ops-toggle" role="button" tabindex="0" aria-expanded="true">
+          <span class="tree-toggle" id="tree-ops-arrow">&#x25BC;</span>
           <span class="panel-header" style="border:none;padding:0;font-size:10px">OPERATIONS</span>
           <span class="tree-count">(<span id="ops-count">1</span>)</span>
         </div>
         <div id="ops-list">
-          <div style="padding:6px 10px 6px 24px">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-              <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>
-              <span style="font-family:var(--font-data);font-size:11px;color:var(--text)">OP SENTINEL WATCH</span>
-              <span style="font-family:var(--font-label);font-size:8px;padding:1px 5px;border:1px solid var(--accent);color:var(--accent);margin-left:auto;letter-spacing:0.3px">ACTIVE</span>
+          <div class="ops-container">
+            <div class="ops-header">
+              <span class="ops-dot"></span>
+              <span class="ops-name">OP SENTINEL WATCH</span>
+              <span class="ops-status-badge">ACTIVE</span>
             </div>
-            <div style="font-family:var(--font-data);font-size:9px;color:var(--text-dim);padding-left:12px;line-height:1.6">
+            <div class="ops-detail-rows">
               Phase: SURVEILLANCE<br>
               Assets: <span id="ops-asset-count">6</span>/6 deployed<br>
               Objectives: <span id="ops-obj-count">0</span> completed<br>
@@ -2030,26 +2060,26 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
           <span class="tree-count">(4)</span>
         </div>
         <div id="aoi-list">
-          <div style="padding:4px 10px 4px 24px">
-            <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
-              <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>
-              <span style="font-family:var(--font-data);font-size:10px;color:var(--text)">AO-IRVINE</span>
-              <span style="font-family:var(--font-label);font-size:8px;color:var(--accent);margin-left:auto;letter-spacing:0.3px">PRIMARY</span>
+          <div class="aoi-list-inner">
+            <div class="aoi-item">
+              <span class="aoi-dot" style="background:var(--accent)"></span>
+              <span class="aoi-name">AO-IRVINE</span>
+              <span class="aoi-class" style="color:var(--accent)">PRIMARY</span>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
-              <span style="width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
-              <span style="font-family:var(--font-data);font-size:10px;color:var(--text)">AO-CAMPUS</span>
-              <span style="font-family:var(--font-label);font-size:8px;color:var(--green);margin-left:auto;letter-spacing:0.3px">CLEAR</span>
+            <div class="aoi-item">
+              <span class="aoi-dot" style="background:var(--green)"></span>
+              <span class="aoi-name">AO-CAMPUS</span>
+              <span class="aoi-class" style="color:var(--green)">CLEAR</span>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
-              <span style="width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0"></span>
-              <span style="font-family:var(--font-data);font-size:10px;color:var(--text)">AO-HIGHWAY</span>
-              <span style="font-family:var(--font-label);font-size:8px;color:var(--amber);margin-left:auto;letter-spacing:0.3px">MONITOR</span>
+            <div class="aoi-item">
+              <span class="aoi-dot" style="background:var(--amber)"></span>
+              <span class="aoi-name">AO-HIGHWAY</span>
+              <span class="aoi-class" style="color:var(--amber)">MONITOR</span>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
-              <span style="width:6px;height:6px;border-radius:50%;background:var(--text-dim);flex-shrink:0"></span>
-              <span style="font-family:var(--font-data);font-size:10px;color:var(--text-secondary)">AO-NORTH</span>
-              <span style="font-family:var(--font-label);font-size:8px;color:var(--text-dim);margin-left:auto;letter-spacing:0.3px">STANDBY</span>
+            <div class="aoi-item">
+              <span class="aoi-dot" style="background:var(--text-dim)"></span>
+              <span class="aoi-name-dim">AO-NORTH</span>
+              <span class="aoi-class" style="color:var(--text-dim)">STANDBY</span>
             </div>
           </div>
         </div>
@@ -2098,7 +2128,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
               <line x1="20" y1="6" x2="20" y2="16" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
               <line x1="20" y1="24" x2="20" y2="34" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
               <line x1="6" y1="20" x2="16" y2="20" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
-              <line x1="24" y1="20" x2="40" y2="20" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+              <line x1="24" y1="20" x2="34" y2="20" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
               <circle cx="20" cy="20" r="3" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
             </svg>
           </div>
@@ -2284,30 +2314,30 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
             <div class="fpv-telem-cell"><div class="fpv-telem-label">Home</div><div class="fpv-telem-value" id="fpv-home">--</div></div>
             <div class="fpv-telem-cell"><div class="fpv-telem-label">Sats</div><div class="fpv-telem-value" id="fpv-sats">--</div></div>
           </div>
-          <div id="fpv-cells" style="padding:6px 12px">
-            <div style="font-family:var(--font-label);font-size:8px;color:var(--text-dim);letter-spacing:0.3px;text-transform:uppercase;margin-bottom:4px">Cell Voltages</div>
-            <div id="fpv-cell-bars" style="display:flex;gap:3px;align-items:flex-end;height:24px"></div>
+          <div id="fpv-cells" class="fpv-sub-section">
+            <div class="fpv-sub-title">Cell Voltages</div>
+            <div id="fpv-cell-bars" class="fpv-cell-grid"></div>
           </div>
-          <div id="fpv-failsafe" style="padding:6px 12px;border-top:1px solid var(--border)">
-            <div style="font-family:var(--font-label);font-size:8px;color:var(--text-dim);letter-spacing:0.3px;text-transform:uppercase;margin-bottom:4px">Failsafe</div>
-            <div id="fpv-failsafe-items" style="display:flex;flex-direction:column;gap:3px"></div>
+          <div id="fpv-failsafe" class="fpv-sub-section-bordered">
+            <div class="fpv-sub-title">Failsafe</div>
+            <div id="fpv-failsafe-items" class="fpv-failsafe-grid"></div>
           </div>
-          <div style="padding:6px 12px;border-top:1px solid var(--border)">
-            <div style="font-family:var(--font-label);font-size:8px;color:var(--text-dim);letter-spacing:0.3px;text-transform:uppercase;margin-bottom:4px">RC Input</div>
-            <div style="display:flex;gap:12px;justify-content:center">
-              <div style="text-align:center">
-                <canvas id="stick-left" width="64" height="64" style="width:64px;height:64px;border:1px solid var(--border);border-radius:2px;background:rgba(0,0,0,0.3)"></canvas>
-                <div style="font-family:var(--font-data);font-size:8px;color:var(--text-dim);margin-top:2px">THR / YAW</div>
+          <div class="fpv-sub-section-bordered">
+            <div class="fpv-sub-title">RC Input</div>
+            <div class="fpv-stick-container">
+              <div class="fpv-stick-group">
+                <canvas id="stick-left" width="64" height="64" class="fpv-stick-canvas"></canvas>
+                <div class="fpv-stick-label">THR / YAW</div>
               </div>
-              <div style="text-align:center">
-                <canvas id="stick-right" width="64" height="64" style="width:64px;height:64px;border:1px solid var(--border);border-radius:2px;background:rgba(0,0,0,0.3)"></canvas>
-                <div style="font-family:var(--font-data);font-size:8px;color:var(--text-dim);margin-top:2px">ROLL / PITCH</div>
+              <div class="fpv-stick-group">
+                <canvas id="stick-right" width="64" height="64" class="fpv-stick-canvas"></canvas>
+                <div class="fpv-stick-label">ROLL / PITCH</div>
               </div>
             </div>
           </div>
-          <div id="fpv-motors" style="padding:6px 12px;border-top:1px solid var(--border)">
-            <div style="font-family:var(--font-label);font-size:8px;color:var(--text-dim);letter-spacing:0.3px;text-transform:uppercase;margin-bottom:4px">Motors</div>
-            <div id="fpv-motor-status" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px"></div>
+          <div id="fpv-motors" class="fpv-sub-section-bordered">
+            <div class="fpv-sub-title">Motors</div>
+            <div id="fpv-motor-status" class="fpv-motor-grid"></div>
           </div>
         </div>
         <div class="cmd-section">
@@ -2321,7 +2351,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         </div>
         <div class="cmd-section">
           <div class="cmd-section-title">Shortcuts</div>
-          <div style="font-family:var(--font-label);font-size:9px;color:var(--text-dim);line-height:1.6">
+          <div class="fpv-shortcuts">
             F — Fullscreen &nbsp; R — Record<br>
             P — Photo &nbsp; &uarr;&darr; — Tilt
           </div>
@@ -2916,7 +2946,7 @@ class DirectiveEngine {
         showToast('DISARMED — ' + targetLabel);
         break;
 
-      case 'TAKEOFF':
+      case 'TAKEOFF': {
         const alt = params.altitude || 30;
         targets.forEach(d => {
           if (!d.armed) { d.armed = true; }
@@ -2927,6 +2957,7 @@ class DirectiveEngine {
         this._logCmd('LAUNCH ' + alt + 'm', targetLabel);
         showToast('LAUNCH ' + alt + 'm — ' + targetLabel);
         break;
+      }
 
       case 'LAND':
         targets.forEach(d => { d.droneState = DRONE_STATES.LANDING; });
@@ -2950,7 +2981,7 @@ class DirectiveEngine {
         showToast('GOTO — navigating to target');
         break;
 
-      case 'SET_FORMATION':
+      case 'SET_FORMATION': {
         const offsets = FORMATION_OFFSETS[params.formation];
         if (offsets) {
           this.drones.forEach((d, i) => { d.formationOffset = offsets[i] || { along: 0, cross: 0 }; });
@@ -2960,6 +2991,7 @@ class DirectiveEngine {
         const label = document.querySelector('.formation-label');
         if (label) label.textContent = params.formation.replace(/_/g, '-');
         break;
+      }
 
       case 'SET_SPEED':
         targets.forEach(d => { d.targetSpeed = params.speed; });
@@ -2977,7 +3009,7 @@ class DirectiveEngine {
         showToast('ABORT — ' + targetLabel, 'error');
         break;
 
-      case 'EXECUTE_MISSION':
+      case 'EXECUTE_MISSION': {
         const leader = this.drones[0];
         leader.missionWaypoints = params.waypoints || [];
         leader.missionIndex = 0;
@@ -2985,6 +3017,7 @@ class DirectiveEngine {
         this._logCmd('MISSION ' + (params.waypoints || []).length + ' waypoints', 'ALL');
         showToast('Mission started — ' + (params.waypoints || []).length + ' waypoints');
         break;
+      }
     }
 
     // Send over WebSocket if connected
@@ -4379,7 +4412,7 @@ function updateInsightsPanel(asset) {
   // --- Anomaly detection ---
   const anomalies = [];
   if (drainRate > 0.8) {
-    anomalies.push({ msg: 'Abnormal battery drain: ' + drainRate.toFixed(2) + '%/min', severity: 'warning', icon: '\u26a0' });
+    anomalies.push({ msg: 'Abnormal battery drain: ' + drainRate.toFixed(2) + '%/min', severity: 'warning', icon: '!' });
   }
   if (drainRate > 1.5) {
     anomalies[anomalies.length - 1].severity = 'critical';
@@ -4389,12 +4422,12 @@ function updateInsightsPanel(asset) {
   if (ds) {
     ds.motors.forEach((m, i) => {
       if (m.temp > 48) {
-        anomalies.push({ msg: 'Motor ' + (i + 1) + ' temp elevated: ' + m.temp.toFixed(1) + '\u00b0C', severity: m.temp > 55 ? 'critical' : 'warning', icon: '\ud83c\udf21' });
+        anomalies.push({ msg: 'Motor ' + (i + 1) + ' temp elevated: ' + m.temp.toFixed(1) + '\u00b0C', severity: m.temp > 55 ? 'critical' : 'warning', icon: 'T' });
       }
     });
   }
   if (signal < 90) {
-    anomalies.push({ msg: 'Signal quality degraded: ' + signal.toFixed(0) + '%', severity: signal < 75 ? 'critical' : 'warning', icon: '\ud83d\udce1' });
+    anomalies.push({ msg: 'Signal quality degraded: ' + signal.toFixed(0) + '%', severity: signal < 75 ? 'critical' : 'warning', icon: 'S' });
   }
   // Heading variance (check last few speed readings for erratic behavior)
   if (is.speedHistory.length >= 5) {
@@ -4423,12 +4456,12 @@ function updateInsightsPanel(asset) {
   // --- Decision intelligence (recommendations) ---
   const recs = [];
   if (battery < 50) {
-    recs.push({ icon: '\ud83d\udd0b', text: 'RTB recommended in ' + rtbStr + ' \u2014 battery at ' + battery.toFixed(0) + '%' });
+    recs.push({ icon: 'P', text: 'RTB recommended in ' + rtbStr + ' \u2014 battery at ' + battery.toFixed(0) + '%' });
   }
   if (ds) {
     const hotMotor = ds.motors.findIndex(m => m.temp > 48);
     if (hotMotor >= 0) {
-      recs.push({ icon: '\u26a1', text: 'Motor ' + (hotMotor + 1) + ' temperature elevated \u2014 reduce speed by 15%' });
+      recs.push({ icon: 'T', text: 'Motor ' + (hotMotor + 1) + ' temperature elevated \u2014 reduce speed by 15%' });
     }
   }
   if (alt > 100) {
@@ -4437,7 +4470,7 @@ function updateInsightsPanel(asset) {
     recs.push({ icon: '\u2193', text: 'Low altitude at speed \u2014 increase to 60m minimum for terrain clearance' });
   }
   if (signal < 85) {
-    recs.push({ icon: '\ud83d\udce1', text: 'Signal at ' + signal.toFixed(0) + '% \u2014 reduce range or increase relay altitude' });
+    recs.push({ icon: 'S', text: 'Signal at ' + signal.toFixed(0) + '% \u2014 reduce range or increase relay altitude' });
   }
   if (recs.length === 0) {
     recs.push({ icon: '\u2713', text: 'All parameters within optimal range \u2014 continue current mission profile' });
@@ -4472,7 +4505,7 @@ function updateInsightsPanel(asset) {
   html += '<div class="insight-card"><div class="insight-label">Optimal RTB Window</div>';
   html += '<div class="insight-value">' + rtbStr + '</div>';
   html += '<div class="insight-sub">Safety margin: 10% battery reserve</div></div>';
-  html += '<div class="insight-card' + (missionProb < 70 ? ' warning' : missionProb < 40 ? ' critical' : ' positive') + '">';
+  html += '<div class="insight-card' + (missionProb < 40 ? ' critical' : missionProb < 70 ? ' warning' : ' positive') + '">';
   html += '<div class="insight-label">Mission Completion Probability</div>';
   html += '<div class="insight-value">' + missionProb + '%</div>';
   html += '<div class="insight-sub">Based on battery, health, signal composite</div></div>';
@@ -4637,7 +4670,12 @@ document.getElementById('tree-assets-toggle').addEventListener('click', () => {
   if (list.style.display === 'none') { list.style.display = ''; arrow.innerHTML = '&#9662;'; }
   else { list.style.display = 'none'; arrow.innerHTML = '&#9656;'; }
 });
-// Operations toggle handled via inline onclick on the section header
+document.getElementById('tree-ops-toggle').addEventListener('click', () => {
+  const list = document.getElementById('ops-list');
+  const arrow = document.getElementById('tree-ops-arrow');
+  if (list.style.display === 'none') { list.style.display = ''; arrow.innerHTML = '&#9662;'; }
+  else { list.style.display = 'none'; arrow.innerHTML = '&#9656;'; }
+});
 document.getElementById('tree-aoi-toggle').addEventListener('click', () => {
   const list = document.getElementById('aoi-list');
   const arrow = document.getElementById('tree-aoi-arrow');
@@ -4891,6 +4929,7 @@ setMode('OBSERVE');
   // Animation loop
   function frame(now) {
     requestAnimationFrame(frame);
+    try {
 
     const dtMs = now - lastFrameTime;
     lastFrameTime = now;
@@ -5040,6 +5079,10 @@ setMode('OBSERVE');
     if (now >= nextEventTime) {
       addEvent(generateActivity(assets));
       nextEventTime = now + rand(EVENT_INTERVAL_MIN, EVENT_INTERVAL_MAX);
+    }
+
+    } catch(e) {
+      console.error('Frame error:', e);
     }
   }
 
