@@ -1,5 +1,5 @@
 """
-NEXUS Wire Protocol — Pydantic models matching src/shared/protocol.js exactly.
+OVERWATCH Wire Protocol — Pydantic models matching src/shared/protocol.js exactly.
 
 The HUD reads these exact field paths:
   p.position.lat, p.position.lon (NOT lng)
@@ -19,41 +19,41 @@ from typing import Optional, List
 # ---- Enums (must match protocol.js string values exactly) ----
 
 class MessageType(str, Enum):
-    TELEM = "TELEM"
+    ASSET_STATE = "ASSET_STATE"
     HEARTBEAT = "HEARTBEAT"
-    CMD = "CMD"
-    FORMATION = "FORMATION"
-    WAYPOINT = "WAYPOINT"
-    PEER = "PEER"
-    ALERT = "ALERT"
+    DIRECTIVE = "DIRECTIVE"
+    OVERLAY_UPDATE = "OVERLAY_UPDATE"
+    OBJECTIVE = "OBJECTIVE"
+    PEER_STATE = "PEER_STATE"
+    ACTIVITY = "ACTIVITY"
     ACK = "ACK"
-    VIDEO_CTRL = "VIDEO_CTRL"
-    CAMERA_CTRL = "CAMERA_CTRL"
-    MSP_TELEM = "MSP_TELEM"
-    GOGGLES = "GOGGLES"
-    DVR_CTRL = "DVR_CTRL"
+    ISR_CTRL = "ISR_CTRL"
+    SENSOR_CTRL = "SENSOR_CTRL"
+    MSP_STATE = "MSP_STATE"
+    HMD_STATE = "HMD_STATE"
+    RECORD_CTRL = "RECORD_CTRL"
     DEVICE_SCAN = "DEVICE_SCAN"
 
 
-class DroneRole(str, Enum):
-    LEADER = "LEADER"
-    WINGMAN = "WINGMAN"
-    RECON = "RECON"
-    SUPPORT = "SUPPORT"
-    TAIL = "TAIL"
+class AssetClassification(str, Enum):
+    PRIMARY = "PRIMARY"
+    ESCORT = "ESCORT"
+    ISR = "ISR"
+    LOGISTICS = "LOGISTICS"
+    OVERWATCH = "OVERWATCH"
 
 
-class DroneStatus(str, Enum):
-    ACTIVE = "ACTIVE"
-    LOW_BATT = "LOW_BATT"
-    WEAK_SIGNAL = "WEAK_SIGNAL"
-    RTL = "RTL"
-    LANDED = "LANDED"
-    LOST = "LOST"
-    FPV_SOLO = "FPV_SOLO"
+class OperationalStatus(str, Enum):
+    NOMINAL = "NOMINAL"
+    DEGRADED = "DEGRADED"
+    COMMS_DEGRADED = "COMMS_DEGRADED"
+    RTB = "RTB"
+    GROUNDED = "GROUNDED"
+    OFFLINE = "OFFLINE"
+    ISR_SOLO = "ISR_SOLO"
 
 
-class FormationType(str, Enum):
+class OverlayType(str, Enum):
     V_FORMATION = "V_FORMATION"
     LINE_ABREAST = "LINE_ABREAST"
     COLUMN = "COLUMN"
@@ -62,25 +62,25 @@ class FormationType(str, Enum):
     SCATTER = "SCATTER"
 
 
-class CommandType(str, Enum):
-    ARM = "ARM"
-    DISARM = "DISARM"
-    TAKEOFF = "TAKEOFF"
-    LAND = "LAND"
-    RTL = "RTL"
+class DirectiveType(str, Enum):
+    LAUNCH_PREP = "LAUNCH_PREP"
+    STAND_DOWN = "STAND_DOWN"
+    LAUNCH = "LAUNCH"
+    RECOVER = "RECOVER"
+    RTB = "RTB"
     GOTO = "GOTO"
     SET_MODE = "SET_MODE"
-    SET_FORMATION = "SET_FORMATION"
+    SET_OVERLAY = "SET_OVERLAY"
     SET_SPEED = "SET_SPEED"
     SET_ALTITUDE = "SET_ALTITUDE"
-    EMERGENCY_STOP = "EMERGENCY_STOP"
+    ABORT = "ABORT"
     EXECUTE_MISSION = "EXECUTE_MISSION"
-    CAMERA_TILT = "CAMERA_TILT"
-    CAMERA_RECORD = "CAMERA_RECORD"
-    CAMERA_PHOTO = "CAMERA_PHOTO"
+    SENSOR_TILT = "SENSOR_TILT"
+    SENSOR_RECORD = "SENSOR_RECORD"
+    SENSOR_CAPTURE = "SENSOR_CAPTURE"
     GIMBAL_CONTROL = "GIMBAL_CONTROL"
-    MSP_ARM = "MSP_ARM"
-    MSP_DISARM = "MSP_DISARM"
+    MSP_LAUNCH_PREP = "MSP_LAUNCH_PREP"
+    MSP_STAND_DOWN = "MSP_STAND_DOWN"
     MSP_SET_MODE = "MSP_SET_MODE"
 
 
@@ -166,7 +166,7 @@ class OffsetVector(BaseModel):
 
 
 class Formation(BaseModel):
-    role: DroneRole
+    role: AssetClassification
     offset_vector: OffsetVector
     cohesion: float
 
@@ -200,8 +200,8 @@ class FPVData(BaseModel):
 
 # ---- Top-level messages ----
 
-class TelemetryPacket(BaseModel):
-    type: MessageType = MessageType.TELEM
+class AssetStatePacket(BaseModel):
+    type: MessageType = MessageType.ASSET_STATE
     drone_id: str
     timestamp: str
     seq: int
@@ -211,16 +211,16 @@ class TelemetryPacket(BaseModel):
     battery: Battery
     gps: GPS
     link: Link
-    status: DroneStatus
+    status: OperationalStatus
     formation: Formation
     fpv: Optional[FPVData] = None
 
     model_config = {"use_enum_values": True}
 
 
-class CommandPacket(BaseModel):
-    type: MessageType = MessageType.CMD
-    command: CommandType
+class DirectivePacket(BaseModel):
+    type: MessageType = MessageType.DIRECTIVE
+    command: DirectiveType
     params: dict = Field(default_factory=dict)
 
     model_config = {"use_enum_values": True}

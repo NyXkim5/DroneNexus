@@ -1,22 +1,22 @@
 /**
- * NEXUS Protocol Unit Tests
+ * OVERWATCH Protocol Unit Tests
  * Run: node tests/protocol.test.js
  */
 
 const assert = require('assert');
 const {
   MessageType,
-  DroneRole,
-  DroneStatus,
-  FormationType,
+  AssetClassification,
+  OperationalStatus,
+  OverlayType,
   V_FORMATION_OFFSETS,
   AlertSeverity,
-  CommandType,
+  DirectiveType,
   FlightMode,
   ProtocolType,
-  createTelemetryPacket,
-  createFPVTelemetryPacket,
-  createVideoControlPacket,
+  createAssetStatePacket,
+  createISRStatePacket,
+  createISRControlPacket,
   calculateLeaderScore,
   calculateCohesion,
 } = require('../src/shared/protocol');
@@ -36,38 +36,38 @@ function test(name, fn) {
   }
 }
 
-console.log('NEXUS Protocol Tests');
+console.log('OVERWATCH Protocol Tests');
 console.log('====================\n');
 
 // --- Message Types ---
 test('MessageType has all required types', () => {
-  const expected = ['TELEM', 'HEARTBEAT', 'CMD', 'FORMATION', 'WAYPOINT', 'PEER', 'ALERT', 'ACK'];
+  const expected = ['ASSET_STATE', 'HEARTBEAT', 'DIRECTIVE', 'OVERLAY_UPDATE', 'OBJECTIVE', 'PEER_STATE', 'ACTIVITY', 'ACK'];
   for (const t of expected) {
     assert.strictEqual(MessageType[t], t);
   }
 });
 
-// --- Drone Roles ---
-test('DroneRole has all roles', () => {
-  const expected = ['LEADER', 'WINGMAN', 'RECON', 'SUPPORT', 'TAIL'];
+// --- Asset Classifications ---
+test('AssetClassification has all classifications', () => {
+  const expected = ['PRIMARY', 'ESCORT', 'ISR', 'LOGISTICS', 'OVERWATCH'];
   for (const r of expected) {
-    assert.strictEqual(DroneRole[r], r);
+    assert.strictEqual(AssetClassification[r], r);
   }
 });
 
-// --- Drone Status ---
-test('DroneStatus has all statuses', () => {
-  const expected = ['ACTIVE', 'LOW_BATT', 'WEAK_SIGNAL', 'RTL', 'LANDED', 'LOST'];
+// --- Operational Status ---
+test('OperationalStatus has all statuses', () => {
+  const expected = ['NOMINAL', 'DEGRADED', 'COMMS_DEGRADED', 'RTB', 'GROUNDED', 'OFFLINE'];
   for (const s of expected) {
-    assert.strictEqual(DroneStatus[s], s);
+    assert.strictEqual(OperationalStatus[s], s);
   }
 });
 
-// --- Formation Types ---
-test('FormationType has all formations', () => {
+// --- Overlay Types ---
+test('OverlayType has all overlay types', () => {
   const expected = ['V_FORMATION', 'LINE_ABREAST', 'COLUMN', 'DIAMOND', 'ORBIT', 'SCATTER'];
   for (const f of expected) {
-    assert.strictEqual(FormationType[f], f);
+    assert.strictEqual(OverlayType[f], f);
   }
 });
 
@@ -93,9 +93,9 @@ test('V-Formation is symmetric on x-axis', () => {
   assert.strictEqual(V_FORMATION_OFFSETS['DELTA-4'].dy, V_FORMATION_OFFSETS['ECHO-5'].dy);
 });
 
-// --- Telemetry Packet ---
-test('createTelemetryPacket returns valid packet', () => {
-  const packet = createTelemetryPacket('ALPHA-1', {
+// --- Asset State Packet ---
+test('createAssetStatePacket returns valid packet', () => {
+  const packet = createAssetStatePacket('ALPHA-1', {
     seq: 1,
     lat: 33.6405,
     lon: -117.8443,
@@ -115,12 +115,12 @@ test('createTelemetryPacket returns valid packet', () => {
     rssi: 90,
     quality: 95,
     latency_ms: 25,
-    status: 'ACTIVE',
-    role: 'LEADER',
+    status: 'NOMINAL',
+    role: 'PRIMARY',
     cohesion: 0.95,
   });
 
-  assert.strictEqual(packet.type, 'TELEM');
+  assert.strictEqual(packet.type, 'ASSET_STATE');
   assert.strictEqual(packet.drone_id, 'ALPHA-1');
   assert.ok(packet.timestamp);
   assert.strictEqual(packet.position.lat, 33.6405);
@@ -129,8 +129,8 @@ test('createTelemetryPacket returns valid packet', () => {
   assert.strictEqual(packet.battery.voltage, 22.5);
   assert.strictEqual(packet.gps.satellites, 15);
   assert.strictEqual(packet.link.rssi, 90);
-  assert.strictEqual(packet.status, 'ACTIVE');
-  assert.strictEqual(packet.formation.role, 'LEADER');
+  assert.strictEqual(packet.status, 'NOMINAL');
+  assert.strictEqual(packet.formation.role, 'PRIMARY');
 });
 
 // --- Leader Election Score ---
@@ -173,28 +173,28 @@ test('Partial cohesion for moderate error', () => {
   assert.ok(cohesion > 0 && cohesion < 1, `Cohesion ${cohesion} should be between 0 and 1`);
 });
 
-// --- FPV: Message Types ---
-test('MessageType has FPV types', () => {
-  const fpvTypes = ['VIDEO_CTRL', 'CAMERA_CTRL', 'MSP_TELEM', 'GOGGLES', 'DVR_CTRL', 'DEVICE_SCAN'];
-  for (const t of fpvTypes) {
+// --- ISR: Message Types ---
+test('MessageType has ISR types', () => {
+  const isrTypes = ['ISR_CTRL', 'SENSOR_CTRL', 'MSP_STATE', 'HMD_STATE', 'RECORD_CTRL', 'DEVICE_SCAN'];
+  for (const t of isrTypes) {
     assert.strictEqual(MessageType[t], t, `Missing MessageType.${t}`);
   }
 });
 
-// --- FPV: Command Types ---
-test('CommandType has FPV commands', () => {
-  const fpvCmds = ['CAMERA_TILT', 'CAMERA_RECORD', 'CAMERA_PHOTO', 'GIMBAL_CONTROL', 'MSP_ARM', 'MSP_DISARM', 'MSP_SET_MODE'];
-  for (const c of fpvCmds) {
-    assert.strictEqual(CommandType[c], c, `Missing CommandType.${c}`);
+// --- ISR: Directive Types ---
+test('DirectiveType has ISR directives', () => {
+  const isrDirectives = ['SENSOR_TILT', 'SENSOR_RECORD', 'SENSOR_CAPTURE', 'GIMBAL_CONTROL', 'MSP_LAUNCH_PREP', 'MSP_STAND_DOWN', 'MSP_SET_MODE'];
+  for (const c of isrDirectives) {
+    assert.strictEqual(DirectiveType[c], c, `Missing DirectiveType.${c}`);
   }
 });
 
-// --- FPV: DroneStatus ---
-test('DroneStatus has FPV_SOLO', () => {
-  assert.strictEqual(DroneStatus.FPV_SOLO, 'FPV_SOLO');
+// --- ISR: OperationalStatus ---
+test('OperationalStatus has ISR_SOLO', () => {
+  assert.strictEqual(OperationalStatus.ISR_SOLO, 'ISR_SOLO');
 });
 
-// --- FPV: FlightMode ---
+// --- ISR: FlightMode ---
 test('FlightMode has all modes', () => {
   const modes = ['ANGLE', 'HORIZON', 'ACRO', 'AIR', 'TURTLE', 'GPS_RESCUE', 'STABILIZE', 'ALT_HOLD', 'LOITER', 'AUTO', 'GUIDED', 'RTL'];
   for (const m of modes) {
@@ -202,7 +202,7 @@ test('FlightMode has all modes', () => {
   }
 });
 
-// --- FPV: ProtocolType ---
+// --- ISR: ProtocolType ---
 test('ProtocolType has all protocols', () => {
   const protocols = ['MAVLINK', 'MSP', 'UNKNOWN'];
   for (const p of protocols) {
@@ -210,21 +210,21 @@ test('ProtocolType has all protocols', () => {
   }
 });
 
-// --- FPV: Telemetry Packet ---
-test('createFPVTelemetryPacket includes fpv extension', () => {
-  const packet = createFPVTelemetryPacket('ALPHA-1', {
+// --- ISR: State Packet ---
+test('createISRStatePacket includes fpv extension', () => {
+  const packet = createISRStatePacket('ALPHA-1', {
     seq: 1, lat: 33.6405, lon: -117.8443, alt_msl: 135, alt_agl: 120,
     roll: 0, pitch: 0, yaw: 0, ground_speed: 10, vertical_speed: 0, heading: 0,
     voltage: 22.5, current: 10, remaining_pct: 85,
     satellites: 15, hdop: 0.8, rssi: 90, quality: 95, latency_ms: 25,
-    status: 'ACTIVE', role: 'LEADER', cohesion: 0.95,
+    status: 'NOMINAL', role: 'PRIMARY', cohesion: 0.95,
     flight_mode: 'ACRO', camera_tilt: -15, mah_consumed: 450,
     cell_voltage: 3.75, flight_timer_s: 120, arm_timer_s: 90,
     home_distance_m: 55.3, home_direction_deg: 180,
     protocol: 'MSP',
   });
 
-  assert.strictEqual(packet.type, 'TELEM');
+  assert.strictEqual(packet.type, 'ASSET_STATE');
   assert.ok(packet.fpv, 'Missing fpv extension');
   assert.strictEqual(packet.fpv.flight_mode, 'ACRO');
   assert.strictEqual(packet.fpv.camera_tilt, -15);
@@ -237,24 +237,24 @@ test('createFPVTelemetryPacket includes fpv extension', () => {
   assert.strictEqual(packet.fpv.protocol, 'MSP');
 });
 
-// --- FPV: Video Control Packet ---
-test('createVideoControlPacket is valid', () => {
-  const packet = createVideoControlPacket('ALPHA-1', 'START', { url: 'rtsp://localhost:8554/fpv' });
-  assert.strictEqual(packet.type, 'VIDEO_CTRL');
+// --- ISR: Control Packet ---
+test('createISRControlPacket is valid', () => {
+  const packet = createISRControlPacket('ALPHA-1', 'START', { url: 'rtsp://localhost:8554/fpv' });
+  assert.strictEqual(packet.type, 'ISR_CTRL');
   assert.strictEqual(packet.drone_id, 'ALPHA-1');
   assert.strictEqual(packet.action, 'START');
   assert.strictEqual(packet.params.url, 'rtsp://localhost:8554/fpv');
   assert.ok(packet.timestamp);
 });
 
-// --- FPV: Base packet still works ---
-test('createFPVTelemetryPacket preserves base fields', () => {
-  const packet = createFPVTelemetryPacket('BRAVO-2', {
+// --- ISR: Base packet still works ---
+test('createISRStatePacket preserves base fields', () => {
+  const packet = createISRStatePacket('BRAVO-2', {
     seq: 5, lat: 34.0, lon: -118.0, alt_msl: 100, alt_agl: 85,
     roll: 3, pitch: -2, yaw: 90, ground_speed: 8, vertical_speed: 1, heading: 90,
     voltage: 23, current: 12, remaining_pct: 70,
     satellites: 14, hdop: 1.0, rssi: 85, quality: 90, latency_ms: 30,
-    status: 'ACTIVE', role: 'WINGMAN', cohesion: 0.88,
+    status: 'NOMINAL', role: 'ESCORT', cohesion: 0.88,
   });
 
   assert.strictEqual(packet.position.lat, 34.0);

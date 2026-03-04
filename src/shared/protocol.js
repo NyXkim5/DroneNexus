@@ -1,7 +1,7 @@
 /**
- * NEXUS Wire Protocol — Shared Constants & Definitions
+ * OVERWATCH Wire Protocol — Shared Constants & Definitions
  *
- * Reference implementation of the NEXUS communication protocol.
+ * Reference implementation of the OVERWATCH communication protocol.
  * Used by both ground station server and companion computer clients.
  */
 
@@ -9,50 +9,50 @@
 // Message Types
 // ============================================================
 const MessageType = {
-  TELEM:      'TELEM',       // Telemetry data (downlink, 10Hz)
-  HEARTBEAT:  'HEARTBEAT',   // Liveness check (bidirectional, 1Hz)
-  CMD:        'CMD',         // Operator command (uplink, on-demand)
-  FORMATION:  'FORMATION',   // Formation update (downlink, on-change)
-  WAYPOINT:   'WAYPOINT',    // Mission waypoint (uplink, on-demand)
-  PEER:       'PEER',        // Peer state exchange (lateral, 5Hz)
-  ALERT:      'ALERT',       // Fault notification (downlink, on-event)
-  ACK:        'ACK',         // Command acknowledgment (bidirectional)
-  VIDEO_CTRL:  'VIDEO_CTRL',  // Video stream control (start/stop/switch)
-  CAMERA_CTRL: 'CAMERA_CTRL', // Camera/gimbal command (tilt/record/photo)
-  MSP_TELEM:   'MSP_TELEM',   // MSP-sourced telemetry (translated)
-  GOGGLES:     'GOGGLES',     // Goggles telemetry bridge data
-  DVR_CTRL:    'DVR_CTRL',    // DVR recording control
-  DEVICE_SCAN: 'DEVICE_SCAN', // USB device detection results
+  ASSET_STATE:   'ASSET_STATE',     // Asset state data (downlink, 10Hz)
+  HEARTBEAT:     'HEARTBEAT',       // Liveness check (bidirectional, 1Hz)
+  DIRECTIVE:     'DIRECTIVE',       // Operator directive (uplink, on-demand)
+  OVERLAY_UPDATE:'OVERLAY_UPDATE',  // Overlay update (downlink, on-change)
+  OBJECTIVE:     'OBJECTIVE',       // Mission objective (uplink, on-demand)
+  PEER_STATE:    'PEER_STATE',      // Peer state exchange (lateral, 5Hz)
+  ACTIVITY:      'ACTIVITY',        // Activity notification (downlink, on-event)
+  ACK:           'ACK',             // Command acknowledgment (bidirectional)
+  ISR_CTRL:      'ISR_CTRL',        // ISR stream control (start/stop/switch)
+  SENSOR_CTRL:   'SENSOR_CTRL',     // Sensor/gimbal command (tilt/record/capture)
+  MSP_STATE:     'MSP_STATE',       // MSP-sourced state (translated)
+  HMD_STATE:     'HMD_STATE',       // HMD telemetry bridge data
+  RECORD_CTRL:   'RECORD_CTRL',     // Recording control
+  DEVICE_SCAN:   'DEVICE_SCAN',     // USB device detection results
 };
 
 // ============================================================
-// Drone Roles
+// Asset Classifications
 // ============================================================
-const DroneRole = {
-  LEADER:   'LEADER',
-  WINGMAN:  'WINGMAN',
-  RECON:    'RECON',
-  SUPPORT:  'SUPPORT',
-  TAIL:     'TAIL',
+const AssetClassification = {
+  PRIMARY:    'PRIMARY',
+  ESCORT:     'ESCORT',
+  ISR:        'ISR',
+  LOGISTICS:  'LOGISTICS',
+  OVERWATCH:  'OVERWATCH',
 };
 
 // ============================================================
-// Drone Status
+// Operational Status
 // ============================================================
-const DroneStatus = {
-  ACTIVE:      'ACTIVE',
-  LOW_BATT:    'LOW_BATT',
-  WEAK_SIGNAL: 'WEAK_SIGNAL',
-  RTL:         'RTL',
-  LANDED:      'LANDED',
-  LOST:        'LOST',
-  FPV_SOLO:    'FPV_SOLO',
+const OperationalStatus = {
+  NOMINAL:        'NOMINAL',
+  DEGRADED:       'DEGRADED',
+  COMMS_DEGRADED: 'COMMS_DEGRADED',
+  RTB:            'RTB',
+  GROUNDED:       'GROUNDED',
+  OFFLINE:        'OFFLINE',
+  ISR_SOLO:       'ISR_SOLO',
 };
 
 // ============================================================
-// Formation Types
+// Overlay Types
 // ============================================================
-const FormationType = {
+const OverlayType = {
   V_FORMATION:   'V_FORMATION',
   LINE_ABREAST:  'LINE_ABREAST',
   COLUMN:        'COLUMN',
@@ -83,35 +83,35 @@ const AlertSeverity = {
 };
 
 // ============================================================
-// Command Types
+// Directive Types
 // ============================================================
-const CommandType = {
-  ARM:              'ARM',
-  DISARM:           'DISARM',
-  TAKEOFF:          'TAKEOFF',
-  LAND:             'LAND',
-  RTL:              'RTL',
+const DirectiveType = {
+  LAUNCH_PREP:      'LAUNCH_PREP',
+  STAND_DOWN:       'STAND_DOWN',
+  LAUNCH:           'LAUNCH',
+  RECOVER:          'RECOVER',
+  RTB:              'RTB',
   GOTO:             'GOTO',
   SET_MODE:         'SET_MODE',
-  SET_FORMATION:    'SET_FORMATION',
+  SET_OVERLAY:      'SET_OVERLAY',
   SET_SPEED:        'SET_SPEED',
   SET_ALTITUDE:     'SET_ALTITUDE',
-  EMERGENCY_STOP:   'EMERGENCY_STOP',
-  CAMERA_TILT:      'CAMERA_TILT',
-  CAMERA_RECORD:    'CAMERA_RECORD',
-  CAMERA_PHOTO:     'CAMERA_PHOTO',
+  ABORT:            'ABORT',
+  SENSOR_TILT:      'SENSOR_TILT',
+  SENSOR_RECORD:    'SENSOR_RECORD',
+  SENSOR_CAPTURE:   'SENSOR_CAPTURE',
   GIMBAL_CONTROL:   'GIMBAL_CONTROL',
-  MSP_ARM:          'MSP_ARM',
-  MSP_DISARM:       'MSP_DISARM',
+  MSP_LAUNCH_PREP:  'MSP_LAUNCH_PREP',
+  MSP_STAND_DOWN:   'MSP_STAND_DOWN',
   MSP_SET_MODE:     'MSP_SET_MODE',
 };
 
 // ============================================================
-// Telemetry Packet Factory
+// Asset State Packet Factory
 // ============================================================
-function createTelemetryPacket(droneId, data) {
+function createAssetStatePacket(droneId, data) {
   return {
-    type: MessageType.TELEM,
+    type: MessageType.ASSET_STATE,
     drone_id: droneId,
     timestamp: new Date().toISOString(),
     seq: data.seq || 0,
@@ -146,7 +146,7 @@ function createTelemetryPacket(droneId, data) {
       quality: data.quality,
       latency_ms: data.latency_ms,
     },
-    status: data.status || DroneStatus.ACTIVE,
+    status: data.status || OperationalStatus.NOMINAL,
     formation: {
       role: data.role,
       offset_vector: data.offset_vector || { dx: 0, dy: 0 },
@@ -217,10 +217,10 @@ const ProtocolType = {
 };
 
 // ============================================================
-// FPV Telemetry Packet Factory
+// ISR State Packet Factory
 // ============================================================
-function createFPVTelemetryPacket(droneId, data) {
-  const base = createTelemetryPacket(droneId, data);
+function createISRStatePacket(droneId, data) {
+  const base = createAssetStatePacket(droneId, data);
   base.fpv = {
     flight_mode:        data.flight_mode || FlightMode.ANGLE,
     camera_tilt:        data.camera_tilt || 0,
@@ -237,11 +237,11 @@ function createFPVTelemetryPacket(droneId, data) {
 }
 
 // ============================================================
-// Video Control Packet Factory
+// ISR Control Packet Factory
 // ============================================================
-function createVideoControlPacket(droneId, action, params) {
+function createISRControlPacket(droneId, action, params) {
   return {
-    type: MessageType.VIDEO_CTRL,
+    type: MessageType.ISR_CTRL,
     drone_id: droneId,
     timestamp: new Date().toISOString(),
     action: action,
@@ -255,17 +255,17 @@ function createVideoControlPacket(droneId, action, params) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MessageType,
-    DroneRole,
-    DroneStatus,
-    FormationType,
+    AssetClassification,
+    OperationalStatus,
+    OverlayType,
     V_FORMATION_OFFSETS,
     AlertSeverity,
-    CommandType,
+    DirectiveType,
     FlightMode,
     ProtocolType,
-    createTelemetryPacket,
-    createFPVTelemetryPacket,
-    createVideoControlPacket,
+    createAssetStatePacket,
+    createISRStatePacket,
+    createISRControlPacket,
     calculateLeaderScore,
     calculateCohesion,
   };
