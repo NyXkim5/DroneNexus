@@ -13,7 +13,7 @@ from msp.protocol import (
     parse_status_ex, parse_battery_state, parse_api_version,
 )
 
-logger = logging.getLogger("nexus.msp")
+logger = logging.getLogger("overwatch.msp")
 
 # Parsers keyed by MSP code
 PARSERS = {

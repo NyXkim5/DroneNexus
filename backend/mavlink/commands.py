@@ -7,7 +7,7 @@ from typing import List
 from mavlink.connection import DroneConnection
 from protocol import Waypoint
 
-logger = logging.getLogger("nexus.commands")
+logger = logging.getLogger("overwatch.commands")
 
 
 class DroneCommander:

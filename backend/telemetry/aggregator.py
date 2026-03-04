@@ -8,24 +8,24 @@ import time
 import logging
 from typing import Dict, Set
 
-from config import NexusSettings
+from config import OverwatchSettings
 from telemetry.collector import DroneState
-from protocol import DroneStatus
+from protocol import OperationalStatus
 from swarm.alerts import AlertEngine
 
-logger = logging.getLogger("nexus.aggregator")
+logger = logging.getLogger("overwatch.aggregator")
 
 
 class SwarmAggregator:
     """
     Runs the 10Hz publish loop:
     1. Snapshot all DroneState objects
-    2. Derive status (LOW_BATT, WEAK_SIGNAL, LOST, etc.)
+    2. Derive status (DEGRADED, COMMS_DEGRADED, OFFLINE, etc.)
     3. Serialize as JSON array matching wire protocol
     4. Broadcast to all WebSocket clients
     """
 
-    def __init__(self, settings: NexusSettings):
+    def __init__(self, settings: OverwatchSettings):
         self.settings = settings
         self.drone_states: Dict[str, DroneState] = {}
         self.ws_clients: Set = set()
@@ -87,15 +87,15 @@ class SwarmAggregator:
     def _derive_status(self, state: DroneState) -> None:
         now = time.monotonic()
         if state.last_update > 0 and now - state.last_update > self.settings.heartbeat_timeout_ms / 1000:
-            state.status = DroneStatus.LOST
+            state.status = OperationalStatus.OFFLINE
         elif not state.in_air and state.alt_agl < 1:
-            state.status = DroneStatus.LANDED
+            state.status = OperationalStatus.GROUNDED
         elif state.remaining_pct < self.settings.low_battery_warning_pct:
-            state.status = DroneStatus.LOW_BATT
+            state.status = OperationalStatus.DEGRADED
         elif state.rssi < 60:
-            state.status = DroneStatus.WEAK_SIGNAL
+            state.status = OperationalStatus.COMMS_DEGRADED
         else:
-            state.status = DroneStatus.ACTIVE
+            state.status = OperationalStatus.NOMINAL
 
     def get_swarm_health(self) -> dict:
         states = list(self.drone_states.values())
@@ -104,7 +104,7 @@ class SwarmAggregator:
 
         avg_battery = sum(s.remaining_pct for s in states) / len(states)
         avg_cohesion = sum(s.cohesion for s in states) / len(states)
-        active_count = sum(1 for s in states if s.status == DroneStatus.ACTIVE)
+        active_count = sum(1 for s in states if s.status == OperationalStatus.NOMINAL)
         avg_link = sum(s.quality for s in states) / len(states)
 
         score = (

@@ -9,7 +9,7 @@ from typing import Optional
 from msp.connection import MSPConnection
 from msp.protocol import MSPCode
 
-logger = logging.getLogger("nexus.msp.commands")
+logger = logging.getLogger("overwatch.msp.commands")
 
 # Betaflight RC channel assignments (standard)
 CHANNEL_ROLL = 0

@@ -25,8 +25,8 @@ def test(name, fn):
         failed += 1
 
 
-print("NEXUS USB Scanner Tests")
-print("=======================\n")
+print("OVERWATCH USB Scanner Tests")
+print("===========================\n")
 
 
 def test_known_devices_populated():

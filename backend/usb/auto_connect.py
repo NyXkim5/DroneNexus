@@ -12,7 +12,7 @@ from usb.scanner import USBScanner, DetectedDevice
 if TYPE_CHECKING:
     from msp.connection import MSPConnection
 
-logger = logging.getLogger("nexus.usb.auto")
+logger = logging.getLogger("overwatch.usb.auto")
 
 
 class AutoConnector:

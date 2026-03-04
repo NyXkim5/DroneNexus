@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, Optional, List, Set
 
-logger = logging.getLogger("nexus.video")
+logger = logging.getLogger("overwatch.video")
 
 
 @dataclass
@@ -210,7 +210,7 @@ class VideoStreamManager:
             while True:
                 img = Image.new('RGB', (640, 480), color=(20, 20, 30))
                 draw = ImageDraw.Draw(img)
-                draw.text((220, 200), f"NEXUS FPV TEST", fill=(0, 255, 136))
+                draw.text((220, 200), f"OVERWATCH ISR TEST", fill=(0, 255, 136))
                 draw.text((250, 240), f"Frame {frame_num}", fill=(100, 150, 200))
                 draw.text((200, 280), time.strftime("%H:%M:%S"), fill=(255, 170, 0))
                 # Crosshair

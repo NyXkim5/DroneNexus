@@ -8,7 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional, Set
 
-logger = logging.getLogger("nexus.usb")
+logger = logging.getLogger("overwatch.usb")
 
 KNOWN_FC_DEVICES = [
     {'vid': 0x10c4, 'pid': 0xea60, 'label': 'CP2102 Flight Controller'},

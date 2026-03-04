@@ -1,7 +1,7 @@
 """
 Mock drone swarm — generates realistic telemetry without MAVSDK/PX4.
 Replicates the behavior of src/simulation/drone-simulator.js in Python.
-Used when NexusSettings.simulation_mode = True.
+Used when OverwatchSettings.simulation_mode = True.
 """
 import asyncio
 import math
@@ -10,10 +10,10 @@ import logging
 from typing import Dict, Optional, List
 
 from telemetry.collector import DroneState
-from protocol import DroneRole, DroneStatus, OffsetVector
-from config import DRONE_FLEET, NexusSettings
+from protocol import AssetClassification, OperationalStatus, OffsetVector
+from config import ASSET_ROSTER, OverwatchSettings
 
-logger = logging.getLogger("nexus.simulation")
+logger = logging.getLogger("overwatch.simulation")
 
 CENTER_LAT = 33.6405
 CENTER_LON = -117.8443
@@ -49,7 +49,7 @@ class MockDrone:
         self.drone_id = drone_id
         self.role = role
         self.index = index
-        self.state = DroneState(drone_id=drone_id, role=DroneRole(role))
+        self.state = DroneState(drone_id=drone_id, role=AssetClassification(role))
 
         # Orbit parameters
         self.orbit_angle = (index / 6) * math.pi * 2
@@ -75,7 +75,7 @@ class MockDrone:
         s.ground_speed = 11.0
         s.armed = True
         s.in_air = True
-        s.status = DroneStatus.ACTIVE
+        s.status = OperationalStatus.NOMINAL
         s.fix_type = "3D-RTK"
         s.offset_dx = V_OFFSETS.get(drone_id, OffsetVector(dx=0, dy=0)).dx
         s.offset_dy = V_OFFSETS.get(drone_id, OffsetVector(dx=0, dy=0)).dy
@@ -131,7 +131,7 @@ class MockDrone:
             s.vertical_speed = 0
             s.in_air = False
             s.armed = False
-            s.status = DroneStatus.LANDED
+            s.status = OperationalStatus.GROUNDED
             s.last_update = time.monotonic()
             return
 
@@ -223,7 +223,7 @@ class MockDrone:
             s.remaining_pct = max(0, s.remaining_pct - 0.01 * dt)
             s.voltage = 18 + (s.remaining_pct / 100) * 7
             s.current = 8 + math.sin(time.time() + self.index) * 2.5
-            s.status = DroneStatus.ACTIVE
+            s.status = OperationalStatus.NOMINAL
             s.in_air = True
             s.armed = True
             s.last_update = time.monotonic()
@@ -262,7 +262,7 @@ class MockDrone:
             s.remaining_pct = max(0, s.remaining_pct - 0.01 * dt)
             s.voltage = 18 + (s.remaining_pct / 100) * 7
             s.current = 8 + math.sin(time.time() + self.index) * 2.5
-            s.status = DroneStatus.ACTIVE
+            s.status = OperationalStatus.NOMINAL
             s.in_air = True
             s.armed = True
             s.last_update = time.monotonic()
@@ -272,7 +272,7 @@ class MockDrone:
         s.in_air = True
         s.armed = True
 
-        if self.role == "LEADER":
+        if self.role == "PRIMARY":
             self.orbit_angle += self.orbit_speed * dt
             s.lat = CENTER_LAT + math.cos(self.orbit_angle) * self.orbit_radius
             s.lon = CENTER_LON + math.sin(self.orbit_angle) * self.orbit_radius
@@ -333,11 +333,11 @@ class MockDrone:
 
         # Status derivation
         if s.remaining_pct < 25:
-            s.status = DroneStatus.LOW_BATT
+            s.status = OperationalStatus.DEGRADED
         elif s.rssi < 60:
-            s.status = DroneStatus.WEAK_SIGNAL
+            s.status = OperationalStatus.COMMS_DEGRADED
         else:
-            s.status = DroneStatus.ACTIVE
+            s.status = OperationalStatus.NOMINAL
 
         s.last_update = time.monotonic()
 
@@ -345,12 +345,12 @@ class MockDrone:
 class MockSwarm:
     """Manages all mock drones and runs the simulation tick loop."""
 
-    def __init__(self, settings: NexusSettings):
+    def __init__(self, settings: OverwatchSettings):
         self.settings = settings
         self.drones: Dict[str, MockDrone] = {}
         self._task: Optional[asyncio.Task] = None
 
-        for i, cfg in enumerate(DRONE_FLEET[:settings.sitl_drone_count]):
+        for i, cfg in enumerate(ASSET_ROSTER[:settings.sitl_drone_count]):
             self.drones[cfg.id] = MockDrone(cfg.id, cfg.role, i)
 
     def get_states(self) -> Dict[str, DroneState]:
@@ -358,7 +358,7 @@ class MockSwarm:
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._tick_loop())
-        logger.info(f"Mock swarm started with {len(self.drones)} drones")
+        logger.info(f"Mock swarm started with {len(self.drones)} assets")
 
     async def stop(self) -> None:
         if self._task:
@@ -370,6 +370,6 @@ class MockSwarm:
             t0 = time.monotonic()
             leader = self.drones.get("ALPHA-1")
             for drone in self.drones.values():
-                drone.update(interval, leader if drone.role != "LEADER" else None)
+                drone.update(interval, leader if drone.role != "PRIMARY" else None)
             elapsed = time.monotonic() - t0
             await asyncio.sleep(max(0, interval - elapsed))

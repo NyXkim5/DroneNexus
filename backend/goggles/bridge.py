@@ -1,7 +1,7 @@
 """
 FPV goggles telemetry bridge.
 Parses telemetry from DJI FPV, HDZero, and Walksnail goggles
-and translates it into NEXUS VideoLinkData.
+and translates it into OVERWATCH VideoLinkData.
 
 DJI and Walksnail use MSP-based protocols for OSD telemetry.
 HDZero uses a custom serial protocol for link statistics.
@@ -15,7 +15,7 @@ from typing import Optional
 
 from msp.protocol import MSPEncoder, MSPDecoder, MSPCode
 
-logger = logging.getLogger("nexus.goggles")
+logger = logging.getLogger("overwatch.goggles")
 
 
 @dataclass

@@ -6,7 +6,7 @@ from typing import Dict, Set, Callable, List
 from protocol import MissionState
 import logging
 
-logger = logging.getLogger("nexus.state_machine")
+logger = logging.getLogger("overwatch.state_machine")
 
 VALID_TRANSITIONS: Dict[MissionState, Set[MissionState]] = {
     MissionState.IDLE: {MissionState.ARMED},

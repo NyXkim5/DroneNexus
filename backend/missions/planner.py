@@ -1,5 +1,5 @@
 """
-Mission planning — converts NEXUS waypoints to MAVSDK MissionItems.
+Mission planning — converts OVERWATCH waypoints to MAVSDK MissionItems.
 """
 import math
 from typing import List
@@ -7,7 +7,7 @@ from protocol import Waypoint
 
 
 class MissionPlanner:
-    """Builds MAVSDK-compatible mission plans from NEXUS waypoint lists."""
+    """Builds MAVSDK-compatible mission plans from OVERWATCH waypoint lists."""
 
     @staticmethod
     def build_orbit_waypoints(wp: Waypoint, num_points: int = 16) -> List[Waypoint]:

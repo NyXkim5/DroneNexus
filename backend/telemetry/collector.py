@@ -8,9 +8,9 @@ import time
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from protocol import (
-    TelemetryPacket, Position, Attitude, Velocity,
+    AssetStatePacket, Position, Attitude, Velocity,
     Battery, GPS, Link, Formation, OffsetVector,
-    DroneStatus, DroneRole, FPVData, VideoLinkData,
+    OperationalStatus, AssetClassification, FPVData, VideoLinkData,
     FlightMode, ProtocolType,
 )
 
@@ -19,7 +19,7 @@ from protocol import (
 class DroneState:
     """Mutable state updated by telemetry streams, read by aggregator."""
     drone_id: str
-    role: DroneRole = DroneRole.WINGMAN
+    role: AssetClassification = AssetClassification.ESCORT
     seq: int = 0
 
     # Position
@@ -59,7 +59,7 @@ class DroneState:
     cohesion: float = 0.0
 
     # Derived status
-    status: DroneStatus = DroneStatus.LANDED
+    status: OperationalStatus = OperationalStatus.GROUNDED
     armed: bool = False
     in_air: bool = False
     last_update: float = 0.0
@@ -83,10 +83,10 @@ class DroneState:
     # Simulation state
     drone_state_label: str = "FLYING"
 
-    def to_telemetry_packet(self) -> TelemetryPacket:
+    def to_telemetry_packet(self) -> AssetStatePacket:
         self.seq += 1
-        return TelemetryPacket(
-            type="TELEM",
+        return AssetStatePacket(
+            type="ASSET_STATE",
             drone_id=self.drone_id,
             timestamp=datetime.now(timezone.utc).isoformat(
                 timespec="milliseconds"

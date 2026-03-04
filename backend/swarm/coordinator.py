@@ -12,16 +12,16 @@ from telemetry.collector import DroneState
 from swarm.formations import compute_formation_offsets, offset_to_latlon, calculate_cohesion
 from swarm.collision import CollisionAvoidance
 from swarm.geofence import Geofence
-from protocol import FormationType, OffsetVector, DroneRole
-from config import NexusSettings
+from protocol import OverlayType, OffsetVector, AssetClassification
+from config import OverwatchSettings
 
-logger = logging.getLogger("nexus.coordinator")
+logger = logging.getLogger("overwatch.coordinator")
 
 
 class SwarmCoordinator:
     """Leader-follower swarm coordination engine."""
 
-    def __init__(self, settings: NexusSettings, drone_states: Dict[str, DroneState]):
+    def __init__(self, settings: OverwatchSettings, drone_states: Dict[str, DroneState]):
         self.settings = settings
         self.drone_states = drone_states
         self.collision = CollisionAvoidance(settings.safety_bubble_m)
@@ -29,7 +29,7 @@ class SwarmCoordinator:
             vertices=settings.geofence_vertices,
             max_altitude_m=settings.max_altitude_m,
         )
-        self.current_formation = FormationType(settings.default_formation)
+        self.current_formation = OverlayType(settings.default_formation)
         self.formation_offsets = compute_formation_offsets(self.current_formation)
         self.target_speed: float = 10.0
         self.target_altitude: float = 30.0
@@ -53,7 +53,7 @@ class SwarmCoordinator:
 
     def set_formation(self, formation) -> None:
         if isinstance(formation, str):
-            formation = FormationType(formation)
+            formation = OverlayType(formation)
         self.current_formation = formation
         new_offsets = compute_formation_offsets(
             formation, self.settings.formation_spacing_m,
@@ -160,7 +160,7 @@ class SwarmCoordinator:
         best_score = -1.0
 
         for drone_id, state in self.drone_states.items():
-            if state.status.value in ("LOST", "LANDED"):
+            if state.status.value in ("OFFLINE", "GROUNDED"):
                 continue
 
             battery_score = state.remaining_pct / 100

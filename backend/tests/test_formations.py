@@ -7,17 +7,17 @@ from swarm.formations import (
     compute_formation_offsets, offset_to_latlon, calculate_cohesion,
     V_FORMATION_OFFSETS, DRONE_ORDER,
 )
-from protocol import FormationType, OffsetVector
+from protocol import OverlayType, OffsetVector
 
 
 def test_v_formation_leader_at_origin():
-    offsets = compute_formation_offsets(FormationType.V_FORMATION)
+    offsets = compute_formation_offsets(OverlayType.V_FORMATION)
     assert offsets["ALPHA-1"].dx == 0
     assert offsets["ALPHA-1"].dy == 0
 
 
 def test_v_formation_symmetric():
-    offsets = compute_formation_offsets(FormationType.V_FORMATION)
+    offsets = compute_formation_offsets(OverlayType.V_FORMATION)
     assert offsets["BRAVO-2"].dx == -offsets["CHARLIE-3"].dx
     assert offsets["BRAVO-2"].dy == offsets["CHARLIE-3"].dy
     assert offsets["DELTA-4"].dx == -offsets["ECHO-5"].dx
@@ -25,7 +25,7 @@ def test_v_formation_symmetric():
 
 
 def test_all_formations_have_all_drones():
-    for ft in FormationType:
+    for ft in OverlayType:
         offsets = compute_formation_offsets(ft)
         for drone_id in DRONE_ORDER:
             assert drone_id in offsets, f"{drone_id} missing from {ft.value}"
@@ -39,7 +39,7 @@ def test_offset_to_latlon_zero_heading():
 
 def test_offset_to_latlon_nonzero():
     lat, lon = offset_to_latlon(33.6405, -117.8443, 90.0, OffsetVector(dx=100, dy=0))
-    # dx=100m east, heading=90 → should rotate
+    # dx=100m east, heading=90 -> should rotate
     assert lat != 33.6405 or lon != -117.8443
 
 

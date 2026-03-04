@@ -11,16 +11,16 @@ import time
 import logging
 from typing import List, Optional
 
-from db.models import NexusDB
+from db.models import OverwatchDB
 from telemetry.aggregator import SwarmAggregator
 
-logger = logging.getLogger("nexus.replay")
+logger = logging.getLogger("overwatch.replay")
 
 
 class ReplayEngine:
     """Records and replays telemetry sessions via the database."""
 
-    def __init__(self, db: NexusDB, aggregator: SwarmAggregator):
+    def __init__(self, db: OverwatchDB, aggregator: SwarmAggregator):
         self._db = db
         self._aggregator = aggregator
 

@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 
 from telemetry.collector import DroneState
 
-logger = logging.getLogger("nexus.geofence")
+logger = logging.getLogger("overwatch.geofence")
 
 # Earth radius in meters for haversine calculations
 _EARTH_R = 6371000.0

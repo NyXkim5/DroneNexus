@@ -6,9 +6,9 @@ import asyncio
 import logging
 from typing import Dict, Optional
 
-from config import NexusSettings, DRONE_FLEET
+from config import OverwatchSettings, ASSET_ROSTER
 
-logger = logging.getLogger("nexus.mavlink")
+logger = logging.getLogger("overwatch.mavlink")
 
 
 class DroneConnection:
@@ -58,13 +58,13 @@ class DroneConnection:
 class MAVLinkConnectionManager:
     """Manages all drone connections for SITL or real hardware."""
 
-    def __init__(self, settings: NexusSettings):
+    def __init__(self, settings: OverwatchSettings):
         self.settings = settings
         self.connections: Dict[str, DroneConnection] = {}
 
     async def connect_all(self) -> None:
         tasks = []
-        for i, drone_cfg in enumerate(DRONE_FLEET[:self.settings.sitl_drone_count]):
+        for i, drone_cfg in enumerate(ASSET_ROSTER[:self.settings.sitl_drone_count]):
             port = self.settings.sitl_base_port + i
             address = f"udp://:{port}"
             conn = DroneConnection(drone_cfg.id, address)
@@ -72,7 +72,7 @@ class MAVLinkConnectionManager:
             tasks.append(conn.connect())
         results = await asyncio.gather(*tasks, return_exceptions=True)
         connected = sum(1 for c in self.connections.values() if c.connected)
-        logger.info(f"Connected {connected}/{len(self.connections)} drones")
+        logger.info(f"Connected {connected}/{len(self.connections)} assets")
 
     async def disconnect_all(self) -> None:
         for conn in self.connections.values():

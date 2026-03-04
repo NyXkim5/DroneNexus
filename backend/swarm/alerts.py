@@ -1,10 +1,10 @@
 """
-NEXUS Alert Engine — Evaluates drone telemetry against safety rules
+OVERWATCH Alert Engine — Evaluates asset telemetry against safety rules
 and emits AlertPacket messages to the HUD.
 
 Built-in rules:
   LOW_BATTERY, WEAK_SIGNAL, LINK_DEGRADED, ALTITUDE_LIMIT,
-  SPEED_LIMIT, DRONE_LOST, GPS_DEGRADED
+  SPEED_LIMIT, ASSET_OFFLINE, GPS_DEGRADED
 """
 from __future__ import annotations
 
@@ -17,11 +17,11 @@ from typing import Callable, Dict, List, Optional
 
 from pydantic import BaseModel
 
-from config import NexusSettings
-from protocol import AlertSeverity, DroneStatus, MessageType
+from config import OverwatchSettings
+from protocol import AlertSeverity, OperationalStatus, MessageType
 from telemetry.collector import DroneState
 
-logger = logging.getLogger("nexus.alerts")
+logger = logging.getLogger("overwatch.alerts")
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ class AlertRule:
     ----------
     name : str
         Rule identifier (e.g. "LOW_BATTERY").
-    check : Callable[[DroneState, NexusSettings], List[AlertPacket] | None]
+    check : Callable[[DroneState, OverwatchSettings], List[AlertPacket] | None]
         Function that inspects a single DroneState and returns zero or more
         AlertPacket instances if the condition fires.
     cooldown_seconds : float
@@ -45,7 +45,7 @@ class AlertRule:
         (drone_id, rule_name) pair.
     """
     name: str
-    check: Callable[["DroneState", "NexusSettings"], Optional[List["AlertPacket"]]]
+    check: Callable[["DroneState", "OverwatchSettings"], Optional[List["AlertPacket"]]]
     cooldown_seconds: float = 30.0
 
 
@@ -55,7 +55,7 @@ class AlertRule:
 
 class AlertPacket(BaseModel):
     """Wire-format alert broadcast to WebSocket clients."""
-    type: MessageType = MessageType.ALERT
+    type: MessageType = MessageType.ACTIVITY
     drone_id: str
     severity: AlertSeverity
     alert_type: str
@@ -72,7 +72,7 @@ class AlertPacket(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _check_low_battery(
-    state: DroneState, settings: NexusSettings
+    state: DroneState, settings: OverwatchSettings
 ) -> Optional[List[AlertPacket]]:
     alerts: List[AlertPacket] = []
     ts = _now_iso()
@@ -83,7 +83,7 @@ def _check_low_battery(
             drone_id=state.drone_id,
             severity=AlertSeverity.CRITICAL,
             alert_type="LOW_BATTERY",
-            message=f"Battery at {pct:.0f}%",
+            message=f"Asset power at {pct:.0f}%",
             value=pct,
             threshold=float(settings.low_battery_critical_pct),
             timestamp=ts,
@@ -93,7 +93,7 @@ def _check_low_battery(
             drone_id=state.drone_id,
             severity=AlertSeverity.WARNING,
             alert_type="LOW_BATTERY",
-            message=f"Battery at {pct:.0f}%",
+            message=f"Asset power at {pct:.0f}%",
             value=pct,
             threshold=float(settings.low_battery_warning_pct),
             timestamp=ts,
@@ -102,7 +102,7 @@ def _check_low_battery(
 
 
 def _check_weak_signal(
-    state: DroneState, settings: NexusSettings
+    state: DroneState, settings: OverwatchSettings
 ) -> Optional[List[AlertPacket]]:
     alerts: List[AlertPacket] = []
     ts = _now_iso()
@@ -113,7 +113,7 @@ def _check_weak_signal(
             drone_id=state.drone_id,
             severity=AlertSeverity.CRITICAL,
             alert_type="WEAK_SIGNAL",
-            message=f"RSSI at {rssi}",
+            message=f"Comms signal at {rssi}",
             value=float(rssi),
             threshold=40.0,
             timestamp=ts,
@@ -123,7 +123,7 @@ def _check_weak_signal(
             drone_id=state.drone_id,
             severity=AlertSeverity.WARNING,
             alert_type="WEAK_SIGNAL",
-            message=f"RSSI at {rssi}",
+            message=f"Comms signal at {rssi}",
             value=float(rssi),
             threshold=60.0,
             timestamp=ts,
@@ -132,7 +132,7 @@ def _check_weak_signal(
 
 
 def _check_link_degraded(
-    state: DroneState, settings: NexusSettings
+    state: DroneState, settings: OverwatchSettings
 ) -> Optional[List[AlertPacket]]:
     alerts: List[AlertPacket] = []
     ts = _now_iso()
@@ -162,14 +162,14 @@ def _check_link_degraded(
 
 
 def _check_altitude_limit(
-    state: DroneState, settings: NexusSettings
+    state: DroneState, settings: OverwatchSettings
 ) -> Optional[List[AlertPacket]]:
     if state.alt_agl > settings.max_altitude_m:
         return [AlertPacket(
             drone_id=state.drone_id,
             severity=AlertSeverity.WARNING,
             alert_type="ALTITUDE_LIMIT",
-            message=f"Altitude {state.alt_agl:.1f}m exceeds limit",
+            message=f"Altitude {state.alt_agl:.1f}m exceeds operational ceiling",
             value=state.alt_agl,
             threshold=settings.max_altitude_m,
             timestamp=_now_iso(),
@@ -178,14 +178,14 @@ def _check_altitude_limit(
 
 
 def _check_speed_limit(
-    state: DroneState, settings: NexusSettings
+    state: DroneState, settings: OverwatchSettings
 ) -> Optional[List[AlertPacket]]:
     if state.ground_speed > settings.max_speed_ms:
         return [AlertPacket(
             drone_id=state.drone_id,
             severity=AlertSeverity.WARNING,
             alert_type="SPEED_LIMIT",
-            message=f"Speed {state.ground_speed:.1f}m/s exceeds limit",
+            message=f"Speed {state.ground_speed:.1f}m/s exceeds operational limit",
             value=state.ground_speed,
             threshold=settings.max_speed_ms,
             timestamp=_now_iso(),
@@ -193,15 +193,15 @@ def _check_speed_limit(
     return None
 
 
-def _check_drone_lost(
-    state: DroneState, settings: NexusSettings
+def _check_asset_offline(
+    state: DroneState, settings: OverwatchSettings
 ) -> Optional[List[AlertPacket]]:
-    if state.status == DroneStatus.LOST:
+    if state.status == OperationalStatus.OFFLINE:
         return [AlertPacket(
             drone_id=state.drone_id,
             severity=AlertSeverity.CRITICAL,
-            alert_type="DRONE_LOST",
-            message=f"{state.drone_id} link lost",
+            alert_type="ASSET_OFFLINE",
+            message=f"{state.drone_id} comms lost",
             value=0.0,
             threshold=float(settings.heartbeat_timeout_ms),
             timestamp=_now_iso(),
@@ -210,7 +210,7 @@ def _check_drone_lost(
 
 
 def _check_gps_degraded(
-    state: DroneState, settings: NexusSettings
+    state: DroneState, settings: OverwatchSettings
 ) -> Optional[List[AlertPacket]]:
     alerts: List[AlertPacket] = []
     ts = _now_iso()
@@ -262,7 +262,7 @@ class AlertEngine:
     cooldowns to avoid flooding the HUD.
     """
 
-    def __init__(self, settings: NexusSettings) -> None:
+    def __init__(self, settings: OverwatchSettings) -> None:
         self.settings = settings
 
         # Cooldown tracker: (drone_id, rule_name) -> monotonic timestamp
@@ -275,7 +275,7 @@ class AlertEngine:
             AlertRule(name="LINK_DEGRADED",  check=_check_link_degraded,  cooldown_seconds=20.0),
             AlertRule(name="ALTITUDE_LIMIT", check=_check_altitude_limit, cooldown_seconds=10.0),
             AlertRule(name="SPEED_LIMIT",    check=_check_speed_limit,    cooldown_seconds=10.0),
-            AlertRule(name="DRONE_LOST",     check=_check_drone_lost,     cooldown_seconds=5.0),
+            AlertRule(name="ASSET_OFFLINE",  check=_check_asset_offline,  cooldown_seconds=5.0),
             AlertRule(name="GPS_DEGRADED",   check=_check_gps_degraded,   cooldown_seconds=20.0),
         ]
 
@@ -310,7 +310,7 @@ class AlertEngine:
 
         if results:
             logger.debug(
-                "Alert engine produced %d alert(s) for %d drone(s)",
+                "Alert engine produced %d alert(s) for %d asset(s)",
                 len(results),
                 len(states),
             )

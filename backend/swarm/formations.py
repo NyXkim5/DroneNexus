@@ -5,7 +5,7 @@ Matches protocol.js V_FORMATION_OFFSETS.
 """
 import math
 from typing import Dict
-from protocol import FormationType, OffsetVector
+from protocol import OverlayType, OffsetVector
 
 DRONE_ORDER = ["ALPHA-1", "BRAVO-2", "CHARLIE-3", "DELTA-4", "ECHO-5", "FOXTROT-6"]
 
@@ -21,13 +21,13 @@ V_FORMATION_OFFSETS: Dict[str, OffsetVector] = {
 
 
 def compute_formation_offsets(
-    formation: FormationType,
+    formation: OverlayType,
     spacing: float = 15.0,
 ) -> Dict[str, OffsetVector]:
-    if formation == FormationType.V_FORMATION:
+    if formation == OverlayType.V_FORMATION:
         return dict(V_FORMATION_OFFSETS)
 
-    elif formation == FormationType.LINE_ABREAST:
+    elif formation == OverlayType.LINE_ABREAST:
         return {
             "ALPHA-1":   OffsetVector(dx=0, dy=0),
             "BRAVO-2":   OffsetVector(dx=-spacing, dy=0),
@@ -37,13 +37,13 @@ def compute_formation_offsets(
             "FOXTROT-6": OffsetVector(dx=-3*spacing, dy=0),
         }
 
-    elif formation == FormationType.COLUMN:
+    elif formation == OverlayType.COLUMN:
         return {
             DRONE_ORDER[i]: OffsetVector(dx=0, dy=-i * spacing)
             for i in range(len(DRONE_ORDER))
         }
 
-    elif formation == FormationType.DIAMOND:
+    elif formation == OverlayType.DIAMOND:
         return {
             "ALPHA-1":   OffsetVector(dx=0, dy=0),
             "BRAVO-2":   OffsetVector(dx=-spacing, dy=-spacing),
@@ -53,7 +53,7 @@ def compute_formation_offsets(
             "FOXTROT-6": OffsetVector(dx=spacing, dy=-2*spacing),
         }
 
-    elif formation == FormationType.ORBIT:
+    elif formation == OverlayType.ORBIT:
         n = len(DRONE_ORDER)
         radius = spacing * 2
         offsets = {}
@@ -65,7 +65,7 @@ def compute_formation_offsets(
             )
         return offsets
 
-    elif formation == FormationType.SCATTER:
+    elif formation == OverlayType.SCATTER:
         import hashlib
         offsets = {}
         box = spacing * 4

@@ -32,8 +32,8 @@ def test(name, fn):
         failed += 1
 
 
-print("NEXUS MSP Protocol Tests")
-print("========================\n")
+print("OVERWATCH MSP Protocol Tests")
+print("============================\n")
 
 
 # ---- Encoder Tests ----

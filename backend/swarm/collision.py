@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import List
 from telemetry.collector import DroneState
 
-logger = logging.getLogger("nexus.collision")
+logger = logging.getLogger("overwatch.collision")
 
 
 @dataclass

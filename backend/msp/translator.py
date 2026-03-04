@@ -1,12 +1,12 @@
 """
-Translates MSP telemetry responses into NEXUS DroneState updates and FPV data.
-Maps Betaflight-specific field formats to the unified NEXUS telemetry model.
+Translates MSP telemetry responses into OVERWATCH DroneState updates and FPV data.
+Maps Betaflight-specific field formats to the unified OVERWATCH telemetry model.
 """
 import math
 import logging
 from typing import Optional
 
-logger = logging.getLogger("nexus.msp.translator")
+logger = logging.getLogger("overwatch.msp.translator")
 
 # Betaflight flight mode flag bit positions
 BETAFLIGHT_MODE_FLAGS = {
@@ -44,7 +44,7 @@ def msp_to_flight_mode(flags: int) -> str:
 
 
 class MSPTranslator:
-    """Maps MSP telemetry poll results to NEXUS-compatible drone state dicts."""
+    """Maps MSP telemetry poll results to OVERWATCH-compatible drone state dicts."""
 
     def __init__(self):
         self._flight_timer = 0.0
