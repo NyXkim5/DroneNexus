@@ -224,20 +224,8 @@ html, body {
   text-align: right;
 }
 
-/* Classification banner */
-.classification-banner {
-  background: var(--classification-bg);
-  color: var(--classification-text);
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 3px 0;
-  flex-shrink: 0;
-  z-index: 2000;
-}
+/* Classification banner — removed */
+.classification-banner { display: none; }
 
 /* TF callsign */
 .tf-callsign {
@@ -1204,22 +1192,430 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 }
 .timeline-time { font-family: var(--font-data); font-size: 10px; color: var(--text-secondary); min-width: 60px; }
 .timeline-desc { font-family: var(--font-ui); font-size: 11px; color: var(--text); }
+
+/* ============================================================
+   FIX #2: ARM/DISARM BUTTON STATE
+   ============================================================ */
+.cmd-btn-grid.safety-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.cmd-btn.state-active {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(63,185,80,0.1);
+  box-shadow: inset 0 0 12px rgba(63,185,80,0.05);
+}
+.cmd-btn.state-inactive {
+  border-color: var(--border);
+  color: var(--text-secondary);
+  background: transparent;
+}
+.cmd-btn.state-disarmed-active {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: rgba(210,153,34,0.08);
+  box-shadow: inset 0 0 12px rgba(210,153,34,0.05);
+}
+
+/* ============================================================
+   FIX #3: BOTTOM PANEL HOVER EFFECTS
+   ============================================================ */
+.bottom-metric {
+  transition: background 0.2s;
+}
+.bottom-metric:hover {
+  background: var(--panel-elevated);
+}
+
+/* Formation overlay clickable */
+.map-overlay.clickable {
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.map-overlay.clickable:hover {
+  border-color: var(--accent);
+}
+
+/* Notification badge */
+.notification-badge {
+  position: relative;
+}
+.notification-badge .badge-count {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-data);
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+}
+.notification-badge .badge-count.hidden { display: none; }
+
+/* Keyboard shortcut hints */
+.kbd-hint {
+  display: inline-block;
+  font-family: var(--font-data);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  color: var(--text-tertiary);
+  background: rgba(255,255,255,0.03);
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* ============================================================
+   FEATURE #4: DIAGNOSTICS PANEL
+   ============================================================ */
+.diag-section {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.diag-section-title {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.diag-health-score {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.diag-health-ring {
+  width: 64px;
+  height: 64px;
+  position: relative;
+}
+.diag-health-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.diag-health-ring .ring-bg {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 5;
+}
+.diag-health-ring .ring-fill {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s, stroke 0.5s;
+}
+.diag-health-pct {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-data);
+  font-size: 16px;
+  font-weight: 700;
+}
+.diag-health-label {
+  font-family: var(--font-label);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.diag-subsystem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.diag-subsystem-name {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--text);
+}
+.diag-subsystem-bar {
+  width: 60px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+.diag-subsystem-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s;
+}
+.diag-subsystem-val {
+  font-family: var(--font-data);
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 32px;
+  text-align: right;
+}
+.diag-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-data);
+  font-size: 11px;
+  padding: 3px 0;
+}
+.diag-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.diag-status-dot.ok { background: var(--green); }
+.diag-status-dot.warning { background: var(--amber); }
+.diag-status-dot.fault { background: var(--red); }
+.diag-sensor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+}
+.diag-motor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.diag-motor-card {
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 8px;
+}
+.diag-motor-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.diag-motor-stat {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.diag-cell-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-family: var(--font-data);
+  font-size: 11px;
+}
+.diag-cell-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.diag-cell-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+.diag-run-btn {
+  width: 100%;
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: rgba(68,147,248,0.08);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.diag-run-btn:hover {
+  background: rgba(68,147,248,0.15);
+}
+.diag-run-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.diag-progress {
+  width: 100%;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.diag-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.15s;
+  width: 0%;
+}
+.diag-results {
+  margin-top: 10px;
+}
+.diag-result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--text);
+}
+.diag-result-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ============================================================
+   FIX #1: DEBRIEF MODE ANALYTICS
+   ============================================================ */
+.debrief-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.debrief-stat-cell {
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 8px 10px;
+}
+.debrief-stat-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+.debrief-stat-value {
+  font-family: var(--font-data);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+.debrief-stat-unit {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-left: 2px;
+}
+.debrief-timeline-item {
+  display: flex;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  align-items: baseline;
+}
+.debrief-timeline-time {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--text-dim);
+  min-width: 40px;
+  flex-shrink: 0;
+}
+.debrief-timeline-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.debrief-timeline-msg {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--text);
+  flex: 1;
+}
+.debrief-asset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.debrief-asset-name {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--text);
+  min-width: 80px;
+}
+.debrief-asset-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.debrief-asset-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+.debrief-asset-pct {
+  font-family: var(--font-data);
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 36px;
+  text-align: right;
+}
+.debrief-replay-indicator {
+  font-family: var(--font-label);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.debrief-replay-indicator.recording {
+  background: rgba(63,185,80,0.12);
+  color: var(--green);
+}
+.debrief-replay-indicator.playing {
+  background: rgba(210,153,34,0.15);
+  color: var(--amber);
+  animation: osd-blink 1s infinite;
+}
+.debrief-replay-indicator.paused {
+  background: rgba(125,133,144,0.15);
+  color: var(--text-secondary);
+}
 </style>
 </head>
 <body>
 <div id="app">
   <!-- ==================== CLASSIFICATION BANNER (TOP) ==================== -->
-  <div class="classification-banner">UNCLASSIFIED // FOR OFFICIAL USE ONLY</div>
+  <div class="classification-banner">UNCLASSIFIED</div>
 
   <!-- ==================== TOP BAR ==================== -->
   <div id="top-bar">
     <div class="brand"><span class="brand-icon">&#9670;</span> OVERWATCH</div>
     <div class="brand-sub">GOTHAM // ISR PLATFORM</div>
     <div class="mode-switch">
-      <button class="mode-btn active" data-mode="OBSERVE">OBSERVE</button>
-      <button class="mode-btn" data-mode="TASK">TASK</button>
-      <button class="mode-btn" data-mode="DEBRIEF">DEBRIEF</button>
-      <button class="mode-btn" data-mode="ISR">ISR FEED</button>
+      <button class="mode-btn active" data-mode="OBSERVE" title="Observe mode (O)">OBSERVE</button>
+      <button class="mode-btn" data-mode="TASK" title="Task mode (T)">TASK</button>
+      <button class="mode-btn" data-mode="DEBRIEF" title="Debrief mode (D)">DEBRIEF</button>
+      <button class="mode-btn" data-mode="ISR" title="ISR Feed mode">ISR FEED</button>
     </div>
     <button class="quick-connect-btn" id="quick-connect-btn" title="Connect to OVERWATCH platform">CONNECT</button>
     <div class="connection-badge sim" id="connection-badge" title="Click to configure connection">
@@ -1319,7 +1715,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
           </select>
         </div>
       </div>
-      <div class="map-overlay" id="formation-overlay">
+      <div class="map-overlay clickable" id="formation-overlay" title="Click to cycle formation">
         <div class="formation-label">V-FORMATION</div>
         <div>
           <span class="cohesion-value" id="cohesion-value">97</span><span class="cohesion-unit">% COHESION</span>
@@ -1359,6 +1755,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
           <button class="inspector-tab active" data-tab="properties">PROPERTIES</button>
           <button class="inspector-tab" data-tab="relationships">RELATIONSHIPS</button>
           <button class="inspector-tab" data-tab="timeline">TIMELINE</button>
+          <button class="inspector-tab" data-tab="diagnostics">DIAGNOSTICS</button>
         </div>
         <div id="inspector-properties" class="inspector-tab-content active">
           <div id="detail-content"><div class="no-selection">SELECT AN ASSET</div></div>
@@ -1368,6 +1765,9 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         </div>
         <div id="inspector-timeline" class="inspector-tab-content">
           <div id="timeline-content"></div>
+        </div>
+        <div id="inspector-diagnostics" class="inspector-tab-content">
+          <div id="diagnostics-content"><div class="no-selection">SELECT AN ASSET</div></div>
         </div>
       </div>
       <!-- TASK MODE -->
@@ -1480,11 +1880,14 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         <button class="cmd-btn danger" id="fpv-estop" style="margin:8px 12px">ABORT</button>
       </div>
       <!-- DEBRIEF MODE -->
-      <div class="debrief-only cmd-panel">
+      <div class="debrief-only cmd-panel" style="overflow-y:auto">
         <div class="panel-header">DEBRIEF</div>
         <div class="cmd-section">
           <div class="cmd-section-title">Session Info</div>
           <div id="replay-info" style="font-family:var(--font-data);font-size:11px;color:var(--text)">Recording in progress...</div>
+          <div style="margin-top:6px">
+            <span class="debrief-replay-indicator recording" id="debrief-replay-state">RECORDING</span>
+          </div>
         </div>
         <div class="cmd-section">
           <div class="cmd-section-title">Playback Speed</div>
@@ -1495,6 +1898,45 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
             <button class="replay-speed-btn" data-speed="4">4x</button>
           </div>
         </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Operation Summary</div>
+          <div class="debrief-stat-grid" id="debrief-stats">
+            <div class="debrief-stat-cell">
+              <div class="debrief-stat-label">Flight Time</div>
+              <div class="debrief-stat-value" id="debrief-flight-time">0:00</div>
+            </div>
+            <div class="debrief-stat-cell">
+              <div class="debrief-stat-label">Directives</div>
+              <div class="debrief-stat-value" id="debrief-directives">0</div>
+            </div>
+            <div class="debrief-stat-cell">
+              <div class="debrief-stat-label">Avg Battery</div>
+              <div class="debrief-stat-value" id="debrief-avg-batt">--<span class="debrief-stat-unit">%</span></div>
+            </div>
+            <div class="debrief-stat-cell">
+              <div class="debrief-stat-label">Avg Speed</div>
+              <div class="debrief-stat-value" id="debrief-avg-speed">--<span class="debrief-stat-unit">m/s</span></div>
+            </div>
+            <div class="debrief-stat-cell">
+              <div class="debrief-stat-label">Distance</div>
+              <div class="debrief-stat-value" id="debrief-distance">--<span class="debrief-stat-unit">km</span></div>
+            </div>
+            <div class="debrief-stat-cell">
+              <div class="debrief-stat-label">Events</div>
+              <div class="debrief-stat-value" id="debrief-events">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Key Events</div>
+          <div id="debrief-key-events" style="max-height:150px;overflow-y:auto">
+            <div style="font-family:var(--font-data);font-size:10px;color:var(--text-secondary)">No key events yet</div>
+          </div>
+        </div>
+        <div class="cmd-section">
+          <div class="cmd-section-title">Per-Asset Performance</div>
+          <div id="debrief-asset-perf"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1503,7 +1945,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   <div id="bottom-panel">
     <div class="event-log-section">
       <div class="bottom-metric-header">
-        <span class="bottom-metric-title">Activity Stream</span>
+        <span class="bottom-metric-title notification-badge">Activity Stream<span class="badge-count hidden" id="event-badge">0</span></span>
       </div>
       <div class="event-log-list" id="event-log"></div>
     </div>
@@ -1560,7 +2002,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   </div>
 
   <!-- ==================== CLASSIFICATION BANNER (BOTTOM) ==================== -->
-  <div class="classification-banner">UNCLASSIFIED // FOR OFFICIAL USE ONLY</div>
+  <div class="classification-banner">UNCLASSIFIED</div>
 </div>
 
 <script>
@@ -2507,6 +2949,13 @@ function renderDroneList(drones) { updateAssetExplorer(drones); }
    ============================================================== */
 function selectDrone(id) {
   selectedDroneId = id;
+  // Pan map to asset location (Issue #3)
+  const assetDefs = typeof assets !== 'undefined' ? assets : null;
+  // We'll find the marker and pan in updateAssetExplorer's click handler
+  if (map && mapMarkers[id]) {
+    const latlng = mapMarkers[id].getLatLng();
+    map.panTo(latlng, { animate: true, duration: 0.5 });
+  }
 }
 
 // Timeline events per asset
@@ -2518,6 +2967,8 @@ function updateInspector(asset) {
     document.getElementById('detail-content').innerHTML = '<div class="no-selection">SELECT AN ASSET</div>';
     document.getElementById('relationships-content').innerHTML = '';
     document.getElementById('timeline-content').innerHTML = '';
+    const diagEl = document.getElementById('diagnostics-content');
+    if (diagEl) diagEl.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>';
     return;
   }
 
@@ -2677,6 +3128,233 @@ function updateInspector(asset) {
   tlContent.innerHTML = events.slice(-20).reverse().map(e =>
     '<div class="timeline-item"><span class="timeline-time">' + e.time + '</span><span class="timeline-desc">' + e.msg + '</span></div>'
   ).join('') || '<div style="padding:14px;color:var(--text-secondary);font-size:11px">No events recorded</div>';
+
+  // Diagnostics tab (Feature #4)
+  updateDiagnosticsPanel(asset);
+}
+
+/* ==============================================================
+   DIAGNOSTICS PANEL RENDERER (Feature #4)
+   ============================================================== */
+// Store diagnostics state per asset
+const diagState = {};
+function getDiagState(assetId) {
+  if (!diagState[assetId]) {
+    // Seed with simulated stable data
+    const seed = assetId.charCodeAt(0) + assetId.length;
+    diagState[assetId] = {
+      overallHealth: clamp(92 + (seed % 7), 85, 99),
+      subsystems: {
+        propulsion: clamp(90 + (seed % 9), 82, 99),
+        avionics: clamp(93 + (seed % 6), 87, 99),
+        comms: clamp(91 + (seed % 8), 84, 99),
+        power: clamp(88 + (seed % 10), 80, 98),
+        sensors: clamp(94 + (seed % 5), 88, 99),
+      },
+      motors: [
+        { rpm: 4200 + (seed % 300), temp: 42 + (seed % 8), health: clamp(95 + (seed % 4), 88, 99) },
+        { rpm: 4180 + ((seed * 2) % 280), temp: 41 + ((seed * 2) % 9), health: clamp(96 + ((seed * 2) % 3), 90, 99) },
+        { rpm: 4220 + ((seed * 3) % 260), temp: 43 + ((seed * 3) % 7), health: clamp(93 + ((seed * 3) % 5), 86, 99) },
+        { rpm: 4190 + ((seed * 4) % 290), temp: 44 + ((seed * 4) % 6), health: clamp(94 + ((seed * 4) % 4), 87, 99) },
+      ],
+      sensors: {
+        gps: 'OK', barometer: 'OK', magnetometer: seed % 7 === 0 ? 'WARNING' : 'OK',
+        accelerometer: 'OK', gyroscope: 'OK', lidar: seed % 11 === 0 ? 'WARNING' : 'OK',
+      },
+      escStatus: 'NOMINAL',
+      imuCalibration: 'CALIBRATED',
+      radioLink: clamp(93 + (seed % 6), 88, 99),
+      antennaStatus: 'DUAL-ACTIVE',
+      cellVoltages: [4.15, 4.13, 4.16, 4.12, 4.14, 4.11].map((v, i) => v + ((seed + i) % 5) * 0.01 - 0.02),
+      bmsHealth: clamp(96 + (seed % 3), 93, 99),
+      lastScanResults: null,
+      scanning: false,
+      scanProgress: 0,
+    };
+    // Inject a warning on motor 3 for some assets
+    if (seed % 5 === 0) {
+      diagState[assetId].motors[2].health = clamp(78 + (seed % 5), 74, 82);
+    }
+  }
+  return diagState[assetId];
+}
+
+function diagHealthColor(val) {
+  if (val >= 90) return 'var(--green)';
+  if (val >= 75) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function diagSensorDotClass(status) {
+  if (status === 'OK') return 'ok';
+  if (status === 'WARNING') return 'warning';
+  return 'fault';
+}
+
+function updateDiagnosticsPanel(asset) {
+  const el = document.getElementById('diagnostics-content');
+  if (!el) return;
+  const ds = getDiagState(asset.id);
+
+  // Add slight jitter each render to make it look live
+  ds.overallHealth = clamp(ds.overallHealth + (Math.random() - 0.5) * 0.3, 82, 99);
+  ds.motors.forEach(m => {
+    m.rpm = clamp(m.rpm + (Math.random() - 0.5) * 20, 3800, 4600);
+    m.temp = clamp(m.temp + (Math.random() - 0.5) * 0.5, 38, 55);
+  });
+  ds.radioLink = clamp(ds.radioLink + (Math.random() - 0.5) * 0.5, 85, 99);
+
+  const circ = 2 * Math.PI * 26;
+  const healthOffset = circ - (ds.overallHealth / 100) * circ;
+  const healthColor = diagHealthColor(ds.overallHealth);
+
+  let html = '';
+
+  // System Health
+  html += '<div class="diag-section"><div class="diag-section-title">System Health</div>';
+  html += '<div class="diag-health-score">';
+  html += '<div class="diag-health-ring"><svg viewBox="0 0 64 64"><circle class="ring-bg" cx="32" cy="32" r="26"/>';
+  html += '<circle class="ring-fill" cx="32" cy="32" r="26" stroke="' + healthColor + '" stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + healthOffset.toFixed(1) + '"/>';
+  html += '</svg><div class="diag-health-pct" style="color:' + healthColor + '">' + ds.overallHealth.toFixed(0) + '</div></div>';
+  html += '<div><div class="diag-health-label">Overall System Health</div>';
+  html += '<div style="font-family:var(--font-data);font-size:10px;color:var(--text-dim);margin-top:2px">' + asset.id + ' // ' + asset.role + '</div></div></div>';
+
+  // Subsystem breakdown
+  Object.entries(ds.subsystems).forEach(([name, val]) => {
+    const c = diagHealthColor(val);
+    html += '<div class="diag-subsystem"><span class="diag-subsystem-name">' + name.charAt(0).toUpperCase() + name.slice(1) + '</span>';
+    html += '<div class="diag-subsystem-bar"><div class="diag-subsystem-bar-fill" style="width:' + val + '%;background:' + c + '"></div></div>';
+    html += '<span class="diag-subsystem-val" style="color:' + c + '">' + val.toFixed(0) + '%</span></div>';
+  });
+  html += '</div>';
+
+  // Hardware — Motors
+  html += '<div class="diag-section"><div class="diag-section-title">Hardware Status</div>';
+  html += '<div class="diag-motor-grid">';
+  ds.motors.forEach((m, i) => {
+    const mc = diagHealthColor(m.health);
+    html += '<div class="diag-motor-card"><div class="diag-motor-label">Motor ' + (i + 1) + '</div>';
+    html += '<div class="diag-motor-stat">RPM: <span style="color:var(--text-bright)">' + m.rpm.toFixed(0) + '</span></div>';
+    html += '<div class="diag-motor-stat">Temp: <span style="color:' + (m.temp > 50 ? 'var(--amber)' : 'var(--text-bright)') + '">' + m.temp.toFixed(1) + '&deg;C</span></div>';
+    html += '<div class="diag-motor-stat">Health: <span style="color:' + mc + '">' + m.health.toFixed(0) + '%</span></div></div>';
+  });
+  html += '</div>';
+  html += '<div style="margin-top:8px"><div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">ESC: ' + ds.escStatus + '</span></div>';
+  html += '<div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">IMU: ' + ds.imuCalibration + '</span></div></div>';
+  html += '</div>';
+
+  // Sensor Health
+  html += '<div class="diag-section"><div class="diag-section-title">Sensor Health</div>';
+  html += '<div class="diag-sensor-grid">';
+  Object.entries(ds.sensors).forEach(([name, status]) => {
+    const dc = diagSensorDotClass(status);
+    html += '<div class="diag-status-indicator"><span class="diag-status-dot ' + dc + '"></span>';
+    html += '<span style="color:var(--text)">' + name.charAt(0).toUpperCase() + name.slice(1) + '</span>';
+    html += '<span style="color:' + (status === 'OK' ? 'var(--green)' : status === 'WARNING' ? 'var(--amber)' : 'var(--red)') + ';font-size:9px;margin-left:auto"> ' + status + '</span></div>';
+  });
+  html += '</div></div>';
+
+  // Communication
+  html += '<div class="diag-section"><div class="diag-section-title">Communication</div>';
+  html += '<div class="diag-subsystem"><span class="diag-subsystem-name">Radio Link</span>';
+  html += '<div class="diag-subsystem-bar"><div class="diag-subsystem-bar-fill" style="width:' + ds.radioLink + '%;background:' + diagHealthColor(ds.radioLink) + '"></div></div>';
+  html += '<span class="diag-subsystem-val" style="color:' + diagHealthColor(ds.radioLink) + '">' + ds.radioLink.toFixed(0) + '%</span></div>';
+  html += '<div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">Antenna: ' + ds.antennaStatus + '</span></div>';
+  html += '<div class="diag-subsystem"><span class="diag-subsystem-name">Signal Quality</span>';
+  const sq = asset.linkQuality || 95;
+  html += '<div class="diag-subsystem-bar"><div class="diag-subsystem-bar-fill" style="width:' + sq + '%;background:' + diagHealthColor(sq) + '"></div></div>';
+  html += '<span class="diag-subsystem-val" style="color:' + diagHealthColor(sq) + '">' + sq.toFixed(0) + '%</span></div>';
+  html += '</div>';
+
+  // Power Systems
+  html += '<div class="diag-section"><div class="diag-section-title">Power Systems (6S)</div>';
+  ds.cellVoltages.forEach((v, i) => {
+    const pct = clamp(((v - 3.3) / (4.2 - 3.3)) * 100, 0, 100);
+    const cc = v < 3.5 ? 'var(--red)' : v < 3.7 ? 'var(--amber)' : 'var(--green)';
+    html += '<div class="diag-cell-row"><span style="color:var(--text-dim);min-width:24px">C' + (i + 1) + '</span>';
+    html += '<div class="diag-cell-bar"><div class="diag-cell-bar-fill" style="width:' + pct.toFixed(0) + '%;background:' + cc + '"></div></div>';
+    html += '<span style="color:' + cc + ';min-width:40px;text-align:right">' + v.toFixed(2) + 'V</span></div>';
+  });
+  html += '<div style="margin-top:6px"><div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">BMS Health: ' + ds.bmsHealth + '%</span></div></div>';
+  html += '</div>';
+
+  // Run Diagnostics
+  html += '<div class="diag-section">';
+  html += '<button class="diag-run-btn" id="diag-run-btn" onclick="runDiagnosticScan(\'' + asset.id + '\')"' + (ds.scanning ? ' disabled' : '') + '>' + (ds.scanning ? 'SCANNING...' : 'RUN DIAGNOSTICS') + '</button>';
+  html += '<div class="diag-progress" id="diag-progress" style="' + (ds.scanning ? '' : 'display:none') + '"><div class="diag-progress-fill" id="diag-progress-fill" style="width:' + ds.scanProgress + '%"></div></div>';
+  if (ds.lastScanResults) {
+    html += '<div class="diag-results" id="diag-results">';
+    html += '<div style="font-family:var(--font-label);font-size:9px;color:var(--text-dim);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px">Scan Results</div>';
+    ds.lastScanResults.forEach(r => {
+      const ic = r.severity === 'ok' ? 'var(--green)' : r.severity === 'warning' ? 'var(--amber)' : 'var(--red)';
+      const dot = r.severity === 'ok' ? 'ok' : r.severity === 'warning' ? 'warning' : 'fault';
+      html += '<div class="diag-result-item"><span class="diag-result-icon"><span class="diag-status-dot ' + dot + '"></span></span><span style="color:' + ic + '">' + r.msg + '</span></div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function runDiagnosticScan(assetId) {
+  const ds = getDiagState(assetId);
+  if (ds.scanning) return;
+  ds.scanning = true;
+  ds.scanProgress = 0;
+  ds.lastScanResults = null;
+
+  const interval = setInterval(() => {
+    ds.scanProgress += 2 + Math.random() * 3;
+    if (ds.scanProgress >= 100) {
+      ds.scanProgress = 100;
+      clearInterval(interval);
+      ds.scanning = false;
+      // Generate simulated results
+      const seed = assetId.charCodeAt(0) + Date.now() % 100;
+      const results = [
+        { msg: 'All flight controllers responsive', severity: 'ok' },
+        { msg: 'GPS module firmware up to date', severity: 'ok' },
+        { msg: 'ESC firmware verified', severity: 'ok' },
+      ];
+      // Inject random warnings
+      const warnings = [
+        'Motor 3 bearing wear detected — schedule inspection',
+        'Magnetometer calibration drift +0.8 deg — recalibrate recommended',
+        'Battery cell C4 slightly below nominal — monitor',
+        'Propeller micro-crack detected on motor 2 — inspect before next flight',
+        'IMU temperature compensation offset increased — re-baseline recommended',
+        'Radio antenna VSWR slightly elevated — check connections',
+      ];
+      const numWarnings = (seed % 3 === 0) ? 2 : 1;
+      for (let i = 0; i < numWarnings; i++) {
+        results.push({ msg: warnings[(seed + i) % warnings.length], severity: 'warning' });
+      }
+      if (seed % 7 === 0) {
+        results.push({ msg: 'Barometer pressure sensor drift exceeds threshold', severity: 'fault' });
+      }
+      results.push({ msg: 'Diagnostic scan complete — ' + results.filter(r => r.severity === 'warning').length + ' warning(s)', severity: 'ok' });
+      ds.lastScanResults = results;
+    }
+    // Re-render if still viewing this asset
+    if (selectedDroneId === assetId) {
+      const progressEl = document.getElementById('diag-progress-fill');
+      if (progressEl) progressEl.style.width = ds.scanProgress + '%';
+      const progressBar = document.getElementById('diag-progress');
+      if (progressBar) progressBar.style.display = '';
+      const btn = document.getElementById('diag-run-btn');
+      if (btn) {
+        btn.disabled = ds.scanning;
+        btn.textContent = ds.scanning ? 'SCANNING... ' + ds.scanProgress.toFixed(0) + '%' : 'RUN DIAGNOSTICS';
+      }
+      if (!ds.scanning && ds.lastScanResults) {
+        // Full re-render to show results
+        const allAssets = window._overwatchAssets || [];
+        const asset = allAssets.find(a => a.id === assetId);
+        if (asset) updateDiagnosticsPanel(asset);
+      }
+    }
+  }, 80);
 }
 
 // backward compat
@@ -2737,14 +3415,15 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
   btn.addEventListener('click', () => setMode(btn.dataset.mode));
 });
 
-// Inspector tab switching
+// Inspector tab switching (supports DIAGNOSTICS tab - Feature #4)
 document.querySelectorAll('.inspector-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.inspector-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.inspector-tab-content').forEach(c => c.classList.remove('active'));
     tab.classList.add('active');
     const target = tab.dataset.tab;
-    document.getElementById('inspector-' + target).classList.add('active');
+    const targetEl = document.getElementById('inspector-' + target);
+    if (targetEl) targetEl.classList.add('active');
   });
 });
 
@@ -2778,6 +3457,7 @@ setMode('OBSERVE');
   // Initialize assets
   const assets = ASSET_DEFS.map((def, i) => new AssetSimulator(def, i));
   const drones = assets; // backward compat alias
+  window._overwatchAssets = assets; // expose for diagnostics panel
 
   // Initialize map
   initMap();
@@ -2814,12 +3494,36 @@ setMode('OBSERVE');
     if (btn) { btn.style.borderColor = ''; btn.style.color = ''; }
   }
 
+  // ---- ARM/DISARM VISUAL STATE (Fix #2) ----
+  let armedState = true; // start armed since drones start FLYING
+  function updateArmDisarmVisuals() {
+    const armBtn = document.getElementById('cmd-arm');
+    const disarmBtn = document.getElementById('cmd-disarm');
+    if (armedState) {
+      armBtn.classList.add('state-active');
+      armBtn.classList.remove('state-inactive');
+      disarmBtn.classList.remove('state-disarmed-active');
+      disarmBtn.classList.add('state-inactive');
+    } else {
+      armBtn.classList.remove('state-active');
+      armBtn.classList.add('state-inactive');
+      disarmBtn.classList.add('state-disarmed-active');
+      disarmBtn.classList.remove('state-inactive');
+    }
+  }
+  // Initialize
+  updateArmDisarmVisuals();
+
   // ---- COMMAND BUTTON HANDLERS ----
   document.getElementById('cmd-arm').addEventListener('click', () => {
     cmdEngine.execute('ARM', { droneId: selectedDroneId === drones[0].id ? null : selectedDroneId });
+    armedState = true;
+    updateArmDisarmVisuals();
   });
   document.getElementById('cmd-disarm').addEventListener('click', () => {
     cmdEngine.execute('DISARM', { droneId: selectedDroneId === drones[0].id ? null : selectedDroneId });
+    armedState = false;
+    updateArmDisarmVisuals();
   });
   document.getElementById('cmd-takeoff').addEventListener('click', () => {
     const alt = parseInt(document.getElementById('takeoff-alt').value);
@@ -3051,6 +3755,38 @@ setMode('OBSERVE');
       sparkHealth.draw();
       sparkLatency.draw();
       sparkBattery.draw();
+
+      // Track distance for debrief
+      drones.forEach(d => {
+        if (d.altitude > 1) {
+          debriefTracker.trackDistance(d.id, d.lat, d.lng);
+        }
+      });
+
+      // Update debrief panel
+      if (currentMode === 'DEBRIEF') {
+        updateDebriefPanel();
+      }
+
+      // Update diagnostics panel if viewing it
+      if (currentMode === 'OBSERVE') {
+        const diagTab = document.querySelector('.inspector-tab[data-tab="diagnostics"]');
+        if (diagTab && diagTab.classList.contains('active')) {
+          const sel = drones.find(d => d.id === selectedDroneId);
+          if (sel) updateDiagnosticsPanel(sel);
+        }
+      }
+
+      // Update arm/disarm visual state based on actual drone state
+      const selDrone = drones.find(d => d.id === selectedDroneId);
+      if (selDrone) {
+        const isArmed = selDrone.armed || selDrone.droneState === 'FLYING' || selDrone.droneState === 'ARMED' ||
+                         selDrone.droneState === 'TAKING_OFF' || selDrone.droneState === 'GOTO' || selDrone.droneState === 'MISSION';
+        if (armedState !== isArmed) {
+          armedState = isArmed;
+          updateArmDisarmVisuals();
+        }
+      }
     }
 
     // Random events
@@ -3467,6 +4203,169 @@ setMode('OBSERVE');
       }
       showToast('Flight mode: ' + mode);
     });
+  });
+
+  // ---- Formation overlay click to cycle (Fix #3) ----
+  const formationOrder = ['V_FORMATION', 'LINE_ABREAST', 'COLUMN', 'DIAMOND', 'ORBIT', 'SCATTER'];
+  let currentFormationIndex = 0;
+  document.getElementById('formation-overlay').addEventListener('click', () => {
+    currentFormationIndex = (currentFormationIndex + 1) % formationOrder.length;
+    const formation = formationOrder[currentFormationIndex];
+    cmdEngine.execute('SET_FORMATION', { formation });
+    document.getElementById('cmd-formation').value = formation;
+  });
+
+  // ---- Notification badge (Fix #3) ----
+  let unreadEventCount = 0;
+  let eventLogFocused = false;
+  const eventBadge = document.getElementById('event-badge');
+  const eventLogSection = document.querySelector('.event-log-section');
+
+  // Track when user scrolls to bottom of event log
+  const eventLogEl = document.getElementById('event-log');
+  if (eventLogEl) {
+    eventLogEl.addEventListener('scroll', () => {
+      if (eventLogEl.scrollTop + eventLogEl.clientHeight >= eventLogEl.scrollHeight - 20) {
+        unreadEventCount = 0;
+        if (eventBadge) { eventBadge.textContent = '0'; eventBadge.classList.add('hidden'); }
+      }
+    });
+  }
+
+  // Override addEvent to track unread count
+  const _origAddEvent = addEvent;
+  addEvent = function(ev) {
+    _origAddEvent(ev);
+    unreadEventCount++;
+    if (eventBadge) {
+      eventBadge.textContent = unreadEventCount > 99 ? '99+' : String(unreadEventCount);
+      eventBadge.classList.remove('hidden');
+    }
+  };
+
+  // ---- Debrief analytics tracking ----
+  const debriefTracker = {
+    startTime: Date.now(),
+    totalDistance: 0,
+    lastPositions: {},
+    keyEvents: [],
+    addKeyEvent(msg, severity) {
+      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(0);
+      const mins = Math.floor(elapsed / 60);
+      const secs = String(elapsed % 60).padStart(2, '0');
+      this.keyEvents.push({ time: mins + ':' + secs, msg, severity });
+      if (this.keyEvents.length > 30) this.keyEvents.shift();
+    },
+    trackDistance(droneId, lat, lng) {
+      if (this.lastPositions[droneId]) {
+        const dLat = (lat - this.lastPositions[droneId].lat) * 111320;
+        const dLng = (lng - this.lastPositions[droneId].lng) * 111320 * Math.cos(lat * Math.PI / 180);
+        this.totalDistance += Math.sqrt(dLat * dLat + dLng * dLng);
+      }
+      this.lastPositions[droneId] = { lat, lng };
+    },
+  };
+
+  // Patch cmdEngine to track key events for debrief
+  const _origExecute = cmdEngine.execute.bind(cmdEngine);
+  cmdEngine.execute = function(cmd, params) {
+    _origExecute(cmd, params);
+    const severityMap = { ARM: 'info', DISARM: 'info', TAKEOFF: 'ok', LAND: 'warn', RTL: 'warn', GOTO: 'info', EMERGENCY_STOP: 'alert', EXECUTE_MISSION: 'ok', SET_FORMATION: 'info' };
+    debriefTracker.addKeyEvent(cmd + (params && params.droneId ? ' -> ' + params.droneId : ''), severityMap[cmd] || 'info');
+  };
+
+  function updateDebriefPanel() {
+    const elapsedSec = (Date.now() - debriefTracker.startTime) / 1000;
+    const mins = Math.floor(elapsedSec / 60);
+    const secs = Math.floor(elapsedSec % 60);
+    const ftEl = document.getElementById('debrief-flight-time');
+    if (ftEl) ftEl.textContent = mins + ':' + String(secs).padStart(2, '0');
+
+    const dirEl = document.getElementById('debrief-directives');
+    if (dirEl) dirEl.textContent = cmdEngine.log.length;
+
+    const avgBat = drones.reduce((s, d) => s + d.battery, 0) / drones.length;
+    const abEl = document.getElementById('debrief-avg-batt');
+    if (abEl) abEl.innerHTML = avgBat.toFixed(0) + '<span class="debrief-stat-unit">%</span>';
+
+    const avgSpd = drones.reduce((s, d) => s + d.speed, 0) / drones.length;
+    const asEl = document.getElementById('debrief-avg-speed');
+    if (asEl) asEl.innerHTML = avgSpd.toFixed(1) + '<span class="debrief-stat-unit">m/s</span>';
+
+    const distKm = debriefTracker.totalDistance / 1000;
+    const distEl = document.getElementById('debrief-distance');
+    if (distEl) distEl.innerHTML = distKm.toFixed(2) + '<span class="debrief-stat-unit">km</span>';
+
+    const evEl = document.getElementById('debrief-events');
+    if (evEl) evEl.textContent = activityStream.length;
+
+    // Key events
+    const keEl = document.getElementById('debrief-key-events');
+    if (keEl) {
+      if (debriefTracker.keyEvents.length === 0) {
+        keEl.innerHTML = '<div style="font-family:var(--font-data);font-size:10px;color:var(--text-secondary)">No key events yet</div>';
+      } else {
+        keEl.innerHTML = debriefTracker.keyEvents.slice().reverse().map(e => {
+          const dotColor = e.severity === 'ok' ? 'var(--green)' : e.severity === 'warn' ? 'var(--amber)' : e.severity === 'alert' ? 'var(--red)' : 'var(--accent)';
+          return '<div class="debrief-timeline-item"><span class="debrief-timeline-time">' + e.time + '</span>' +
+            '<span class="debrief-timeline-dot" style="background:' + dotColor + '"></span>' +
+            '<span class="debrief-timeline-msg">' + e.msg + '</span></div>';
+        }).join('');
+      }
+    }
+
+    // Per-asset performance
+    const perfEl = document.getElementById('debrief-asset-perf');
+    if (perfEl) {
+      perfEl.innerHTML = drones.map(d => {
+        const bc = batteryColor(d.battery);
+        return '<div class="debrief-asset-row">' +
+          '<span style="width:6px;height:6px;border-radius:50%;background:' + d.color + ';flex-shrink:0"></span>' +
+          '<span class="debrief-asset-name">' + d.id + '</span>' +
+          '<div class="debrief-asset-bar"><div class="debrief-asset-bar-fill" style="width:' + d.battery + '%;background:' + bc + '"></div></div>' +
+          '<span class="debrief-asset-pct" style="color:' + bc + '">' + d.battery.toFixed(0) + '%</span></div>';
+      }).join('');
+    }
+
+    // Replay state indicator
+    const stateEl = document.getElementById('debrief-replay-state');
+    if (stateEl) {
+      if (replaySystem.playing) {
+        stateEl.className = 'debrief-replay-indicator playing';
+        stateEl.textContent = 'REPLAYING';
+      } else if (replaySystem.recording) {
+        stateEl.className = 'debrief-replay-indicator recording';
+        stateEl.textContent = 'RECORDING';
+      } else {
+        stateEl.className = 'debrief-replay-indicator paused';
+        stateEl.textContent = 'PAUSED';
+      }
+    }
+  }
+
+  // ---- Global keyboard shortcuts (Fix #3) ----
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+    const key = e.key;
+
+    // Number keys 1-6 to select assets
+    if (key >= '1' && key <= '6') {
+      const idx = parseInt(key) - 1;
+      if (idx < drones.length) {
+        e.preventDefault();
+        selectDrone(drones[idx].id);
+        showToast('Selected ' + drones[idx].id);
+      }
+      return;
+    }
+
+    // Mode shortcuts (only when not in ISR mode, which has its own shortcuts)
+    if (currentMode !== 'ISR') {
+      if (key.toLowerCase() === 'o') { e.preventDefault(); setMode('OBSERVE'); return; }
+      if (key.toLowerCase() === 't') { e.preventDefault(); setMode('TASK'); return; }
+      if (key.toLowerCase() === 'd') { e.preventDefault(); setMode('DEBRIEF'); return; }
+    }
   });
 
   // ---- Keyboard shortcuts (SOLO mode) ----
