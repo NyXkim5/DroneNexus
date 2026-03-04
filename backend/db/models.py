@@ -1,5 +1,5 @@
 """
-SQLite persistence via aiosqlite for telemetry, commands, and events.
+SQLite persistence via aiosqlite for telemetry, directives, and events.
 """
 import aiosqlite
 import json
@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 import logging
 
-logger = logging.getLogger("nexus.db")
+logger = logging.getLogger("overwatch.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS telemetry (
@@ -47,10 +47,10 @@ CREATE INDEX IF NOT EXISTS idx_events_ts ON events(timestamp);
 """
 
 
-class NexusDB:
-    """Async SQLite database for telemetry logging and replay."""
+class OverwatchDB:
+    """Async SQLite database for OVERWATCH telemetry logging and replay."""
 
-    def __init__(self, db_path: str = "nexus.db"):
+    def __init__(self, db_path: str = "overwatch.db"):
         self.db_path = db_path
         self._db: Optional[aiosqlite.Connection] = None
 

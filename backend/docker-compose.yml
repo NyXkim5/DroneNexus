@@ -1,17 +1,17 @@
 version: "3.8"
 
 services:
-  nexus-gcs:
+  overwatch-platform:
     build: .
     ports:
       - "8765:8765"
     volumes:
-      - nexus-data:/data
+      - overwatch-data:/data
     environment:
-      - NEXUS_SIMULATION_MODE=true
-      - NEXUS_TELEMETRY_RATE_HZ=10
-      - NEXUS_SITL_DRONE_COUNT=6
+      - OVERWATCH_SIMULATION_MODE=true
+      - OVERWATCH_TELEMETRY_RATE_HZ=10
+      - OVERWATCH_SITL_DRONE_COUNT=6
     restart: unless-stopped
 
 volumes:
-  nexus-data:
+  overwatch-data:

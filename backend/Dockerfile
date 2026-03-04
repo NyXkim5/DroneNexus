@@ -9,7 +9,7 @@ COPY . .
 
 EXPOSE 8765
 
-ENV NEXUS_SIMULATION_MODE=true
-ENV NEXUS_DB_PATH=/data/nexus.db
+ENV OVERWATCH_SIMULATION_MODE=true
+ENV OVERWATCH_DB_PATH=/data/overwatch.db
 
 CMD ["python3", "main.py"]

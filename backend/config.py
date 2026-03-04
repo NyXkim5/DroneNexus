@@ -1,25 +1,25 @@
 """
-NEXUS Ground Control Station — Configuration
-Loaded from environment variables with NEXUS_ prefix.
+OVERWATCH ISR Platform — Configuration
+Loaded from environment variables with OVERWATCH_ prefix.
 """
 from pydantic_settings import BaseSettings
 from pydantic import BaseModel
 from typing import List, Tuple
 
 
-class DroneConfig(BaseModel):
+class AssetConfig(BaseModel):
     id: str
     role: str
     color: str
 
 
-DRONE_FLEET: List[DroneConfig] = [
-    DroneConfig(id="ALPHA-1",   role="LEADER",  color="#00ff88"),
-    DroneConfig(id="BRAVO-2",   role="WINGMAN", color="#3388ff"),
-    DroneConfig(id="CHARLIE-3", role="RECON",   color="#ffaa00"),
-    DroneConfig(id="DELTA-4",   role="WINGMAN", color="#ff3355"),
-    DroneConfig(id="ECHO-5",    role="SUPPORT", color="#00ccff"),
-    DroneConfig(id="FOXTROT-6", role="TAIL",    color="#aa55ff"),
+ASSET_ROSTER: List[AssetConfig] = [
+    AssetConfig(id="ALPHA-1",   role="PRIMARY",    color="#00ff88"),
+    AssetConfig(id="BRAVO-2",   role="ESCORT",     color="#3388ff"),
+    AssetConfig(id="CHARLIE-3", role="ISR",        color="#ffaa00"),
+    AssetConfig(id="DELTA-4",   role="ESCORT",     color="#ff3355"),
+    AssetConfig(id="ECHO-5",    role="LOGISTICS",  color="#00ccff"),
+    AssetConfig(id="FOXTROT-6", role="OVERWATCH",  color="#aa55ff"),
 ]
 
 
@@ -74,7 +74,7 @@ class USBSettings(BaseModel):
     ]
 
 
-class NexusSettings(BaseSettings):
+class OverwatchSettings(BaseSettings):
     # Server
     ws_port: int = 8765
     http_port: int = 8080
@@ -111,7 +111,7 @@ class NexusSettings(BaseSettings):
     cohesion_threshold: float = 0.75
 
     # Database
-    db_path: str = "nexus.db"
+    db_path: str = "overwatch.db"
 
     # Mode
     simulation_mode: bool = True
@@ -125,4 +125,4 @@ class NexusSettings(BaseSettings):
     # USB Auto-Detection
     usb: USBSettings = USBSettings()
 
-    model_config = {"env_prefix": "NEXUS_"}
+    model_config = {"env_prefix": "OVERWATCH_"}
