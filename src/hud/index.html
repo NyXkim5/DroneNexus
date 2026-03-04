@@ -1164,13 +1164,14 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 
 /* Inspector tabs */
 .inspector-tabs {
-  display: flex; border-bottom: 1px solid var(--border);
+  display: flex; border-bottom: 1px solid var(--border); overflow: hidden;
 }
 .inspector-tab {
   font-family: var(--font-label); font-size: 10px; font-weight: 600;
-  letter-spacing: 0.05em; text-transform: uppercase; padding: 8px 14px;
+  letter-spacing: 0.05em; text-transform: uppercase; padding: 8px 6px;
   border: none; border-bottom: 2px solid transparent; background: transparent;
   color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
+  flex: 1; text-align: center; white-space: nowrap;
 }
 .inspector-tab.active { color: var(--text); border-bottom-color: var(--accent); }
 .inspector-tab:hover:not(.active) { color: var(--text); }
@@ -1487,6 +1488,34 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 }
 
 /* ============================================================
+   FEATURE #5: INSIGHTS PANEL (Foundry-level Analytics)
+   ============================================================ */
+.insight-section { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.insight-section-title { font-family: var(--font-label); font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+.insight-card { background: var(--panel-elevated); border-radius: 3px; padding: 8px 10px; margin-bottom: 6px; border-left: 3px solid var(--accent); }
+.insight-card.warning { border-left-color: var(--amber); }
+.insight-card.critical { border-left-color: var(--red); }
+.insight-card.positive { border-left-color: var(--green); }
+.insight-label { font-family: var(--font-label); font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.3px; }
+.insight-value { font-family: var(--font-data); font-size: 13px; color: var(--text-bright); margin-top: 2px; }
+.insight-sub { font-family: var(--font-data); font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+.insight-trend { display: inline-block; font-size: 10px; margin-left: 6px; }
+.insight-trend.up { color: var(--green); }
+.insight-trend.down { color: var(--red); }
+.insight-trend.stable { color: var(--text-dim); }
+.insight-risk-meter { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.insight-risk-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+.insight-rec { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; background: var(--panel-elevated); border-radius: 3px; margin-bottom: 4px; }
+.insight-rec-icon { flex-shrink: 0; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+.insight-rec-text { font-family: var(--font-data); font-size: 10px; color: var(--text); line-height: 1.4; }
+.insight-sparkline-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.insight-sparkline-label { font-family: var(--font-label); font-size: 9px; color: var(--text-dim); min-width: 50px; text-transform: uppercase; letter-spacing: 0.3px; }
+.insight-mini-spark { width: 80px; height: 20px; }
+.insight-correlation { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
+.insight-corr-pair { font-family: var(--font-data); font-size: 10px; color: var(--text); }
+.insight-corr-val { font-family: var(--font-data); font-size: 10px; font-weight: 600; }
+
+/* ============================================================
    FIX #1: DEBRIEF MODE ANALYTICS
    ============================================================ */
 .debrief-stat-grid {
@@ -1752,10 +1781,11 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       <div class="observe-only">
         <div class="panel-header" id="detail-header">INSPECTOR</div>
         <div class="inspector-tabs" id="inspector-tabs">
-          <button class="inspector-tab active" data-tab="properties">PROPERTIES</button>
-          <button class="inspector-tab" data-tab="relationships">RELATIONSHIPS</button>
-          <button class="inspector-tab" data-tab="timeline">TIMELINE</button>
-          <button class="inspector-tab" data-tab="diagnostics">DIAGNOSTICS</button>
+          <button class="inspector-tab active" data-tab="properties">PROPS</button>
+          <button class="inspector-tab" data-tab="relationships">RELS</button>
+          <button class="inspector-tab" data-tab="timeline">TIME</button>
+          <button class="inspector-tab" data-tab="diagnostics">DIAG</button>
+          <button class="inspector-tab" data-tab="insights">INTEL</button>
         </div>
         <div id="inspector-properties" class="inspector-tab-content active">
           <div id="detail-content"><div class="no-selection">SELECT AN ASSET</div></div>
@@ -1768,6 +1798,9 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         </div>
         <div id="inspector-diagnostics" class="inspector-tab-content">
           <div id="diagnostics-content"><div class="no-selection">SELECT AN ASSET</div></div>
+        </div>
+        <div id="inspector-insights" class="inspector-tab-content">
+          <div id="insights-content"><div class="no-selection">SELECT AN ASSET</div></div>
         </div>
       </div>
       <!-- TASK MODE -->
@@ -3131,6 +3164,9 @@ function updateInspector(asset) {
 
   // Diagnostics tab (Feature #4)
   updateDiagnosticsPanel(asset);
+
+  // Insights tab (Feature #5 — Foundry-level analytics)
+  updateInsightsPanel(asset);
 }
 
 /* ==============================================================
@@ -3357,6 +3393,286 @@ function runDiagnosticScan(assetId) {
   }, 80);
 }
 
+/* ==============================================================
+   INSIGHTS PANEL RENDERER (Feature #5 — Foundry-level Analytics)
+   ============================================================== */
+const insightState = {};
+function getInsightState(assetId) {
+  if (!insightState[assetId]) {
+    insightState[assetId] = {
+      batteryHistory: [],
+      speedHistory: [],
+      altHistory: [],
+      signalHistory: [],
+      anomalies: [],
+      lastUpdate: 0,
+    };
+  }
+  return insightState[assetId];
+}
+
+function drawMiniSparkline(canvasEl, data, color) {
+  if (!canvasEl || data.length < 2) return;
+  const ctx = canvasEl.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvasEl.clientWidth;
+  const h = canvasEl.clientHeight;
+  canvasEl.width = w * dpr;
+  canvasEl.height = h * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+  let minV = Infinity, maxV = -Infinity;
+  data.forEach(v => { if (v < minV) minV = v; if (v > maxV) maxV = v; });
+  const range = maxV - minV || 1;
+  const step = w / (data.length - 1);
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = i * step;
+    const y = 2 + (h - 4) - ((v - minV) / range) * (h - 4);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
+function updateInsightsPanel(asset) {
+  const container = document.getElementById('insights-content');
+  if (!container) return;
+  if (!asset) {
+    container.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>';
+    return;
+  }
+
+  const is = getInsightState(asset.id);
+  const now = Date.now();
+
+  // Update rolling history (max 30 entries, throttle to ~1s intervals)
+  if (now - is.lastUpdate > 900) {
+    is.lastUpdate = now;
+    is.batteryHistory.push(asset.battery);
+    is.speedHistory.push(asset.speed || 0);
+    is.altHistory.push(asset.alt || 0);
+    is.signalHistory.push(asset.signal || 100);
+    if (is.batteryHistory.length > 30) is.batteryHistory.shift();
+    if (is.speedHistory.length > 30) is.speedHistory.shift();
+    if (is.altHistory.length > 30) is.altHistory.shift();
+    if (is.signalHistory.length > 30) is.signalHistory.shift();
+  }
+
+  // --- Compute predictive analytics ---
+  const battery = asset.battery || 100;
+  const speed = asset.speed || 0;
+  const alt = asset.alt || 0;
+  const signal = asset.signal || 100;
+
+  // Battery drain rate estimation
+  let drainRate = 0.5; // default %/min
+  if (is.batteryHistory.length >= 5) {
+    const oldest = is.batteryHistory[0];
+    const newest = is.batteryHistory[is.batteryHistory.length - 1];
+    const elapsed = (is.batteryHistory.length - 1); // seconds approx
+    if (elapsed > 0 && oldest > newest) {
+      drainRate = ((oldest - newest) / elapsed) * 60; // per minute
+    }
+  }
+  if (drainRate < 0.1) drainRate = 0.5; // fallback
+
+  const minsRemaining = battery / drainRate;
+  const etaHrs = Math.floor(minsRemaining / 60);
+  const etaMins = Math.floor(minsRemaining % 60);
+  const etaStr = etaHrs > 0 ? etaHrs + 'h ' + etaMins + 'm' : etaMins + 'm';
+
+  // Estimated range (km) — speed in m/s * time remaining in seconds / 1000
+  const rangeKm = ((speed * minsRemaining * 60) / 1000).toFixed(1);
+
+  // Distance from origin (approximate — use lat/lng delta)
+  const originLat = asset.originLat || asset.lat;
+  const originLng = asset.originLng || asset.lng;
+  const dLat = (asset.lat - originLat) * 111320;
+  const dLng = (asset.lng - originLng) * 111320 * Math.cos(asset.lat * Math.PI / 180);
+  const distFromOrigin = Math.sqrt(dLat * dLat + dLng * dLng); // meters
+
+  // Optimal RTB time — when to head back based on distance and speed
+  const rtbTimeSec = speed > 0 ? distFromOrigin / speed : 0;
+  const rtbBatteryNeeded = (rtbTimeSec / 60) * drainRate + 10; // +10% safety margin
+  const optimalRtbMins = Math.max(0, (battery - rtbBatteryNeeded) / drainRate);
+  const rtbStr = optimalRtbMins > 60 ? Math.floor(optimalRtbMins / 60) + 'h ' + Math.floor(optimalRtbMins % 60) + 'm' : Math.floor(optimalRtbMins) + 'm';
+
+  // Mission completion probability
+  const healthScore = asset.health || 100;
+  const batteryFactor = Math.min(battery / 30, 1); // <30% = reduced
+  const healthFactor = Math.min(healthScore / 70, 1);
+  const signalFactor = Math.min(signal / 80, 1);
+  const missionProb = Math.min(100, Math.round(batteryFactor * healthFactor * signalFactor * 100));
+
+  // --- Anomaly detection ---
+  const anomalies = [];
+  if (drainRate > 0.8) {
+    anomalies.push({ msg: 'Abnormal battery drain: ' + drainRate.toFixed(2) + '%/min', severity: 'warning', icon: '\u26a0' });
+  }
+  if (drainRate > 1.5) {
+    anomalies[anomalies.length - 1].severity = 'critical';
+  }
+  // Motor temp check (use diagnostics state if available)
+  const ds = diagState[asset.id];
+  if (ds) {
+    ds.motorTemps.forEach((t, i) => {
+      if (t > 48) {
+        anomalies.push({ msg: 'Motor ' + (i + 1) + ' temp elevated: ' + t.toFixed(1) + '\u00b0C', severity: t > 55 ? 'critical' : 'warning', icon: '\ud83c\udf21' });
+      }
+    });
+  }
+  if (signal < 90) {
+    anomalies.push({ msg: 'Signal quality degraded: ' + signal.toFixed(0) + '%', severity: signal < 75 ? 'critical' : 'warning', icon: '\ud83d\udce1' });
+  }
+  // Heading variance (check last few speed readings for erratic behavior)
+  if (is.speedHistory.length >= 5) {
+    const recentSpeeds = is.speedHistory.slice(-5);
+    const avgSpd = recentSpeeds.reduce((a, b) => a + b, 0) / recentSpeeds.length;
+    const variance = recentSpeeds.reduce((a, b) => a + (b - avgSpd) * (b - avgSpd), 0) / recentSpeeds.length;
+    if (variance > 4) {
+      anomalies.push({ msg: 'Velocity variance detected: \u03c3\u00b2=' + variance.toFixed(1), severity: 'warning', icon: '\u21c4' });
+    }
+  }
+  if (anomalies.length === 0) {
+    anomalies.push({ msg: 'All parameters nominal', severity: 'ok', icon: '\u2713' });
+  }
+
+  // --- Risk assessment ---
+  let riskScore = 0;
+  riskScore += Math.max(0, (100 - battery) * 0.3); // battery depletion
+  riskScore += Math.max(0, (100 - healthScore) * 0.25);
+  riskScore += Math.max(0, (100 - signal) * 0.2);
+  riskScore += anomalies.filter(a => a.severity === 'warning').length * 8;
+  riskScore += anomalies.filter(a => a.severity === 'critical').length * 15;
+  riskScore = Math.min(100, Math.round(riskScore));
+  const riskColor = riskScore < 30 ? 'var(--green)' : riskScore < 60 ? 'var(--amber)' : 'var(--red)';
+  const riskLabel = riskScore < 30 ? 'LOW' : riskScore < 60 ? 'MODERATE' : 'HIGH';
+
+  // --- Decision intelligence (recommendations) ---
+  const recs = [];
+  if (battery < 50) {
+    recs.push({ icon: '\ud83d\udd0b', text: 'RTB recommended in ' + rtbStr + ' \u2014 battery at ' + battery.toFixed(0) + '%' });
+  }
+  if (ds) {
+    const hotMotor = ds.motorTemps.findIndex(t => t > 48);
+    if (hotMotor >= 0) {
+      recs.push({ icon: '\u26a1', text: 'Motor ' + (hotMotor + 1) + ' temperature elevated \u2014 reduce speed by 15%' });
+    }
+  }
+  if (alt > 100) {
+    recs.push({ icon: '\u2191', text: 'Current altitude ' + alt.toFixed(0) + 'm \u2014 consider descent to 85m for optimal wind profile' });
+  } else if (alt < 40 && speed > 5) {
+    recs.push({ icon: '\u2193', text: 'Low altitude at speed \u2014 increase to 60m minimum for terrain clearance' });
+  }
+  if (signal < 85) {
+    recs.push({ icon: '\ud83d\udce1', text: 'Signal at ' + signal.toFixed(0) + '% \u2014 reduce range or increase relay altitude' });
+  }
+  if (recs.length === 0) {
+    recs.push({ icon: '\u2713', text: 'All parameters within optimal range \u2014 continue current mission profile' });
+  }
+
+  // --- Trend indicators ---
+  function trendIndicator(history) {
+    if (history.length < 3) return { cls: 'stable', sym: '\u2192' };
+    const recent = history.slice(-3);
+    const diff = recent[recent.length - 1] - recent[0];
+    if (diff > 0.5) return { cls: 'up', sym: '\u2191' };
+    if (diff < -0.5) return { cls: 'down', sym: '\u2193' };
+    return { cls: 'stable', sym: '\u2192' };
+  }
+
+  const battTrend = trendIndicator(is.batteryHistory);
+  const spdTrend = trendIndicator(is.speedHistory);
+  const altTrend = trendIndicator(is.altHistory);
+  const sigTrend = trendIndicator(is.signalHistory);
+
+  // Build HTML
+  let html = '';
+
+  // Section 1: Predictive Analytics
+  html += '<div class="insight-section"><div class="insight-section-title">Predictive Analytics</div>';
+  html += '<div class="insight-card"><div class="insight-label">Battery Depletion ETA</div>';
+  html += '<div class="insight-value">Est. ' + etaStr + ' remaining<span class="insight-trend ' + battTrend.cls + '">' + battTrend.sym + '</span></div>';
+  html += '<div class="insight-sub">Drain rate: ' + drainRate.toFixed(2) + '%/min</div></div>';
+  html += '<div class="insight-card"><div class="insight-label">Estimated Range</div>';
+  html += '<div class="insight-value">' + rangeKm + ' km</div>';
+  html += '<div class="insight-sub">At current speed: ' + speed.toFixed(1) + ' m/s</div></div>';
+  html += '<div class="insight-card"><div class="insight-label">Optimal RTB Window</div>';
+  html += '<div class="insight-value">' + rtbStr + '</div>';
+  html += '<div class="insight-sub">Safety margin: 10% battery reserve</div></div>';
+  html += '<div class="insight-card' + (missionProb < 70 ? ' warning' : missionProb < 40 ? ' critical' : ' positive') + '">';
+  html += '<div class="insight-label">Mission Completion Probability</div>';
+  html += '<div class="insight-value">' + missionProb + '%</div>';
+  html += '<div class="insight-sub">Based on battery, health, signal composite</div></div>';
+  html += '</div>';
+
+  // Section 2: Anomaly Detection
+  html += '<div class="insight-section"><div class="insight-section-title">Anomaly Detection</div>';
+  anomalies.forEach(a => {
+    const cardCls = a.severity === 'critical' ? ' critical' : a.severity === 'warning' ? ' warning' : ' positive';
+    html += '<div class="insight-card' + cardCls + '">';
+    html += '<div class="insight-label">' + a.icon + ' ' + (a.severity === 'ok' ? 'NOMINAL' : a.severity.toUpperCase()) + '</div>';
+    html += '<div class="insight-sub">' + a.msg + '</div></div>';
+  });
+  html += '</div>';
+
+  // Section 3: Trend Sparklines
+  html += '<div class="insight-section"><div class="insight-section-title">Telemetry Trends</div>';
+  const sparkData = [
+    { label: 'Battery', data: is.batteryHistory, color: '#4493f8', val: battery.toFixed(0) + '%', trend: battTrend },
+    { label: 'Speed', data: is.speedHistory, color: '#3fb950', val: speed.toFixed(1) + ' m/s', trend: spdTrend },
+    { label: 'Alt', data: is.altHistory, color: '#d29922', val: alt.toFixed(0) + ' m', trend: altTrend },
+    { label: 'Signal', data: is.signalHistory, color: '#f0f0f0', val: signal.toFixed(0) + '%', trend: sigTrend },
+  ];
+  sparkData.forEach((s, idx) => {
+    html += '<div class="insight-sparkline-row">';
+    html += '<span class="insight-sparkline-label">' + s.label + '</span>';
+    html += '<canvas class="insight-mini-spark" id="insight-spark-' + idx + '"></canvas>';
+    html += '<span style="font-family:var(--font-data);font-size:10px;color:var(--text);min-width:55px;text-align:right">' + s.val + '</span>';
+    html += '<span class="insight-trend ' + s.trend.cls + '">' + s.trend.sym + '</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Section 4: Risk Assessment
+  html += '<div class="insight-section"><div class="insight-section-title">Risk Assessment</div>';
+  html += '<div class="insight-card' + (riskScore >= 60 ? ' critical' : riskScore >= 30 ? ' warning' : ' positive') + '">';
+  html += '<div class="insight-label">Composite Risk Score</div>';
+  html += '<div class="insight-value" style="color:' + riskColor + '">' + riskScore + ' / 100 \u2014 ' + riskLabel + '</div>';
+  html += '<div class="insight-risk-meter"><div class="insight-risk-fill" style="width:' + riskScore + '%;background:' + riskColor + '"></div></div>';
+  html += '</div>';
+  // Risk factors
+  html += '<div style="margin-top:4px">';
+  html += '<div class="insight-correlation"><span class="insight-corr-pair">Battery depletion</span><span class="insight-corr-val" style="color:' + (battery < 30 ? 'var(--red)' : battery < 50 ? 'var(--amber)' : 'var(--green)') + '">' + (100 - battery).toFixed(0) + '%</span></div>';
+  html += '<div class="insight-correlation"><span class="insight-corr-pair">System health</span><span class="insight-corr-val" style="color:' + (healthScore < 70 ? 'var(--red)' : healthScore < 85 ? 'var(--amber)' : 'var(--green)') + '">' + healthScore.toFixed(0) + '%</span></div>';
+  html += '<div class="insight-correlation"><span class="insight-corr-pair">Signal integrity</span><span class="insight-corr-val" style="color:' + (signal < 75 ? 'var(--red)' : signal < 90 ? 'var(--amber)' : 'var(--green)') + '">' + signal.toFixed(0) + '%</span></div>';
+  html += '<div class="insight-correlation"><span class="insight-corr-pair">Active anomalies</span><span class="insight-corr-val" style="color:' + (anomalies.filter(a => a.severity !== 'ok').length > 0 ? 'var(--amber)' : 'var(--green)') + '">' + anomalies.filter(a => a.severity !== 'ok').length + '</span></div>';
+  html += '</div></div>';
+
+  // Section 5: Decision Intelligence
+  html += '<div class="insight-section"><div class="insight-section-title">Decision Intelligence</div>';
+  recs.forEach(r => {
+    html += '<div class="insight-rec">';
+    html += '<div class="insight-rec-icon">' + r.icon + '</div>';
+    html += '<div class="insight-rec-text">' + r.text + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  container.innerHTML = html;
+
+  // Draw sparklines after DOM update
+  requestAnimationFrame(() => {
+    sparkData.forEach((s, idx) => {
+      const canvas = document.getElementById('insight-spark-' + idx);
+      drawMiniSparkline(canvas, s.data, s.color);
+    });
+  });
+}
+
 // backward compat
 function renderDetailPanel(drone) { updateInspector(drone); }
 
@@ -3415,7 +3731,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
   btn.addEventListener('click', () => setMode(btn.dataset.mode));
 });
 
-// Inspector tab switching (supports DIAGNOSTICS tab - Feature #4)
+// Inspector tab switching (supports DIAGNOSTICS #4 and INSIGHTS #5 tabs)
 document.querySelectorAll('.inspector-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.inspector-tab').forEach(t => t.classList.remove('active'));
@@ -3688,8 +4004,10 @@ setMode('OBSERVE');
     if (currentMode === 'DEBRIEF' && replaySystem.playing) {
       replayTickCounter++;
       if (replayTickCounter % 6 === 0) replaySystem.tick();
+    } else if (currentMode === 'DEBRIEF' && !replaySystem.recording) {
+      // Paused in debrief — freeze, do nothing
     } else {
-      // Update drone simulation
+      // Update drone simulation (only in OBSERVE/TASK modes, or DEBRIEF while recording)
       const leader = drones[0];
       leader.update(dtSec, 0, 0, 0);
       for (let i = 1; i < drones.length; i++) {
@@ -3774,6 +4092,12 @@ setMode('OBSERVE');
         if (diagTab && diagTab.classList.contains('active')) {
           const sel = drones.find(d => d.id === selectedDroneId);
           if (sel) updateDiagnosticsPanel(sel);
+        }
+        // Update insights panel if viewing it
+        const insightsTab = document.querySelector('.inspector-tab[data-tab="insights"]');
+        if (insightsTab && insightsTab.classList.contains('active')) {
+          const sel = drones.find(d => d.id === selectedDroneId);
+          if (sel) updateInsightsPanel(sel);
         }
       }
 
