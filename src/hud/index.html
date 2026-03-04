@@ -174,17 +174,42 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   transition: all 0.15s;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.mode-btn::before {
+  content: '';
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: background 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
 }
 
 .mode-btn.active {
   background: transparent;
   color: var(--text);
-  border-bottom-color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+  box-shadow: inset 0 -1px 0 var(--accent);
+}
+
+.mode-btn.active::before {
+  background: var(--accent);
+  box-shadow: 0 0 4px var(--accent);
 }
 
 .mode-btn:hover:not(.active) {
   color: var(--text);
   background: transparent;
+}
+
+.mode-btn:hover:not(.active)::before {
+  background: var(--text);
 }
 
 .live-indicator {
@@ -337,6 +362,47 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
 .asset-status.rtb { color: var(--purple); }
 .asset-status.grounded { color: var(--text-secondary); }
 .asset-status.offline { color: var(--text-tertiary); }
+
+/* Asset micro-bars (battery + signal indicators) */
+.asset-vitals {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  margin-top: 3px;
+}
+.asset-micro-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.asset-micro-bar-label {
+  font-family: var(--font-label);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  width: 20px;
+}
+.asset-micro-bar-track {
+  width: 42px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 1.5px;
+  overflow: hidden;
+}
+.asset-micro-bar-fill {
+  height: 100%;
+  border-radius: 1.5px;
+  transition: width 0.4s ease, background 0.4s ease;
+}
+.asset-micro-bar-pct {
+  font-family: var(--font-data);
+  font-size: 9px;
+  min-width: 22px;
+  text-align: right;
+}
 
 /* Legacy compat for status badges */
 .drone-status-badge {
@@ -897,6 +963,16 @@ body[data-mode="DEBRIEF"] .task-only { display: none !important; }
 body[data-mode="ISR"] .observe-only,
 body[data-mode="ISR"] .task-only,
 body[data-mode="ISR"] .debrief-only { display: none !important; }
+
+/* Mode switch fade transition */
+#right-panel, #left-panel, #bottom-panel {
+  transition: opacity 0.15s ease;
+}
+body.mode-transitioning #right-panel,
+body.mode-transitioning #left-panel,
+body.mode-transitioning #bottom-panel {
+  opacity: 0;
+}
 body[data-mode="ISR"] #left-panel { width: 0; overflow: hidden; border: none; padding: 0; }
 body[data-mode="ISR"] #right-panel { width: 260px; }
 body[data-mode="ISR"] #bottom-panel { height: 48px; }
@@ -1168,7 +1244,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 
 /* Inspector tabs */
 .inspector-tabs {
-  display: flex; border-bottom: 1px solid var(--border); overflow: hidden;
+  display: flex; border-bottom: 1px solid var(--border); overflow: visible;
 }
 .inspector-tab {
   font-family: var(--font-label); font-size: 10px; font-weight: 600;
@@ -1634,6 +1710,17 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   color: var(--text-secondary);
 }
 
+/* Shortcut Help */
+.shortcut-help { position: fixed; inset: 0; z-index: 10001; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+.shortcut-help.hidden { display: none; }
+.shortcut-help-modal { background: var(--panel); border: 1px solid var(--border-light); border-radius: 2px; padding: 20px 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+.shortcut-help-title { font-family: var(--font-label); font-size: 12px; font-weight: 600; color: var(--text); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 12px; }
+.shortcut-group { margin-bottom: 12px; }
+.shortcut-group-title { font-family: var(--font-label); font-size: 9px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 6px; }
+.shortcut-row { display: flex; align-items: center; padding: 3px 0; }
+.shortcut-key { font-family: var(--font-data); font-size: 11px; color: var(--accent); min-width: 80px; }
+.shortcut-desc { font-family: var(--font-data); font-size: 11px; color: var(--text-secondary); }
+
 /* Command Palette */
 .cmd-palette { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: flex-start; justify-content: center; padding-top: 20vh; }
 .cmd-palette.hidden { display: none; }
@@ -1664,14 +1751,136 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .link-direction { color: var(--text-dim); font-family: var(--font-data); font-size: 10px; }
 .link-card { display: flex; align-items: center; gap: 6px; }
 .link-cardinality { font-family: var(--font-data); font-size: 9px; color: var(--text-tertiary); margin-left: auto; }
+/* ============================================================
+   UNIVERSAL TOOLTIP SYSTEM
+   ============================================================ */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1C2127;
+  color: #F6F7F9;
+  border: 1px solid var(--border-light);
+  padding: 4px 8px;
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 2px;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 9999;
+  transition: opacity 0.15s 0.4s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
+}
+[data-tooltip]:active::after {
+  opacity: 0;
+  transition-delay: 0s;
+}
+[data-tooltip]:disabled::after,
+[data-tooltip][disabled]::after {
+  display: none;
+}
+
 /* Map Toolbar */
 .map-toolbar { position: absolute; top: 10px; right: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 2px; padding: 4px; }
-.map-tool-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; border-radius: 1px; color: var(--text-secondary); cursor: pointer; font-size: 14px; transition: all 0.15s; font-family: var(--font-data); }
+.map-tool-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; border-radius: 1px; color: var(--text-secondary); cursor: pointer; font-size: 14px; transition: all 0.15s; font-family: var(--font-data); position: relative; }
 .map-tool-btn:hover { background: var(--panel-elevated); color: var(--text); border-color: var(--border); }
 .map-tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.map-tool-btn[data-tooltip]:hover::after { content: attr(data-tooltip); position: absolute; right: 42px; top: 50%; transform: translateY(-50%); background: var(--panel); border: 1px solid var(--border); padding: 4px 8px; font-family: var(--font-label); font-size: 9px; color: var(--text); white-space: nowrap; pointer-events: none; z-index: 1001; }
+/* Override: mode button tooltips appear below the button (top bar) */
+.mode-btn[data-tooltip]::after { bottom: auto; top: calc(100% + 4px); }
+/* Override: map toolbar tooltips appear to the left of the button */
+.map-tool-btn[data-tooltip]::after { bottom: auto; left: auto; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
 .map-tool-sep { height: 1px; background: var(--border); margin: 2px 0; }
 .map-measurement-label { background: var(--panel); border: 1px solid var(--accent); padding: 2px 6px; font-family: var(--font-data); font-size: 10px; color: var(--text-bright); white-space: nowrap; border-radius: 1px; }
+
+/* ============================================================
+   ONBOARDING OVERLAY
+   ============================================================ */
+#onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+#onboarding-overlay.dismissed {
+  opacity: 0;
+  pointer-events: none;
+}
+#onboarding-overlay.hidden { display: none; }
+
+.onboard-hint {
+  position: absolute;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 10px 14px;
+  max-width: 260px;
+  opacity: 0;
+  transform: translateY(6px);
+  animation: onboardFadeIn 0.4s ease forwards;
+}
+.onboard-hint:nth-child(1) { animation-delay: 0.1s; }
+.onboard-hint:nth-child(2) { animation-delay: 0.3s; }
+.onboard-hint:nth-child(3) { animation-delay: 0.5s; }
+.onboard-hint:nth-child(4) { animation-delay: 0.7s; }
+.onboard-hint:nth-child(5) { animation-delay: 0.9s; }
+
+@keyframes onboardFadeIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.onboard-hint-label {
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.3px;
+  line-height: 1.5;
+}
+.onboard-hint-sub {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+.onboard-hint-key {
+  display: inline-block;
+  font-family: var(--font-data);
+  font-size: 10px;
+  background: var(--border);
+  color: var(--text-secondary);
+  padding: 1px 6px;
+  border-radius: 2px;
+  margin-left: 2px;
+}
+.onboard-dismiss {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-label);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  opacity: 0;
+  animation: onboardFadeIn 0.4s ease 1.2s forwards;
+}
 </style>
 </head>
 <body>
@@ -1681,22 +1890,22 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
     <div class="brand"><span class="brand-icon">&#9670;</span> OVERWATCH</div>
     <div class="brand-sub">OVERWATCH // ISR PLATFORM</div>
     <div class="mode-switch">
-      <button class="mode-btn active" data-mode="OBSERVE" title="Observe mode (O)">OBSERVE</button>
-      <button class="mode-btn" data-mode="TASK" title="Task mode (T)">TASK</button>
-      <button class="mode-btn" data-mode="DEBRIEF" title="Debrief mode (D)">DEBRIEF</button>
-      <button class="mode-btn" data-mode="ISR" title="ISR Feed mode">ISR FEED</button>
+      <button class="mode-btn active" data-mode="OBSERVE" data-tooltip="Monitor all assets in real-time">OBSERVE</button>
+      <button class="mode-btn" data-mode="TASK" data-tooltip="Issue commands and plan missions">TASK</button>
+      <button class="mode-btn" data-mode="DEBRIEF" data-tooltip="Review recorded mission data">DEBRIEF</button>
+      <button class="mode-btn" data-mode="ISR" data-tooltip="Full-screen FPV camera view">ISR FEED</button>
     </div>
     <button class="quick-connect-btn" id="quick-connect-btn" title="Connect to OVERWATCH platform">CONNECT</button>
     <div class="connection-badge sim" id="connection-badge" title="Click to configure connection">
       <div class="connection-badge-dot"></div>
       <span id="connection-label">EXERCISE</span>
     </div>
-    <div class="live-indicator">
+    <div class="live-indicator" data-tooltip="Connection status">
       <div class="live-dot"></div>
       <div class="live-label" id="live-label">EXERCISE</div>
     </div>
-    <span class="tf-callsign">TF-OVERWATCH-01</span>
-    <div class="utc-clock" id="utc-clock">00:00:00Z</div>
+    <span class="tf-callsign" data-tooltip="Task force callsign">TF-OVERWATCH-01</span>
+    <div class="utc-clock" id="utc-clock" data-tooltip="UTC mission clock">00:00:00Z</div>
   </div>
 
   <!-- ==================== MAIN AREA ==================== -->
@@ -1779,7 +1988,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       </div>
       <!-- FPV Video Panel -->
       <div id="video-panel" class="video-panel" style="display:none">
-        <button id="pip-close-btn" onclick="(function(){ var vp=document.getElementById('video-panel'); vp.style.display='none'; vp.classList.remove('pip'); })()">&times;</button>
+        <button id="pip-close-btn" data-tooltip="Close video panel" onclick="(function(){ var vp=document.getElementById('video-panel'); vp.style.display='none'; vp.classList.remove('pip'); })()">&times;</button>
         <video id="fpv-video" autoplay muted playsinline style="display:none"></video>
         <img id="fpv-mjpeg" style="display:none" alt="FPV Feed">
         <canvas id="fpv-canvas" width="640" height="480"></canvas>
@@ -1797,6 +2006,26 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
           <div class="osd-element" id="osd-home" style="bottom:4%;left:44%"></div>
           <div class="osd-element" id="osd-mode" style="bottom:4%;right:2%"></div>
           <div class="osd-warning" id="osd-warning" style="display:none"></div>
+          <!-- Artificial Horizon -->
+          <div id="osd-horizon" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;width:200px;height:2px;z-index:4">
+            <div style="width:100%;height:100%;background:rgba(255,255,255,0.4);border-radius:1px"></div>
+            <div style="position:absolute;left:0;top:0;width:40px;height:2px;background:rgba(255,255,255,0.7)"></div>
+            <div style="position:absolute;right:0;top:0;width:40px;height:2px;background:rgba(255,255,255,0.7)"></div>
+          </div>
+          <!-- Center Crosshair -->
+          <div id="osd-crosshair" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:5">
+            <svg width="40" height="40" viewBox="0 0 40 40">
+              <line x1="20" y1="6" x2="20" y2="16" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+              <line x1="20" y1="24" x2="20" y2="34" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+              <line x1="6" y1="20" x2="16" y2="20" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+              <line x1="24" y1="20" x2="40" y2="20" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+              <circle cx="20" cy="20" r="3" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+            </svg>
+          </div>
+          <!-- Camera Tilt Readout -->
+          <div id="osd-tilt" class="osd-element" style="bottom:8%;right:2%">TILT 0&deg;</div>
+          <!-- HDOP Readout -->
+          <div id="osd-hdop" class="osd-element" style="bottom:8%;left:2%">HDOP 0.0</div>
         </div>
         <!-- DVR Badge -->
         <div class="dvr-badge" id="dvr-badge" style="display:none">
@@ -1806,17 +2035,17 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         <!-- Camera Tilt -->
         <div class="tilt-slider-wrap" id="tilt-slider-wrap">
           <span style="font-size:8px;color:var(--text-dim);font-family:var(--font-label);letter-spacing:0.5px">TILT</span>
-          <input type="range" id="camera-tilt" min="-90" max="30" value="0">
+          <input type="range" id="camera-tilt" min="-90" max="30" value="0" data-tooltip="Adjust camera tilt angle">
           <span style="font-size:10px;color:var(--text-bright);font-family:var(--font-data)" id="tilt-value">0&deg;</span>
         </div>
         <!-- Video Controls Bar -->
         <div class="video-controls">
-          <button class="wp-btn" id="video-fullscreen">FULL</button>
-          <button class="wp-btn" id="video-pip">PIP</button>
-          <button class="wp-btn" id="video-record" style="border-color:var(--red);color:var(--red)">REC</button>
-          <button class="wp-btn" id="video-photo">PHOTO</button>
+          <button class="wp-btn" id="video-fullscreen" data-tooltip="Toggle fullscreen (F)">FULL</button>
+          <button class="wp-btn" id="video-pip" data-tooltip="Picture-in-picture mode">PIP</button>
+          <button class="wp-btn" id="video-record" data-tooltip="Start/stop recording (R)" style="border-color:var(--red);color:var(--red)">REC</button>
+          <button class="wp-btn" id="video-photo" data-tooltip="Capture screenshot (P)">PHOTO</button>
           <span style="flex:1"></span>
-          <select class="cmd-select" id="video-source" style="width:auto;min-width:120px;font-size:10px">
+          <select class="cmd-select" id="video-source" data-tooltip="Select video input source" style="width:auto;min-width:120px;font-size:10px">
             <option value="canvas">Test Pattern</option>
             <option value="">No Video Source</option>
           </select>
@@ -1830,21 +2059,21 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       </div>
       <!-- Objective toolbar (TASK mode) -->
       <div class="waypoint-toolbar task-only" id="waypoint-toolbar">
-        <button class="wp-btn" id="wp-add-mode">+ OBJECTIVE</button>
-        <button class="wp-btn" id="wp-loiter">HOLD</button>
-        <button class="wp-btn" id="wp-orbit">ORBIT</button>
+        <button class="wp-btn" id="wp-add-mode" data-tooltip="Add waypoint objective on map">+ OBJECTIVE</button>
+        <button class="wp-btn" id="wp-loiter" data-tooltip="Loiter at current position">HOLD</button>
+        <button class="wp-btn" id="wp-orbit" data-tooltip="Orbit around point">ORBIT</button>
         <span style="font-family:var(--font-data);font-size:11px;color:var(--text-secondary)" id="wp-count">0 objectives</span>
-        <button class="wp-btn execute" id="wp-execute">EXECUTE OPERATION</button>
-        <button class="wp-btn clear" id="wp-clear">CLEAR</button>
+        <button class="wp-btn execute" id="wp-execute" data-tooltip="Begin mission execution">EXECUTE OPERATION</button>
+        <button class="wp-btn clear" id="wp-clear" data-tooltip="Clear all objectives">CLEAR</button>
       </div>
       <!-- Debrief bar (DEBRIEF mode) -->
       <div class="replay-bar debrief-only" id="replay-bar">
-        <button class="wp-btn" id="replay-play-btn">PLAY</button>
-        <button class="wp-btn" id="replay-pause-btn">PAUSE</button>
+        <button class="wp-btn" id="replay-play-btn" data-tooltip="Play debrief recording">PLAY</button>
+        <button class="wp-btn" id="replay-pause-btn" data-tooltip="Pause playback">PAUSE</button>
         <span class="replay-timestamp" id="replay-time-current">00:00</span>
         <input type="range" class="replay-timeline" id="replay-timeline" min="0" max="100" value="0">
         <span class="replay-timestamp" id="replay-time-total">00:00</span>
-        <button class="replay-speed-btn" id="replay-speed-toggle">1x</button>
+        <button class="replay-speed-btn" id="replay-speed-toggle" data-tooltip="Playback speed">1x</button>
       </div>
       <!-- GOTO indicator -->
       <div class="goto-indicator" id="goto-indicator" style="display:none">
@@ -1859,11 +2088,11 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       <div class="observe-only">
         <div class="panel-header" id="detail-header">INSPECTOR</div>
         <div class="inspector-tabs" id="inspector-tabs">
-          <button class="inspector-tab active" data-tab="properties">PROPS</button>
-          <button class="inspector-tab" data-tab="relationships">RELS</button>
-          <button class="inspector-tab" data-tab="timeline">TIME</button>
-          <button class="inspector-tab" data-tab="diagnostics">DIAG</button>
-          <button class="inspector-tab" data-tab="insights">INTEL</button>
+          <button class="inspector-tab active" data-tab="properties" data-tooltip="Properties">PROPS</button>
+          <button class="inspector-tab" data-tab="relationships" data-tooltip="Relationships">RELS</button>
+          <button class="inspector-tab" data-tab="timeline" data-tooltip="Timeline">TIME</button>
+          <button class="inspector-tab" data-tab="diagnostics" data-tooltip="Diagnostics">DIAG</button>
+          <button class="inspector-tab" data-tab="insights" data-tooltip="Intelligence">INTEL</button>
         </div>
         <div id="inspector-properties" class="inspector-tab-content active">
           <div id="detail-content"><div class="no-selection">SELECT AN ASSET</div></div>
@@ -1892,10 +2121,10 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         <div class="cmd-section">
           <div class="cmd-section-title">Safety</div>
           <div class="cmd-btn-grid">
-            <button class="cmd-btn" id="cmd-arm">LAUNCH PREP</button>
-            <button class="cmd-btn" id="cmd-disarm">STAND DOWN</button>
+            <button class="cmd-btn" id="cmd-arm" data-tooltip="Arm motors for launch">LAUNCH PREP</button>
+            <button class="cmd-btn" id="cmd-disarm" data-tooltip="Disarm motors">STAND DOWN</button>
           </div>
-          <button class="cmd-btn danger" id="cmd-estop">ABORT</button>
+          <button class="cmd-btn danger" id="cmd-estop" data-tooltip="Emergency stop all assets">ABORT</button>
         </div>
         <div class="cmd-section">
           <div class="cmd-section-title">Flight</div>
@@ -1907,10 +2136,10 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
             <input type="range" class="cmd-slider" id="takeoff-alt" min="5" max="120" value="30" step="1">
           </div>
           <div class="cmd-btn-grid">
-            <button class="cmd-btn" id="cmd-takeoff">LAUNCH</button>
-            <button class="cmd-btn" id="cmd-land">RECOVER</button>
-            <button class="cmd-btn" id="cmd-rtl">RTB</button>
-            <button class="cmd-btn" id="cmd-goto">GOTO (MAP)</button>
+            <button class="cmd-btn" id="cmd-takeoff" data-tooltip="Take off to set altitude">LAUNCH</button>
+            <button class="cmd-btn" id="cmd-land" data-tooltip="Land at current position">RECOVER</button>
+            <button class="cmd-btn" id="cmd-rtl" data-tooltip="Return to base">RTB</button>
+            <button class="cmd-btn" id="cmd-goto" data-tooltip="Click map to set destination">GOTO (MAP)</button>
           </div>
         </div>
         <div class="cmd-section">
@@ -1946,17 +2175,17 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         <div class="cmd-section">
           <div class="cmd-section-title">Controls</div>
           <div class="cmd-btn-grid">
-            <button class="cmd-btn" id="fpv-arm">ARM</button>
-            <button class="cmd-btn" id="fpv-disarm">DISARM</button>
+            <button class="cmd-btn" id="fpv-arm" data-tooltip="Arm motors">ARM</button>
+            <button class="cmd-btn" id="fpv-disarm" data-tooltip="Disarm motors">DISARM</button>
           </div>
         </div>
         <div class="cmd-section">
           <div class="cmd-section-title">Flight Mode</div>
           <div class="fpv-mode-btns">
-            <button class="fpv-mode-btn" data-fmode="ANGLE">ANGLE</button>
-            <button class="fpv-mode-btn" data-fmode="HORIZON">HORIZON</button>
-            <button class="fpv-mode-btn active" data-fmode="ACRO">ACRO</button>
-            <button class="fpv-mode-btn" data-fmode="GPS_RESCUE">RESCUE</button>
+            <button class="fpv-mode-btn" data-fmode="ANGLE" data-tooltip="Self-leveling mode">ANGLE</button>
+            <button class="fpv-mode-btn" data-fmode="HORIZON" data-tooltip="Hybrid stabilized mode">HORIZON</button>
+            <button class="fpv-mode-btn active" data-fmode="ACRO" data-tooltip="Full manual acrobatic mode">ACRO</button>
+            <button class="fpv-mode-btn" data-fmode="GPS_RESCUE" data-tooltip="GPS-assisted return to home">RESCUE</button>
           </div>
         </div>
         <div class="cmd-section">
@@ -1970,6 +2199,31 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
             <div class="fpv-telem-cell"><div class="fpv-telem-label">mAh</div><div class="fpv-telem-value" id="fpv-mah">--</div></div>
             <div class="fpv-telem-cell"><div class="fpv-telem-label">Home</div><div class="fpv-telem-value" id="fpv-home">--</div></div>
             <div class="fpv-telem-cell"><div class="fpv-telem-label">Sats</div><div class="fpv-telem-value" id="fpv-sats">--</div></div>
+          </div>
+          <div id="fpv-cells" style="padding:6px 12px">
+            <div style="font-family:var(--font-label);font-size:8px;color:var(--text-dim);letter-spacing:0.3px;text-transform:uppercase;margin-bottom:4px">Cell Voltages</div>
+            <div id="fpv-cell-bars" style="display:flex;gap:3px;align-items:flex-end;height:24px"></div>
+          </div>
+          <div id="fpv-failsafe" style="padding:6px 12px;border-top:1px solid var(--border)">
+            <div style="font-family:var(--font-label);font-size:8px;color:var(--text-dim);letter-spacing:0.3px;text-transform:uppercase;margin-bottom:4px">Failsafe</div>
+            <div id="fpv-failsafe-items" style="display:flex;flex-direction:column;gap:3px"></div>
+          </div>
+          <div style="padding:6px 12px;border-top:1px solid var(--border)">
+            <div style="font-family:var(--font-label);font-size:8px;color:var(--text-dim);letter-spacing:0.3px;text-transform:uppercase;margin-bottom:4px">RC Input</div>
+            <div style="display:flex;gap:12px;justify-content:center">
+              <div style="text-align:center">
+                <canvas id="stick-left" width="64" height="64" style="width:64px;height:64px;border:1px solid var(--border);border-radius:2px;background:rgba(0,0,0,0.3)"></canvas>
+                <div style="font-family:var(--font-data);font-size:8px;color:var(--text-dim);margin-top:2px">THR / YAW</div>
+              </div>
+              <div style="text-align:center">
+                <canvas id="stick-right" width="64" height="64" style="width:64px;height:64px;border:1px solid var(--border);border-radius:2px;background:rgba(0,0,0,0.3)"></canvas>
+                <div style="font-family:var(--font-data);font-size:8px;color:var(--text-dim);margin-top:2px">ROLL / PITCH</div>
+              </div>
+            </div>
+          </div>
+          <div id="fpv-motors" style="padding:6px 12px;border-top:1px solid var(--border)">
+            <div style="font-family:var(--font-label);font-size:8px;color:var(--text-dim);letter-spacing:0.3px;text-transform:uppercase;margin-bottom:4px">Motors</div>
+            <div id="fpv-motor-status" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px"></div>
           </div>
         </div>
         <div class="cmd-section">
@@ -1988,7 +2242,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
             P — Photo &nbsp; &uarr;&darr; — Tilt
           </div>
         </div>
-        <button class="cmd-btn danger" id="fpv-estop" style="margin:8px 12px">ABORT</button>
+        <button class="cmd-btn danger" id="fpv-estop" data-tooltip="Emergency stop" style="margin:8px 12px">ABORT</button>
       </div>
       <!-- DEBRIEF MODE -->
       <div class="debrief-only cmd-panel" style="overflow-y:auto">
@@ -2003,10 +2257,10 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         <div class="cmd-section">
           <div class="cmd-section-title">Playback Speed</div>
           <div style="display:flex;gap:6px">
-            <button class="replay-speed-btn" data-speed="0.5">0.5x</button>
-            <button class="replay-speed-btn active" data-speed="1">1x</button>
-            <button class="replay-speed-btn" data-speed="2">2x</button>
-            <button class="replay-speed-btn" data-speed="4">4x</button>
+            <button class="replay-speed-btn" data-speed="0.5" data-tooltip="Half speed">0.5x</button>
+            <button class="replay-speed-btn active" data-speed="1" data-tooltip="Normal speed">1x</button>
+            <button class="replay-speed-btn" data-speed="2" data-tooltip="Double speed">2x</button>
+            <button class="replay-speed-btn" data-speed="4" data-tooltip="Quadruple speed">4x</button>
           </div>
         </div>
         <div class="cmd-section">
@@ -2060,7 +2314,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       </div>
       <div class="event-log-list" id="event-log" aria-live="polite" role="log"></div>
     </div>
-    <div class="bottom-metric">
+    <div class="bottom-metric" data-tooltip="Task force overall health">
       <div class="bottom-metric-header">
         <span class="bottom-metric-title">TF Health</span>
       </div>
@@ -2069,7 +2323,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       </div>
       <canvas class="sparkline-canvas" id="spark-health"></canvas>
     </div>
-    <div class="bottom-metric">
+    <div class="bottom-metric" data-tooltip="Communication link latency">
       <div class="bottom-metric-header">
         <span class="bottom-metric-title">Commlink</span>
         <span class="mesh-badge" id="mesh-badge">NOMINAL</span>
@@ -2079,7 +2333,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       </div>
       <canvas class="sparkline-canvas" id="spark-latency"></canvas>
     </div>
-    <div class="bottom-metric">
+    <div class="bottom-metric" data-tooltip="Average fleet battery level">
       <div class="bottom-metric-header">
         <span class="bottom-metric-title">Power State</span>
       </div>
@@ -2097,7 +2351,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
     <div class="connection-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <span style="font-family:var(--font-ui);font-size:14px;font-weight:600;color:var(--text);letter-spacing:0.05em">PLATFORM CONNECTION</span>
-        <button id="conn-close" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px">&times;</button>
+        <button id="conn-close" data-tooltip="Close" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px">&times;</button>
       </div>
       <div style="margin-bottom:16px">
         <div class="cmd-section-title">WebSocket URL</div>
@@ -2105,13 +2359,39 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         <div style="font-family:var(--font-label);font-size:9px;color:var(--text-secondary)">Connect to OVERWATCH platform</div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="cmd-btn" id="conn-connect" style="flex:1;border-color:var(--green);color:var(--green)">CONNECT</button>
-        <button class="cmd-btn" id="conn-disconnect" style="flex:1;border-color:var(--red);color:var(--red)" disabled>DISCONNECT</button>
+        <button class="cmd-btn" id="conn-connect" data-tooltip="Establish WebSocket connection" style="flex:1;border-color:var(--green);color:var(--green)">CONNECT</button>
+        <button class="cmd-btn" id="conn-disconnect" data-tooltip="Close active connection" style="flex:1;border-color:var(--red);color:var(--red)" disabled>DISCONNECT</button>
       </div>
       <div id="conn-status" style="margin-top:12px;font-family:var(--font-data);font-size:11px;color:var(--text-secondary);text-align:center">Not connected — exercise mode</div>
     </div>
   </div>
 
+</div>
+
+<div id="shortcut-help" class="shortcut-help hidden">
+  <div class="shortcut-help-modal">
+    <div class="shortcut-help-title">Keyboard Shortcuts</div>
+    <div class="shortcut-group">
+      <div class="shortcut-group-title">Navigation</div>
+      <div class="shortcut-row"><span class="shortcut-key">Cmd+K</span><span class="shortcut-desc">Command palette</span></div>
+      <div class="shortcut-row"><span class="shortcut-key">1-6</span><span class="shortcut-desc">Select drone</span></div>
+      <div class="shortcut-row"><span class="shortcut-key">O / T / D</span><span class="shortcut-desc">Switch mode</span></div>
+      <div class="shortcut-row"><span class="shortcut-key">?</span><span class="shortcut-desc">This help</span></div>
+    </div>
+    <div class="shortcut-group">
+      <div class="shortcut-group-title">FPV / ISR Mode</div>
+      <div class="shortcut-row"><span class="shortcut-key">F</span><span class="shortcut-desc">Toggle fullscreen</span></div>
+      <div class="shortcut-row"><span class="shortcut-key">R</span><span class="shortcut-desc">Start / stop recording</span></div>
+      <div class="shortcut-row"><span class="shortcut-key">P</span><span class="shortcut-desc">Capture photo</span></div>
+      <div class="shortcut-row"><span class="shortcut-key">Arrow Up/Down</span><span class="shortcut-desc">Camera tilt</span></div>
+      <div class="shortcut-row"><span class="shortcut-key">ESC</span><span class="shortcut-desc">Exit fullscreen</span></div>
+    </div>
+    <div class="shortcut-group">
+      <div class="shortcut-group-title">Map Tools</div>
+      <div class="shortcut-row"><span class="shortcut-key">M</span><span class="shortcut-desc">Measure distance</span></div>
+    </div>
+    <div style="font-family:var(--font-data);font-size:10px;color:var(--text-dim);margin-top:8px;text-align:center">Press ? or ESC to close</div>
+  </div>
 </div>
 
 <div id="command-palette" class="cmd-palette hidden" role="dialog" aria-label="Command palette">
@@ -2520,11 +2800,29 @@ class DirectiveEngine {
     const targetLabel = params.droneId || 'ALL';
 
     switch (cmd) {
-      case 'ARM':
+      case 'ARM': {
+        // Pre-arm safety checks
+        const failedChecks = [];
+        targets.forEach(d => {
+          if (d.battery < 20) failedChecks.push(d.id + ': Battery below 20% (' + d.battery.toFixed(0) + '%)');
+          if (d.satellites < 6) failedChecks.push(d.id + ': Insufficient GPS (' + d.satellites + ' sats)');
+          if (d.hdop > 2.5) failedChecks.push(d.id + ': GPS accuracy poor (HDOP ' + d.hdop.toFixed(1) + ')');
+          const ds = typeof getDiagState === 'function' ? getDiagState(d.id) : null;
+          if (ds && ds.overallHealth < 80) failedChecks.push(d.id + ': System health below 80% (' + ds.overallHealth.toFixed(0) + '%)');
+        });
+
+        if (failedChecks.length > 0) {
+          showToast('PRE-ARM FAILED: ' + failedChecks[0], 'warning');
+          addEvent({ time: utcString(), source: targets[0]?.id || 'SYSTEM', msg: 'Pre-arm check failed: ' + failedChecks.join('; '), severity: 'warn' });
+          break;
+        }
+
         targets.forEach(d => { d.armed = true; d.droneState = DRONE_STATES.ARMED; d.altitude = 0; d.speed = 0; });
         this._logCmd('ARM', targetLabel);
         showToast('ARMED — ' + targetLabel);
+        addEvent({ time: utcString(), source: targetLabel, msg: 'Pre-arm checks passed. Armed.', severity: 'ok' });
         break;
+      }
 
       case 'DISARM':
         targets.forEach(d => { d.armed = false; d.droneState = DRONE_STATES.IDLE; d.speed = 0; });
@@ -2588,9 +2886,9 @@ class DirectiveEngine {
         break;
 
       case 'EMERGENCY_STOP':
-        this.drones.forEach(d => { d.droneState = DRONE_STATES.EMERGENCY; });
-        this._logCmd('ABORT', 'ALL');
-        showToast('ABORT — ALL ASSETS', 'error');
+        targets.forEach(d => { d.droneState = DRONE_STATES.EMERGENCY; d.armed = false; });
+        this._logCmd('ABORT', targetLabel);
+        showToast('ABORT — ' + targetLabel, 'error');
         break;
 
       case 'EXECUTE_MISSION':
@@ -3130,6 +3428,11 @@ function updateAssetExplorer(assets) {
       const roleClass = asset.role.toLowerCase();
       const statusClass = asset.status.toLowerCase().replace(/_/g, '_');
 
+      const bat = asset.battery != null ? asset.battery : 100;
+      const sig = asset.linkQuality != null ? asset.linkQuality : 100;
+      const batCol = bat > 50 ? 'var(--green)' : bat > 20 ? 'var(--amber)' : 'var(--red)';
+      const sigCol = sig > 85 ? 'var(--green)' : sig > 60 ? 'var(--amber)' : 'var(--red)';
+
       item.innerHTML = `
         <div class="asset-item-top">
           <span class="asset-dot" style="background:${asset.color}"></span>
@@ -3138,6 +3441,22 @@ function updateAssetExplorer(assets) {
         </div>
         <div style="padding-left:12px;margin-top:2px">
           <span class="asset-status ${statusClass}" data-field="status">${asset.status.replace(/_/g,' ')}</span>
+        </div>
+        <div class="asset-vitals">
+          <div class="asset-micro-bar">
+            <span class="asset-micro-bar-label">BAT</span>
+            <div class="asset-micro-bar-track">
+              <div class="asset-micro-bar-fill" data-field="bat-fill" style="width:${bat}%;background:${batCol}"></div>
+            </div>
+            <span class="asset-micro-bar-pct" data-field="bat-pct" style="color:${batCol}">${Math.round(bat)}%</span>
+          </div>
+          <div class="asset-micro-bar">
+            <span class="asset-micro-bar-label">SIG</span>
+            <div class="asset-micro-bar-track">
+              <div class="asset-micro-bar-fill" data-field="sig-fill" style="width:${sig}%;background:${sigCol}"></div>
+            </div>
+            <span class="asset-micro-bar-pct" data-field="sig-pct" style="color:${sigCol}">${Math.round(sig)}%</span>
+          </div>
         </div>
       `;
       container.appendChild(item);
@@ -3151,6 +3470,34 @@ function updateAssetExplorer(assets) {
         const statusClass = asset.status.toLowerCase().replace(/_/g, '_');
         if (statusEl.textContent !== statusText) statusEl.textContent = statusText;
         statusEl.className = 'asset-status ' + statusClass;
+      }
+
+      // In-place update battery micro-bar
+      const bat = asset.battery != null ? asset.battery : 100;
+      const batCol = bat > 50 ? 'var(--green)' : bat > 20 ? 'var(--amber)' : 'var(--red)';
+      const batFill = item.querySelector('[data-field="bat-fill"]');
+      if (batFill) {
+        batFill.style.width = bat + '%';
+        batFill.style.background = batCol;
+      }
+      const batPct = item.querySelector('[data-field="bat-pct"]');
+      if (batPct) {
+        batPct.textContent = Math.round(bat) + '%';
+        batPct.style.color = batCol;
+      }
+
+      // In-place update signal micro-bar
+      const sig = asset.linkQuality != null ? asset.linkQuality : 100;
+      const sigCol = sig > 85 ? 'var(--green)' : sig > 60 ? 'var(--amber)' : 'var(--red)';
+      const sigFill = item.querySelector('[data-field="sig-fill"]');
+      if (sigFill) {
+        sigFill.style.width = sig + '%';
+        sigFill.style.background = sigCol;
+      }
+      const sigPct = item.querySelector('[data-field="sig-pct"]');
+      if (sigPct) {
+        sigPct.textContent = Math.round(sig) + '%';
+        sigPct.style.color = sigCol;
       }
     }
   });
@@ -3924,9 +4271,27 @@ function renderActivityStream() {
 /* ==============================================================
    MODE SWITCH
    ============================================================== */
-let currentMode = 'OBSERVE';
+let currentMode = null;
 
 function setMode(mode) {
+  if (mode === currentMode) return;
+  const isInitial = currentMode === null;
+  if (!isInitial) {
+    // Fade out panels briefly before switching
+    document.body.classList.add('mode-transitioning');
+    setTimeout(() => {
+      applyMode(mode);
+      // Fade panels back in
+      requestAnimationFrame(() => {
+        document.body.classList.remove('mode-transitioning');
+      });
+    }, 150);
+  } else {
+    applyMode(mode);
+  }
+}
+
+function applyMode(mode) {
   currentMode = mode;
   document.body.dataset.mode = mode;
   document.querySelectorAll('.mode-btn').forEach(b => {
@@ -4511,7 +4876,7 @@ setMode('OBSERVE');
       const as = f.arm_timer_s || 0;
       this.els.armTimer.textContent = 'ARM ' + Math.floor(as / 60) + ':' + String(Math.floor(as % 60)).padStart(2, '0');
 
-      this.els.gps.textContent = drone.lat.toFixed(6) + '  ' + drone.lng.toFixed(6);
+      this.els.gps.textContent = drone.lat.toFixed(6) + '  ' + drone.lng.toFixed(6) + '  ' + drone.satellites + 'SAT';
       this.els.alt.textContent = fmt(drone.altitude, 1) + 'm';
       this.els.speed.textContent = fmt(drone.speed, 1) + 'm/s';
       this.els.rssi.textContent = 'RSSI ' + fmt(drone.rssi, 0);
@@ -4524,11 +4889,39 @@ setMode('OBSERVE');
       this.els.home.textContent = hd.toFixed(0) + 'm ' + compass;
       this.els.mode.textContent = f.flight_mode || 'ANGLE';
 
-      // Warnings
-      if (drone.battery < 20) {
-        this.els.warning.textContent = 'LOW BATTERY'; this.els.warning.style.display = '';
-      } else if (drone.rssi < 50) {
-        this.els.warning.textContent = 'LOW SIGNAL'; this.els.warning.style.display = '';
+      // Artificial horizon rotation
+      const horizonEl = document.getElementById('osd-horizon');
+      if (horizonEl) {
+        const rollDeg = drone.roll || 0;
+        const pitchOffset = (drone.pitch || 0) * 1.5; // pixels per degree
+        horizonEl.style.transform = 'translate(-50%, calc(-50% + ' + pitchOffset + 'px)) rotate(' + (-rollDeg) + 'deg)';
+      }
+
+      // Camera tilt readout
+      const tiltEl = document.getElementById('osd-tilt');
+      if (tiltEl) {
+        const tiltVal = (drone.fpvData && drone.fpvData.camera_tilt) || 0;
+        tiltEl.textContent = 'TILT ' + tiltVal + '\u00B0';
+      }
+
+      // HDOP readout
+      const hdopEl = document.getElementById('osd-hdop');
+      if (hdopEl) {
+        hdopEl.textContent = 'HDOP ' + (drone.hdop || 0).toFixed(1);
+        hdopEl.style.color = drone.hdop > 2.0 ? _css('--red') : drone.hdop > 1.5 ? _css('--amber') : '';
+      }
+
+      // Enhanced warnings
+      const warnings = [];
+      if (drone.battery < 20) warnings.push('LOW BATTERY ' + drone.battery.toFixed(0) + '%');
+      if (drone.rssi < 50) warnings.push('LOW SIGNAL');
+      if (drone.satellites < 8) warnings.push('GPS DEGRADED');
+      if (drone.hdop > 2.0) warnings.push('GPS ACCURACY LOW');
+
+      if (warnings.length > 0) {
+        this.els.warning.textContent = warnings[0];
+        this.els.warning.style.display = '';
+        this.els.warning.style.color = _css('--red');
       } else {
         this.els.warning.style.display = 'none';
       }
@@ -4602,8 +4995,12 @@ setMode('OBSERVE');
         const f = d.fpvData;
         f.mah_consumed += Math.abs(d.current) * (1/10) / 3.6;
         f.cell_voltage = d.voltage / 6;
-        f.flight_timer_s += 0.1;
-        f.arm_timer_s += 0.1;
+        if (d.droneState !== DRONE_STATES.LANDED && d.droneState !== DRONE_STATES.IDLE && d.armed) {
+          f.flight_timer_s += 0.1;
+        }
+        if (d.armed) {
+          f.arm_timer_s += 0.1;
+        }
         const dlat = (d.lat - CENTER_LAT) * 111320;
         const dlng = (d.lng - CENTER_LNG) * 111320 * Math.cos(d.lat * Math.PI / 180);
         f.home_distance_m = Math.sqrt(dlat * dlat + dlng * dlng);
@@ -4639,6 +5036,105 @@ setMode('OBSERVE');
     $('fpv-mah').textContent = (f.mah_consumed || 0).toFixed(0);
     $('fpv-home').textContent = (f.home_distance_m || 0).toFixed(0) + 'm';
     $('fpv-sats').textContent = sel.satellites;
+
+    // Cell voltage bars
+    const cellBarsEl = document.getElementById('fpv-cell-bars');
+    if (cellBarsEl && sel) {
+      const ds = typeof getDiagState === 'function' ? getDiagState(sel.id) : null;
+      if (ds && ds.cellVoltages) {
+        cellBarsEl.innerHTML = ds.cellVoltages.map((v, i) => {
+          const pct = Math.max(0, Math.min(100, ((v - 3.3) / (4.2 - 3.3)) * 100));
+          const c = v < 3.5 ? _css('--red') : v < 3.7 ? _css('--amber') : _css('--green');
+          return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">' +
+            '<div style="width:100%;background:rgba(255,255,255,0.06);border-radius:1px;height:24px;position:relative;overflow:hidden">' +
+            '<div style="position:absolute;bottom:0;width:100%;height:' + pct + '%;background:' + c + ';border-radius:1px;transition:height 0.3s"></div></div>' +
+            '<span style="font-family:var(--font-data);font-size:8px;color:' + c + '">' + v.toFixed(2) + '</span></div>';
+        }).join('');
+      }
+    }
+
+    // Failsafe indicators
+    const fsEl = document.getElementById('fpv-failsafe-items');
+    if (fsEl && sel) {
+      const items = [];
+      // Battery failsafe
+      const batPct = sel.battery;
+      const batStatus = batPct > 30 ? 'ok' : batPct > 20 ? 'warn' : 'crit';
+      const batColor = batStatus === 'ok' ? _css('--green') : batStatus === 'warn' ? _css('--amber') : _css('--red');
+      items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + batColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">RTH Battery</span><span style="font-family:var(--font-data);font-size:10px;color:' + batColor + ';margin-left:auto">' + (batStatus === 'crit' ? 'TRIGGERED' : batStatus === 'warn' ? 'WARNING' : 'OK') + '</span></div>');
+
+      // GPS failsafe
+      const gpsStatus = sel.satellites >= 8 ? 'ok' : sel.satellites >= 5 ? 'warn' : 'crit';
+      const gpsColor = gpsStatus === 'ok' ? _css('--green') : gpsStatus === 'warn' ? _css('--amber') : _css('--red');
+      items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + gpsColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">GPS Lock</span><span style="font-family:var(--font-data);font-size:10px;color:' + gpsColor + ';margin-left:auto">' + sel.satellites + ' sats</span></div>');
+
+      // Signal failsafe
+      const sigStatus = sel.linkQuality > 80 ? 'ok' : sel.linkQuality > 60 ? 'warn' : 'crit';
+      const sigColor = sigStatus === 'ok' ? _css('--green') : sigStatus === 'warn' ? _css('--amber') : _css('--red');
+      items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + sigColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">RC Link</span><span style="font-family:var(--font-data);font-size:10px;color:' + sigColor + ';margin-left:auto">' + sel.linkQuality.toFixed(0) + '%</span></div>');
+
+      // Home distance
+      const homeDist = sel.fpvData ? sel.fpvData.home_distance_m : 0;
+      const homeStatus = homeDist < 500 ? 'ok' : homeDist < 1000 ? 'warn' : 'crit';
+      const homeColor = homeStatus === 'ok' ? _css('--green') : homeStatus === 'warn' ? _css('--amber') : _css('--red');
+      items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + homeColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">Home Dist</span><span style="font-family:var(--font-data);font-size:10px;color:' + homeColor + ';margin-left:auto">' + homeDist.toFixed(0) + 'm</span></div>');
+
+      fsEl.innerHTML = items.join('');
+    }
+
+    // Stick input visualization (simulated from drone attitude)
+    if (sel) {
+      const drawStick = (canvasId, x, y) => {
+        const c = document.getElementById(canvasId);
+        if (!c) return;
+        const ctx = c.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        c.width = 64 * dpr; c.height = 64 * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, 64, 64);
+        // Grid lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(32, 0); ctx.lineTo(32, 64); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, 32); ctx.lineTo(64, 32); ctx.stroke();
+        // Stick position
+        const px = 32 + x * 28;
+        const py = 32 - y * 28;
+        ctx.beginPath();
+        ctx.arc(px, py, 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(45,114,210,0.8)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(45,114,210,0.4)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      };
+
+      // Left stick: throttle (vertical) from speed ratio, yaw from heading change
+      const throttle = sel.speed / 15; // normalize to 0-1
+      const yaw = Math.sin(sel.heading * Math.PI / 180) * 0.3;
+      drawStick('stick-left', yaw, throttle - 0.5);
+
+      // Right stick: roll and pitch from attitude
+      const rollNorm = (sel.roll || 0) / 30; // normalize ±30 to ±1
+      const pitchNorm = (sel.pitch || 0) / 20; // normalize ±20 to ±1
+      drawStick('stick-right', rollNorm, -pitchNorm);
+    }
+
+    // Motor status
+    const motorEl = document.getElementById('fpv-motor-status');
+    if (motorEl && sel) {
+      const ds = typeof getDiagState === 'function' ? getDiagState(sel.id) : null;
+      if (ds && ds.motors) {
+        motorEl.innerHTML = ds.motors.map((m, i) => {
+          const tempColor = m.temp > 50 ? _css('--red') : m.temp > 45 ? _css('--amber') : _css('--green');
+          const healthColor = m.health >= 90 ? _css('--green') : m.health >= 75 ? _css('--amber') : _css('--red');
+          return '<div style="text-align:center;padding:3px;background:rgba(0,0,0,0.2);border-radius:1px">' +
+            '<div style="font-family:var(--font-data);font-size:9px;color:var(--text-dim)">M' + (i + 1) + '</div>' +
+            '<div style="font-family:var(--font-data);font-size:10px;color:' + healthColor + '">' + m.rpm.toFixed(0) + '</div>' +
+            '<div style="font-family:var(--font-data);font-size:8px;color:' + tempColor + '">' + m.temp.toFixed(0) + '°</div></div>';
+        }).join('');
+      }
+    }
 
     // Video link info
     const vl = f.video_link || {};
@@ -5225,6 +5721,11 @@ setMode('OBSERVE');
       if (key.toLowerCase() === 't') { e.preventDefault(); setMode('TASK'); return; }
       if (key.toLowerCase() === 'd') { e.preventDefault(); setMode('DEBRIEF'); return; }
     }
+
+    if (key === 'm' && currentMode !== 'ISR') {
+      e.preventDefault();
+      if (typeof mapTools !== 'undefined') mapTools.activate('measure');
+    }
   });
 
   // ---- Keyboard shortcuts (SOLO mode) ----
@@ -5253,8 +5754,85 @@ setMode('OBSERVE');
     }
   });
 
+  // ? key shows shortcut help
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === '?') {
+      e.preventDefault();
+      const help = document.getElementById('shortcut-help');
+      help.classList.toggle('hidden');
+    }
+  });
+
+  // Click backdrop to close
+  document.getElementById('shortcut-help').addEventListener('click', (e) => {
+    if (e.target.id === 'shortcut-help') {
+      e.target.classList.add('hidden');
+    }
+  });
+
 })();
 
+</script>
+
+<!-- ==================== ONBOARDING OVERLAY ==================== -->
+<div id="onboarding-overlay" class="hidden">
+  <!-- Hint 1: Asset list (left sidebar) -->
+  <div class="onboard-hint" style="top: 120px; left: 24px;">
+    <div class="onboard-hint-label">Select an asset to view telemetry</div>
+    <div class="onboard-hint-sub">Browse drones, sensors, and ground stations in the Object Explorer.</div>
+  </div>
+
+  <!-- Hint 2: Mode buttons (top bar) -->
+  <div class="onboard-hint" style="top: 60px; left: 260px;">
+    <div class="onboard-hint-label">Switch modes: Observe, Task, Debrief, ISR</div>
+    <div class="onboard-hint-sub">Each mode reconfigures the HUD for a different workflow.</div>
+  </div>
+
+  <!-- Hint 3: Cmd+K search (center) -->
+  <div class="onboard-hint" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">
+    <div class="onboard-hint-label">Press <span class="onboard-hint-key">Cmd+K</span> to search anything</div>
+    <div class="onboard-hint-sub">Assets, commands, map locations &mdash; all searchable.</div>
+  </div>
+
+  <!-- Hint 4: ISR FPV hint (top-right area near ISR button) -->
+  <div class="onboard-hint" style="top: 60px; right: 40px; left: auto;">
+    <div class="onboard-hint-label">Click an asset, then ISR FEED for FPV view</div>
+    <div class="onboard-hint-sub">Full-screen first-person camera feed with DVR controls.</div>
+  </div>
+
+  <!-- Hint 5: Keyboard shortcuts (bottom) -->
+  <div class="onboard-hint" style="bottom: 60px; left: 50%; transform: translateX(-50%);">
+    <div class="onboard-hint-label">Press <span class="onboard-hint-key">?</span> for keyboard shortcuts</div>
+  </div>
+
+  <div class="onboard-dismiss">Click anywhere or press any key to dismiss</div>
+</div>
+
+<script>
+(function() {
+  if (localStorage.getItem('overwatch_onboarded')) return;
+
+  const overlay = document.getElementById('onboarding-overlay');
+  overlay.classList.remove('hidden');
+
+  function dismiss() {
+    overlay.classList.add('dismissed');
+    localStorage.setItem('overwatch_onboarded', '1');
+    document.removeEventListener('keydown', dismissOnKey, true);
+    overlay.removeEventListener('click', dismiss);
+    setTimeout(function() { overlay.classList.add('hidden'); }, 350);
+  }
+
+  function dismissOnKey(e) {
+    // Don't intercept if user is typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    dismiss();
+  }
+
+  overlay.addEventListener('click', dismiss);
+  document.addEventListener('keydown', dismissOnKey, true);
+})();
 </script>
 </body>
 </html>
