@@ -33,6 +33,7 @@
   --cyan:           #4C90F0;
   --blue:           #2D72D2;
   --purple:         #7961DB;
+  --bg-deep:        #000000;
   --sky:            #1a2a3a;
   --ground:         #3a2a1a;
   --font-data:  'JetBrains Mono', 'IBM Plex Mono', monospace;
@@ -404,7 +405,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   text-align: right;
 }
 
-/* Legacy compat for status badges */
+/* Asset status badges */
 .drone-status-badge {
   font-family: var(--font-label);
   font-size: 9px;
@@ -426,7 +427,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
 }
 
 .drone-status-badge.weak_signal, .drone-status-badge.comms_degraded {
-  background: rgba(248,81,73,0.15);
+  background: rgba(205,66,70,0.15);
   color: var(--red);
 }
 
@@ -1063,11 +1064,11 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   transition: all 0.15s;
 }
 .wp-btn:hover { border-color: var(--accent); color: var(--accent); }
-.wp-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.wp-btn.active { background: var(--accent); color: var(--text-bright); border-color: var(--accent); }
 .wp-btn.execute { border-color: var(--green); color: var(--green); }
 .wp-btn.execute:hover { background: rgba(63,185,80,0.12); }
 .wp-btn.clear { border-color: var(--red); color: var(--red); }
-.wp-btn.clear:hover { background: rgba(248,81,73,0.12); }
+.wp-btn.clear:hover { background: rgba(205,66,70,0.12); }
 .waypoint-marker {
   width: 24px; height: 24px; border-radius: 2px; border: 2px solid var(--accent);
   background: rgba(68,147,248,0.15); color: var(--accent); font-family: var(--font-data);
@@ -1141,7 +1142,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .drone-status-badge.landing { background: rgba(210,153,34,0.15); color: var(--amber); }
 .drone-status-badge.rtl, .drone-status-badge.rtb { background: rgba(163,113,247,0.15); color: var(--purple); }
 .drone-status-badge.landed,.drone-status-badge.idle,.drone-status-badge.grounded { background: rgba(125,133,144,0.15); color: var(--text-secondary); }
-.drone-status-badge.emergency { background: var(--red); color: #fff; }
+.drone-status-badge.emergency { background: var(--red); color: var(--text-bright); }
 .drone-status-badge.goto { background: rgba(68,147,248,0.12); color: var(--accent); }
 .drone-status-badge.mission,.drone-status-badge.operation { background: rgba(63,185,80,0.12); color: var(--green); }
 
@@ -1156,7 +1157,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
    FPV / SOLO MODE
    ============================================================ */
 .video-panel {
-  position: absolute; inset: 0; background: #000; overflow: hidden; z-index: 10;
+  position: absolute; inset: 0; background: var(--bg-deep); overflow: hidden; z-index: 10;
 }
 .video-panel video, .video-panel img, .video-panel canvas {
   width: 100%; height: 100%; object-fit: contain;
@@ -1172,7 +1173,7 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
 .video-panel.pip #pip-close-btn { display: flex; }
 .osd-overlay {
   position: absolute; inset: 0; pointer-events: none;
-  font-family: var(--font-data); color: #fff;
+  font-family: var(--font-data); color: var(--text-bright);
 }
 .osd-element { position: absolute; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .osd-warning {
@@ -1185,11 +1186,11 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   position: absolute; top: 8px; right: 8px;
   display: flex; align-items: center; gap: 6px;
   padding: 4px 10px; border-radius: 2px;
-  background: rgba(255,51,85,0.85); color: #fff;
+  background: rgba(205,66,70,0.85); color: var(--text-bright);
   font-family: var(--font-label); font-size: 10px;
   font-weight: 600; letter-spacing: 0.5px; z-index: 20;
 }
-.dvr-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: pulse-dot 1s infinite; }
+.dvr-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-bright); animation: pulse-dot 1s infinite; }
 .video-controls {
   position: absolute; bottom: 0; left: 0; right: 0;
   display: flex; align-items: center; padding: 6px 12px;
@@ -1330,7 +1331,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   height: 16px;
   border-radius: 2px;
   background: var(--red);
-  color: #fff;
+  color: var(--text-bright);
   font-family: var(--font-data);
   font-size: 9px;
   font-weight: 700;
@@ -1763,8 +1764,8 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: #1C2127;
-  color: #F6F7F9;
+  background: var(--panel);
+  color: var(--text);
   border: 1px solid var(--border-light);
   padding: 4px 8px;
   font-family: var(--font-label);
@@ -1796,7 +1797,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .map-toolbar { position: absolute; top: 10px; right: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 2px; padding: 4px; }
 .map-tool-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; border-radius: 1px; color: var(--text-secondary); cursor: pointer; font-size: 14px; transition: all 0.15s; font-family: var(--font-data); position: relative; }
 .map-tool-btn:hover { background: var(--panel-elevated); color: var(--text); border-color: var(--border); }
-.map-tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.map-tool-btn.active { background: var(--accent); color: var(--text-bright); border-color: var(--accent); }
 /* Override: mode button tooltips appear below the button (top bar) */
 .mode-btn[data-tooltip]::after { bottom: auto; top: calc(100% + 4px); }
 /* Override: map toolbar tooltips appear to the left of the button */
@@ -1888,7 +1889,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   <!-- ==================== TOP BAR ==================== -->
   <div id="top-bar">
     <div class="brand"><span class="brand-icon">&#9670;</span> OVERWATCH</div>
-    <div class="brand-sub">OVERWATCH // ISR PLATFORM</div>
+    <div class="brand-sub">ISR PLATFORM</div>
     <div class="mode-switch">
       <button class="mode-btn active" data-mode="OBSERVE" data-tooltip="Monitor all assets in real-time">OBSERVE</button>
       <button class="mode-btn" data-mode="TASK" data-tooltip="Issue commands and plan missions">TASK</button>
@@ -2078,7 +2079,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
       <!-- GOTO indicator -->
       <div class="goto-indicator" id="goto-indicator" style="display:none">
         <div style="font-family:var(--font-label);font-size:9px;color:var(--accent);letter-spacing:0.05em;text-transform:uppercase">GOTO Target</div>
-        <div style="font-family:var(--font-data);font-size:12px;color:var(--text-bright)" id="goto-coords">Click map...</div>
+        <div style="font-family:var(--font-data);font-size:12px;color:var(--text-bright)" id="goto-coords">Awaiting target designation...</div>
       </div>
     </div>
 
@@ -2143,7 +2144,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
           </div>
         </div>
         <div class="cmd-section">
-          <div class="cmd-section-title">Overlay</div>
+          <div class="cmd-section-title">FLIGHT PARAMETERS</div>
           <div class="cmd-slider-group">
             <div class="cmd-slider-header"><span class="cmd-slider-label">Speed</span><span class="cmd-slider-value" id="speed-val">12 m/s</span></div>
             <input type="range" class="cmd-slider" id="cmd-speed" min="1" max="20" value="12" step="0.5">
@@ -2182,17 +2183,17 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
         <div class="cmd-section">
           <div class="cmd-section-title">Flight Mode</div>
           <div class="fpv-mode-btns">
-            <button class="fpv-mode-btn" data-fmode="ANGLE" data-tooltip="Self-leveling mode">ANGLE</button>
-            <button class="fpv-mode-btn" data-fmode="HORIZON" data-tooltip="Hybrid stabilized mode">HORIZON</button>
-            <button class="fpv-mode-btn active" data-fmode="ACRO" data-tooltip="Full manual acrobatic mode">ACRO</button>
-            <button class="fpv-mode-btn" data-fmode="GPS_RESCUE" data-tooltip="GPS-assisted return to home">RESCUE</button>
+            <button class="fpv-mode-btn active" data-fmode="STABILIZE" data-tooltip="Self-leveling mode">STABILIZE</button>
+            <button class="fpv-mode-btn" data-fmode="ALT_HOLD" data-tooltip="Altitude hold mode">ALT_HOLD</button>
+            <button class="fpv-mode-btn" data-fmode="MANUAL" data-tooltip="Full manual control">MANUAL</button>
+            <button class="fpv-mode-btn" data-fmode="GUIDED" data-tooltip="GPS-assisted return to base">GUIDED</button>
           </div>
         </div>
         <div class="cmd-section">
           <div class="cmd-section-title">Telemetry</div>
           <div class="fpv-telem-grid" id="fpv-telem-grid">
             <div class="fpv-telem-cell"><div class="fpv-telem-label">Battery</div><div class="fpv-telem-value" id="fpv-bat">--</div></div>
-            <div class="fpv-telem-cell"><div class="fpv-telem-label">Cell V</div><div class="fpv-telem-value" id="fpv-cell">--</div></div>
+            <div class="fpv-telem-cell"><div class="fpv-telem-label">V/Cell</div><div class="fpv-telem-value" id="fpv-cell">--</div></div>
             <div class="fpv-telem-cell"><div class="fpv-telem-label">Alt AGL</div><div class="fpv-telem-value" id="fpv-alt">--</div></div>
             <div class="fpv-telem-cell"><div class="fpv-telem-label">Speed</div><div class="fpv-telem-value" id="fpv-spd">--</div></div>
             <div class="fpv-telem-cell"><div class="fpv-telem-label">RSSI</div><div class="fpv-telem-value" id="fpv-rssi">--</div></div>
@@ -2310,7 +2311,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
   <div id="bottom-panel">
     <div class="event-log-section">
       <div class="bottom-metric-header">
-        <span class="bottom-metric-title notification-badge">Activity Stream<span class="badge-count hidden" id="event-badge">0</span></span>
+        <span class="bottom-metric-title notification-badge">ACTIVITY STREAM<span class="badge-count hidden" id="event-badge">0</span></span>
       </div>
       <div class="event-log-list" id="event-log" aria-live="polite" role="log"></div>
     </div>
@@ -2373,9 +2374,9 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
     <div class="shortcut-help-title">Keyboard Shortcuts</div>
     <div class="shortcut-group">
       <div class="shortcut-group-title">Navigation</div>
-      <div class="shortcut-row"><span class="shortcut-key">Cmd+K</span><span class="shortcut-desc">Command palette</span></div>
-      <div class="shortcut-row"><span class="shortcut-key">1-6</span><span class="shortcut-desc">Select drone</span></div>
-      <div class="shortcut-row"><span class="shortcut-key">O / T / D</span><span class="shortcut-desc">Switch mode</span></div>
+      <div class="shortcut-row"><span class="shortcut-key">Cmd/Ctrl+K</span><span class="shortcut-desc">Command palette</span></div>
+      <div class="shortcut-row"><span class="shortcut-key">1-6</span><span class="shortcut-desc">Select asset</span></div>
+      <div class="shortcut-row"><span class="shortcut-key">O / T / D / I</span><span class="shortcut-desc">Switch mode</span></div>
       <div class="shortcut-row"><span class="shortcut-key">?</span><span class="shortcut-desc">This help</span></div>
     </div>
     <div class="shortcut-group">
@@ -2400,10 +2401,10 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
     <input id="cmd-palette-input" type="text" placeholder="Search assets, commands, modes..." autocomplete="off" spellcheck="false" role="combobox">
     <div id="cmd-palette-results" class="cmd-palette-results" role="listbox" aria-label="Search results"></div>
     <div class="cmd-palette-footer">
-      <span class="cmd-palette-hint">ESC close</span>
-      <span class="cmd-palette-hint">ARROW navigate</span>
-      <span class="cmd-palette-hint">ENTER select</span>
-      <span class="cmd-palette-hint" style="margin-left:auto">CMD+K</span>
+      <span class="cmd-palette-hint">ESC to close</span>
+      <span class="cmd-palette-hint">&uarr;&darr; to navigate</span>
+      <span class="cmd-palette-hint">ENTER to select</span>
+      <span class="cmd-palette-hint" style="margin-left:auto">CMD/CTRL+K</span>
     </div>
   </div>
 </div>
@@ -2415,6 +2416,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 
 // ---- CSS VARIABLE HELPER ----
 const _css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const _cssRgba = (v, a) => { const h = _css(v); const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16); return `rgba(${r},${g},${b},${a})`; };
 
 // ---- CONSTANTS ----
 const CENTER_LAT = 33.6405;
@@ -2438,7 +2440,7 @@ const FORMATION_OFFSETS = {
 
 const DRONE_STATES = {
   IDLE:'IDLE', ARMED:'ARMED', TAKING_OFF:'TAKING_OFF', FLYING:'FLYING',
-  LANDING:'LANDING', LANDED:'LANDED', RTL:'RTL', EMERGENCY:'EMERGENCY',
+  LANDING:'LANDING', LANDED:'LANDED', RTB:'RTB', EMERGENCY:'EMERGENCY',
   GOTO:'GOTO', MISSION:'MISSION'
 };
 
@@ -2543,7 +2545,7 @@ class AssetSimulator {
 
     // FPV extensions
     this.fpvData = {
-      flight_mode: 'ANGLE',
+      flight_mode: 'STABILIZE',
       camera_tilt: 0,
       mah_consumed: 0,
       cell_voltage: (this.voltage / 6),
@@ -2673,7 +2675,7 @@ class AssetSimulator {
         }
         break;
 
-      case DRONE_STATES.RTL:
+      case DRONE_STATES.RTB:
         if (this._flyToward(this.homePosition.lat, this.homePosition.lng, dt)) {
           this.droneState = DRONE_STATES.LANDING;
         }
@@ -2695,10 +2697,10 @@ class AssetSimulator {
 
     // Common sensor updates for airborne states
     const airborne = [DRONE_STATES.FLYING, DRONE_STATES.GOTO, DRONE_STATES.MISSION,
-                      DRONE_STATES.RTL, DRONE_STATES.TAKING_OFF, DRONE_STATES.LANDING];
+                      DRONE_STATES.RTB, DRONE_STATES.TAKING_OFF, DRONE_STATES.LANDING];
     if (airborne.includes(this.droneState)) {
       this.battery = Math.max(0, this.battery - 0.01 * dt);
-      this.voltage = 16 + this.battery * 0.09 + Math.sin(this.t) * 0.1;
+      this.voltage = 20.5 + this.battery * 0.047 + Math.sin(this.t) * 0.1;
       this.current = 10 + Math.sin(this.t * 0.3) * 4;
       this.satellites = clamp(Math.round(14 + Math.sin(this.t * 0.2 + this.index) * 2), 12, 16);
       this.hdop = clamp(0.8 + Math.sin(this.t * 0.15 + this.index) * 0.3, 0.6, 1.2);
@@ -2813,15 +2815,16 @@ class DirectiveEngine {
 
         if (failedChecks.length > 0) {
           showToast('PRE-ARM FAILED: ' + failedChecks[0], 'warning');
-          addEvent({ time: utcString(), source: targets[0]?.id || 'SYSTEM', msg: 'Pre-arm check failed: ' + failedChecks.join('; '), severity: 'warn' });
-          break;
+          this.addEvent({ time: utcTimeStamp(), source: targets[0]?.id || 'SYSTEM', msg: 'Pre-arm check failed: ' + failedChecks.join('; '), severity: 'warn' });
+          return; // ARM failure emits its own event; skip generic post-switch event
         }
 
         targets.forEach(d => { d.armed = true; d.droneState = DRONE_STATES.ARMED; d.altitude = 0; d.speed = 0; });
         this._logCmd('ARM', targetLabel);
         showToast('ARMED — ' + targetLabel);
-        addEvent({ time: utcString(), source: targetLabel, msg: 'Pre-arm checks passed. Armed.', severity: 'ok' });
-        break;
+        this.addEvent({ time: utcTimeStamp(), source: targetLabel, msg: 'Pre-arm checks passed. Armed.', severity: 'ok' });
+        objectivesCompleted++;
+        return; // ARM emits its own event; skip generic post-switch event
       }
 
       case 'DISARM':
@@ -2838,20 +2841,20 @@ class DirectiveEngine {
           d.droneState = DRONE_STATES.TAKING_OFF;
           d.altitude = d.altitude || 0.5;
         });
-        this._logCmd('TAKEOFF ' + alt + 'm', targetLabel);
-        showToast('TAKEOFF ' + alt + 'm — ' + targetLabel);
+        this._logCmd('LAUNCH ' + alt + 'm', targetLabel);
+        showToast('LAUNCH ' + alt + 'm — ' + targetLabel);
         break;
 
       case 'LAND':
         targets.forEach(d => { d.droneState = DRONE_STATES.LANDING; });
-        this._logCmd('LAND', targetLabel);
-        showToast('LANDING — ' + targetLabel);
+        this._logCmd('RECOVER', targetLabel);
+        showToast('RECOVER — ' + targetLabel);
         break;
 
-      case 'RTL':
-        targets.forEach(d => { d.droneState = DRONE_STATES.RTL; });
-        this._logCmd('RTL', targetLabel);
-        showToast('RTL — ' + targetLabel, 'warning');
+      case 'RTB':
+        targets.forEach(d => { d.droneState = DRONE_STATES.RTB; });
+        this._logCmd('RTB', targetLabel);
+        showToast('RTB — ' + targetLabel, 'warning');
         break;
 
       case 'GOTO':
@@ -2909,6 +2912,7 @@ class DirectiveEngine {
     }
 
     this.addEvent({ time: utcTimeStamp(), source: 'OVERWATCH', msg: cmd + ' → ' + targetLabel, severity: 'info' });
+    objectivesCompleted++;
   }
 
   _logCmd(text, target) {
@@ -3354,7 +3358,7 @@ function initMap() {
   // Formation lines from primary to each follower
   ASSET_DEFS.forEach((def, i) => {
     if (i === 0) return; // skip primary
-    const line = L.polyline([], { color: '#383E47', weight: 1, opacity: 0.6, dashArray: '6, 6' }).addTo(map);
+    const line = L.polyline([], { color: _css('--border-light'), weight: 1, opacity: 0.6, dashArray: '6, 6' }).addTo(map);
     formationLines.push({ id: def.id, line });
   });
 }
@@ -3553,7 +3557,7 @@ function updateInspector(asset) {
     </div>
     <!-- ATTITUDE -->
     <div class="detail-section">
-      <div class="detail-section-title">Attitude <span class="prop-type-tag">FLOAT64</span></div>
+      <div class="detail-section-title">Attitude <span class="prop-type-tag">DOUBLE</span></div>
       <div class="attitude-container">
         <div class="attitude-ball" id="attitude-ball" style="transform: translate(-50%, -50%) rotate(${asset.roll}deg) translateY(${-asset.pitch * 1.5}px);">
           <div class="attitude-sky"></div>
@@ -3608,7 +3612,7 @@ function updateInspector(asset) {
 
     <!-- VELOCITY -->
     <div class="detail-section">
-      <div class="detail-section-title">Velocity <span class="prop-type-tag">FLOAT64</span></div>
+      <div class="detail-section-title">Velocity <span class="prop-type-tag">DOUBLE</span></div>
       <div class="telem-grid">
         <div class="telem-cell">
           <div class="telem-cell-label">Ground Speed (m/s)</div>
@@ -3627,7 +3631,7 @@ function updateInspector(asset) {
 
     <!-- POWER STATE -->
     <div class="detail-section">
-      <div class="detail-section-title">Power State <span class="prop-type-tag">FLOAT64</span></div>
+      <div class="detail-section-title">Power State <span class="prop-type-tag">DOUBLE</span></div>
       <div class="battery-detail">
         <div class="battery-big-num" style="color:${batColor}">${asset.battery.toFixed(1)}%</div>
         <div class="battery-meta">
@@ -3643,7 +3647,7 @@ function updateInspector(asset) {
     <!-- POSITIONING -->
     <div class="detail-section">
       <div class="detail-section-title">Positioning <span class="prop-type-tag">GEO_POINT</span></div>
-      <div class="gps-fix-badge">3D-RTK FIX</div>
+      <div class="gps-fix-badge">3D FIX</div>
       <div class="gps-grid">
         <div class="gps-cell">
           <div class="gps-cell-label">Satellites</div>
@@ -3658,10 +3662,10 @@ function updateInspector(asset) {
 
     <!-- COMMLINK -->
     <div class="detail-section">
-      <div class="detail-section-title">Commlink <span class="prop-type-tag">STRUCT</span></div>
+      <div class="detail-section-title">Commlink</div>
       <div class="link-cards">
         <div class="link-card">
-          <div class="link-card-value" style="color:${rssiC}">${asset.rssi.toFixed(0)}<span class="link-card-unit">dBm</span></div>
+          <div class="link-card-value" style="color:${rssiC}">${asset.rssi.toFixed(0)}</div>
           <div class="link-card-label">RSSI</div>
         </div>
         <div class="link-card">
@@ -3680,7 +3684,7 @@ function updateInspector(asset) {
       <div class="detail-section-title">Status <span class="prop-type-tag">ENUM</span></div>
       <div class="drone-status-badge ${asset.status.toLowerCase()}" style="display:inline-block;font-size:11px;padding:3px 10px">${asset.status.replace(/_/g,' ')}</div>
     </div>
-    <div class="ontology-source">SRC: SIM-ENGINE // CONF: HIGH // UPD: ${new Date().toISOString().substr(11, 8)}Z</div>
+    <div class="ontology-source">SRC: SIM-ENGINE // CONF: HIGH // UPD: ${new Date().toISOString().substring(11, 19)}Z</div>
   `;
 
   // Relationships tab
@@ -3689,23 +3693,23 @@ function updateInspector(asset) {
   relContent.innerHTML = `
     <div style="padding:8px 12px">
       <div class="relationship-card">
-        <div class="link-type-label">Link[MEMBER_OF] <span class="link-cardinality">1:1</span></div>
+        <div class="link-type-label">Link[memberOf] <span class="link-cardinality">1:1</span></div>
         <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> TF-OVERWATCH-01</div>
       </div>
       ${isPrimary ? '' : `<div class="relationship-card">
-        <div class="link-type-label">Link[REPORTS_TO] <span class="link-cardinality">N:1</span></div>
+        <div class="link-type-label">Link[reportsTo] <span class="link-cardinality">N:1</span></div>
         <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> ALPHA-1</div>
       </div>`}
       <div class="relationship-card">
-        <div class="link-type-label">Link[ASSIGNED_ROLE] <span class="link-cardinality">1:1</span></div>
+        <div class="link-type-label">Link[assignedRole] <span class="link-cardinality">1:1</span></div>
         <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> ${asset.role}</div>
       </div>
       <div class="relationship-card">
-        <div class="link-type-label">Link[OPERATES_IN] <span class="link-cardinality">N:1</span></div>
+        <div class="link-type-label">Link[operatesIn] <span class="link-cardinality">N:1</span></div>
         <div class="link-direction">${asset.id} <span style="color:var(--accent)">&rarr;</span> AO-IRVINE</div>
       </div>
       <div class="relationship-card">
-        <div class="link-type-label">Link[COMM_LINK] <span class="link-cardinality">1:N</span></div>
+        <div class="link-type-label">Link[commLink] <span class="link-cardinality">1:N</span></div>
         <div class="link-direction">${asset.id} <span style="color:var(--accent)">&harr;</span> MESH-NET-01</div>
       </div>
     </div>
@@ -4234,6 +4238,7 @@ function updateInsightsPanel(asset) {
    BOTTOM PANEL — ACTIVITY STREAM
    ============================================================== */
 const activityStream = [];
+let objectivesCompleted = 0;
 
 function addEvent(ev) {
   activityStream.push(ev);
@@ -4364,7 +4369,7 @@ setMode('OBSERVE');
     gotoMode = true;
     map.getContainer().style.cursor = 'crosshair';
     document.getElementById('goto-indicator').style.display = '';
-    document.getElementById('goto-coords').textContent = 'Click map to set target...';
+    document.getElementById('goto-coords').textContent = 'Awaiting target designation...';
     const btn = document.getElementById('cmd-goto');
     if (btn) { btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--accent)'; }
   }
@@ -4413,7 +4418,7 @@ setMode('OBSERVE');
     cmdEngine.execute('TAKEOFF', { altitude: alt });
   });
   document.getElementById('cmd-land').addEventListener('click', () => cmdEngine.execute('LAND'));
-  document.getElementById('cmd-rtl').addEventListener('click', () => cmdEngine.execute('RTL'));
+  document.getElementById('cmd-rtl').addEventListener('click', () => cmdEngine.execute('RTB'));
   document.getElementById('cmd-goto').addEventListener('click', () => {
     if (gotoMode) disableGotoMode(); else enableGotoMode();
   });
@@ -4626,7 +4631,7 @@ setMode('OBSERVE');
       const meshOk = avgLat < 40;
       const meshBadge = document.getElementById('mesh-badge');
       meshBadge.textContent = meshOk ? 'NOMINAL' : 'DEGRADED';
-      meshBadge.style.background = meshOk ? 'rgba(63,185,80,0.12)' : 'rgba(210,153,34,0.15)';
+      meshBadge.style.background = meshOk ? _cssRgba('--green', 0.12) : _cssRgba('--amber', 0.15);
       meshBadge.style.color = meshOk ? 'var(--green)' : 'var(--amber)';
 
       // Power State
@@ -4661,6 +4666,12 @@ setMode('OBSERVE');
         const opsSec = Math.floor((Date.now() - debriefTracker.startTime) / 1000);
         const opsMin = Math.floor(opsSec / 60);
         opsElapsed.textContent = opsMin + ':' + String(opsSec % 60).padStart(2, '0');
+      }
+
+      // Update objectives completed count
+      const opsObjCount = document.getElementById('ops-obj-count');
+      if (opsObjCount) {
+        opsObjCount.textContent = objectivesCompleted;
       }
 
       // Update diagnostics panel if viewing it
@@ -4739,30 +4750,30 @@ setMode('OBSERVE');
       const w = 640, h = 480;
       const draw = () => {
         this._testFrame++;
-        ctx.fillStyle = '#111418';
+        ctx.fillStyle = _css('--bg');
         ctx.fillRect(0, 0, w, h);
         // Grid lines
-        ctx.strokeStyle = 'rgba(115,128,145,0.08)';
+        ctx.strokeStyle = _cssRgba('--text-dim', 0.08);
         ctx.lineWidth = 1;
         for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
         for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
         // Crosshair
-        ctx.strokeStyle = 'rgba(115,128,145,0.3)';
+        ctx.strokeStyle = _cssRgba('--text-dim', 0.3);
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(w/2 - 20, h/2); ctx.lineTo(w/2 + 20, h/2); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(w/2, h/2 - 20); ctx.lineTo(w/2, h/2 + 20); ctx.stroke();
         // Text
-        ctx.font = '16px JetBrains Mono';
-        ctx.fillStyle = '#ABB3BF';
+        ctx.font = '16px ' + _css('--font-data');
+        ctx.fillStyle = _css('--text-secondary');
         ctx.textAlign = 'center';
         ctx.fillText('OVERWATCH ISR TEST PATTERN', w/2, h/2 - 50);
-        ctx.font = '12px JetBrains Mono';
-        ctx.fillStyle = '#5F6B7C';
+        ctx.font = '12px ' + _css('--font-data');
+        ctx.fillStyle = _css('--text-tertiary');
         ctx.fillText('No video source connected', w/2, h/2 + 50);
         ctx.fillText('Frame ' + this._testFrame, w/2, h/2 + 70);
         const t = new Date();
-        ctx.fillStyle = '#ABB3BF';
-        ctx.fillText(t.toISOString().substr(11, 8) + 'Z', w/2, h/2 + 90);
+        ctx.fillStyle = _css('--text-secondary');
+        ctx.fillText(t.toISOString().substring(11, 19) + 'Z', w/2, h/2 + 90);
         this._testPatternId = requestAnimationFrame(draw);
       };
       draw();
@@ -4867,7 +4878,7 @@ setMode('OBSERVE');
       const fmt = (v, d) => (v || 0).toFixed(d);
 
       this.els.battery.textContent = fmt(drone.voltage, 1) + 'V  ' + fmt(drone.battery, 0) + '%';
-      this.els.battery.style.color = drone.battery < 25 ? _css('--red') : drone.battery < 50 ? _css('--amber') : '#fff';
+      this.els.battery.style.color = drone.battery < 25 ? _css('--red') : drone.battery < 50 ? _css('--amber') : _css('--text-bright');
       this.els.cell.textContent = fmt(f.cell_voltage || drone.voltage / 6, 2) + 'V/cell';
       this.els.mah.textContent = (f.mah_consumed || 0).toFixed(0) + ' mAh';
 
@@ -4880,14 +4891,14 @@ setMode('OBSERVE');
       this.els.alt.textContent = fmt(drone.altitude, 1) + 'm';
       this.els.speed.textContent = fmt(drone.speed, 1) + 'm/s';
       this.els.rssi.textContent = 'RSSI ' + fmt(drone.rssi, 0);
-      this.els.rssi.style.color = drone.rssi < 50 ? _css('--red') : drone.rssi < 70 ? _css('--amber') : '#fff';
+      this.els.rssi.style.color = drone.rssi < 50 ? _css('--red') : drone.rssi < 70 ? _css('--amber') : _css('--text-bright');
 
       const hd = f.home_distance_m || 0;
       const hdir = f.home_direction_deg || 0;
       const dirs = ['N','NE','E','SE','S','SW','W','NW'];
       const compass = dirs[Math.round(((hdir % 360) + 360) % 360 / 45) % 8];
       this.els.home.textContent = hd.toFixed(0) + 'm ' + compass;
-      this.els.mode.textContent = f.flight_mode || 'ANGLE';
+      this.els.mode.textContent = f.flight_mode || 'STABILIZE';
 
       // Artificial horizon rotation
       const horizonEl = document.getElementById('osd-horizon');
@@ -4943,7 +4954,7 @@ setMode('OBSERVE');
       this.startTime = performance.now();
       this.telemLog = [];
       document.getElementById('dvr-badge').style.display = '';
-      document.getElementById('video-record').style.background = 'rgba(255,51,85,0.2)';
+      document.getElementById('video-record').style.background = 'rgba(205,66,70,0.2)';
       showToast('DVR recording started');
     }
 
@@ -5061,7 +5072,7 @@ setMode('OBSERVE');
       const batPct = sel.battery;
       const batStatus = batPct > 30 ? 'ok' : batPct > 20 ? 'warn' : 'crit';
       const batColor = batStatus === 'ok' ? _css('--green') : batStatus === 'warn' ? _css('--amber') : _css('--red');
-      items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + batColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">RTH Battery</span><span style="font-family:var(--font-data);font-size:10px;color:' + batColor + ';margin-left:auto">' + (batStatus === 'crit' ? 'TRIGGERED' : batStatus === 'warn' ? 'WARNING' : 'OK') + '</span></div>');
+      items.push('<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:' + batColor + ';flex-shrink:0"></span><span style="font-family:var(--font-data);font-size:10px;color:var(--text)">RTB Battery</span><span style="font-family:var(--font-data);font-size:10px;color:' + batColor + ';margin-left:auto">' + (batStatus === 'crit' ? 'TRIGGERED' : batStatus === 'warn' ? 'WARNING' : 'OK') + '</span></div>');
 
       // GPS failsafe
       const gpsStatus = sel.satellites >= 8 ? 'ok' : sel.satellites >= 5 ? 'warn' : 'crit';
@@ -5093,7 +5104,7 @@ setMode('OBSERVE');
         ctx.scale(dpr, dpr);
         ctx.clearRect(0, 0, 64, 64);
         // Grid lines
-        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.strokeStyle = _cssRgba('--text-bright', 0.08);
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(32, 0); ctx.lineTo(32, 64); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, 32); ctx.lineTo(64, 32); ctx.stroke();
@@ -5102,9 +5113,9 @@ setMode('OBSERVE');
         const py = 32 - y * 28;
         ctx.beginPath();
         ctx.arc(px, py, 6, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(45,114,210,0.8)';
+        ctx.fillStyle = _cssRgba('--accent', 0.8);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(45,114,210,0.4)';
+        ctx.strokeStyle = _cssRgba('--accent', 0.4);
         ctx.lineWidth = 1;
         ctx.stroke();
       };
@@ -5145,7 +5156,7 @@ setMode('OBSERVE');
 
     // Update active flight mode button
     document.querySelectorAll('.fpv-mode-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.fmode === (f.flight_mode || 'ACRO'));
+      b.classList.toggle('active', b.dataset.fmode === (f.flight_mode || 'STABILIZE'));
     });
   }, 100);
 
@@ -5192,7 +5203,7 @@ setMode('OBSERVE');
           break;
         } catch (e) { continue; }
       }
-      if (!connected) showToast('No OVERWATCH platform found', 'warning');
+      if (!connected) showToast('No platform backend detected', 'warning');
     } finally {
       setTimeout(() => { btn.classList.remove('scanning'); btn.textContent = 'CONNECT'; }, 2000);
     }
@@ -5232,7 +5243,7 @@ setMode('OBSERVE');
     cmdEngine.execute('DISARM', { droneId: selectedDroneId });
   });
   document.getElementById('fpv-estop').addEventListener('click', () => {
-    if (confirm('ABORT — Are you sure?')) {
+    if (confirm('ABORT — selected asset will execute emergency descent. Confirm?')) {
       cmdEngine.execute('EMERGENCY_STOP', { droneId: selectedDroneId });
     }
   });
@@ -5319,7 +5330,7 @@ setMode('OBSERVE');
   const _origExecute = cmdEngine.execute.bind(cmdEngine);
   cmdEngine.execute = function(cmd, params) {
     _origExecute(cmd, params);
-    const severityMap = { ARM: 'info', DISARM: 'info', TAKEOFF: 'ok', LAND: 'warn', RTL: 'warn', GOTO: 'info', EMERGENCY_STOP: 'alert', EXECUTE_MISSION: 'ok', SET_FORMATION: 'info' };
+    const severityMap = { ARM: 'info', DISARM: 'info', TAKEOFF: 'ok', LAND: 'warn', RTB: 'warn', GOTO: 'info', EMERGENCY_STOP: 'alert', EXECUTE_MISSION: 'ok', SET_FORMATION: 'info' };
     debriefTracker.addKeyEvent(cmd + (params && params.droneId ? ' -> ' + params.droneId : ''), severityMap[cmd] || 'info');
   };
 
@@ -5610,13 +5621,13 @@ setMode('OBSERVE');
         { label: 'STAND DOWN', hint: 'Disarm selected asset', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('DISARM', { droneId: selectedDroneId }); } },
         { label: 'LAUNCH', hint: 'Takeoff to set altitude', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('TAKEOFF', { droneId: selectedDroneId }); } },
         { label: 'RECOVER', hint: 'Land selected asset', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('LAND', { droneId: selectedDroneId }); } },
-        { label: 'RTB', hint: 'Return to base', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('RTL', { droneId: selectedDroneId }); } },
+        { label: 'RTB', hint: 'Return to base', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('RTB', { droneId: selectedDroneId }); } },
         { label: 'ABORT', hint: 'Emergency stop all', action: () => { if (typeof cmdEngine !== 'undefined') cmdEngine.execute('EMERGENCY_STOP', {}); } },
       ];
       cmds.forEach(c => items.push({ category: 'COMMANDS', icon: '\u25B6', label: c.label, hint: c.hint, action: c.action }));
       // Modes
       const modes = [
-        { label: 'OBSERVE', hint: 'Surveillance mode', action: () => setMode('OBSERVE') },
+        { label: 'OBSERVE', hint: 'Real-time fleet monitoring', action: () => setMode('OBSERVE') },
         { label: 'TASK', hint: 'Directive center', action: () => setMode('TASK') },
         { label: 'DEBRIEF', hint: 'Replay & analytics', action: () => setMode('DEBRIEF') },
         { label: 'ISR FEED', hint: 'FPV camera view', action: () => setMode('ISR') },
@@ -5720,6 +5731,7 @@ setMode('OBSERVE');
       if (key.toLowerCase() === 'o') { e.preventDefault(); setMode('OBSERVE'); return; }
       if (key.toLowerCase() === 't') { e.preventDefault(); setMode('TASK'); return; }
       if (key.toLowerCase() === 'd') { e.preventDefault(); setMode('DEBRIEF'); return; }
+      if (key.toLowerCase() === 'i') { e.preventDefault(); setMode('ISR'); return; }
     }
 
     if (key === 'm' && currentMode !== 'ISR') {
@@ -5780,7 +5792,7 @@ setMode('OBSERVE');
   <!-- Hint 1: Asset list (left sidebar) -->
   <div class="onboard-hint" style="top: 120px; left: 24px;">
     <div class="onboard-hint-label">Select an asset to view telemetry</div>
-    <div class="onboard-hint-sub">Browse drones, sensors, and ground stations in the Object Explorer.</div>
+    <div class="onboard-hint-sub">Browse ISR assets and telemetry in the Object Explorer.</div>
   </div>
 
   <!-- Hint 2: Mode buttons (top bar) -->
@@ -5791,7 +5803,7 @@ setMode('OBSERVE');
 
   <!-- Hint 3: Cmd+K search (center) -->
   <div class="onboard-hint" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">
-    <div class="onboard-hint-label">Press <span class="onboard-hint-key">Cmd+K</span> to search anything</div>
+    <div class="onboard-hint-label">Press <span class="onboard-hint-key">Cmd/Ctrl+K</span> to search anything</div>
     <div class="onboard-hint-sub">Assets, commands, map locations &mdash; all searchable.</div>
   </div>
 
