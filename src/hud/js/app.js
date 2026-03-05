@@ -13,10 +13,11 @@ import { Sparkline } from './sparkline.js';
 import { DirectiveEngine, ObjectiveManager, PlatformLink, DebriefSystem, setDiagStateProvider } from './engine.js';
 import { initMap, createDroneIcon, updateMapMarker, updateFormationLines,
          updateFovCone } from './map.js';
-import { updateAssetExplorer, selectDrone, updateInspector, getDiagState,
-         updateDiagnosticsPanel, updateHardwarePanel, addEvent,
-         renderActivityStream, setEventCallback, setModeProvider,
-         generateActivity, generateStateCorrelatedEvents } from './panels.js';
+import { generateActivity, generateStateCorrelatedEvents, addEvent,
+         renderActivityStream, setEventCallback } from './activity.js';
+import { updateAssetExplorer, selectDrone } from './assetExplorer.js';
+import { updateInspector, setModeProvider } from './inspector.js';
+import { getDiagState, updateDiagnosticsPanel, updateHardwarePanel } from './diagnostics.js';
 
 /* ==============================================================
    MODE SWITCH
@@ -74,7 +75,7 @@ export function setMode(mode) {
   }
 }
 
-// Inject setMode into panels.js via callback provider
+// Inject setMode into inspector.js via callback provider
 setModeProvider(setMode);
 
 /* ==============================================================
@@ -1701,25 +1702,25 @@ tabList.addEventListener('keydown', (e) => {
   activateTab(tabs[newIndex]);
 });
 
-// Tree section toggles
-document.getElementById('tree-assets-toggle').addEventListener('click', () => {
-  const list = document.getElementById('asset-list');
-  const arrow = document.getElementById('tree-assets-arrow');
-  if (list.style.display === 'none') { list.style.display = ''; arrow.innerHTML = '&#9662;'; }
-  else { list.style.display = 'none'; arrow.innerHTML = '&#9656;'; }
-});
-document.getElementById('tree-ops-toggle').addEventListener('click', () => {
-  const list = document.getElementById('ops-list');
-  const arrow = document.getElementById('tree-ops-arrow');
-  if (list.style.display === 'none') { list.style.display = ''; arrow.innerHTML = '&#9662;'; }
-  else { list.style.display = 'none'; arrow.innerHTML = '&#9656;'; }
-});
-document.getElementById('tree-aoi-toggle').addEventListener('click', () => {
-  const list = document.getElementById('aoi-list');
-  const arrow = document.getElementById('tree-aoi-arrow');
-  if (list.style.display === 'none') { list.style.display = ''; arrow.innerHTML = '&#9662;'; }
-  else { list.style.display = 'none'; arrow.innerHTML = '&#9656;'; }
-});
+// Tree section toggles — click + keyboard (Enter/Space) for role="button" elements
+function wireTreeToggle(toggleId, listId, arrowId) {
+  const toggle = document.getElementById(toggleId);
+  const handler = () => {
+    const list = document.getElementById(listId);
+    const arrow = document.getElementById(arrowId);
+    const expanded = list.style.display !== 'none';
+    list.style.display = expanded ? 'none' : '';
+    arrow.innerHTML = expanded ? '&#9656;' : '&#9662;';
+    toggle.setAttribute('aria-expanded', String(!expanded));
+  };
+  toggle.addEventListener('click', handler);
+  toggle.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+  });
+}
+wireTreeToggle('tree-assets-toggle', 'asset-list', 'tree-assets-arrow');
+wireTreeToggle('tree-ops-toggle', 'ops-list', 'tree-ops-arrow');
+wireTreeToggle('tree-aoi-toggle', 'aoi-list', 'tree-aoi-arrow');
 
 // Initialize mode
 setMode('OBSERVE');
