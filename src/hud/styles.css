@@ -1026,14 +1026,92 @@ body[data-mode="ISR"] .observe-only,
 body[data-mode="ISR"] .task-only,
 body[data-mode="ISR"] .debrief-only { display: none !important; }
 
-/* Mode switch fade transition */
-#right-panel, #left-panel, #bottom-panel {
-  transition: opacity 0.15s ease;
+/* ── Mode transition: Palantir Gotham scan-line wipe ── */
+
+/* Scan-line overlay — horizontal accent line sweeps top→bottom */
+.mode-scanline {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 12px 2px var(--accent), 0 0 40px 4px rgba(59,130,196,0.3);
+  z-index: 9999;
+  pointer-events: none;
+  animation: scanSweep 0.4s ease-in-out forwards;
 }
-body.mode-transitioning #right-panel,
-body.mode-transitioning #left-panel,
-body.mode-transitioning #bottom-panel {
+@keyframes scanSweep {
+  0%   { top: 0; opacity: 1; }
+  80%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Brief full-screen CRT flash at midpoint */
+.mode-flash {
+  position: fixed;
+  inset: 0;
+  background: var(--accent);
   opacity: 0;
+  z-index: 9998;
+  pointer-events: none;
+  animation: crtFlash 0.35s ease-out forwards;
+}
+@keyframes crtFlash {
+  0%   { opacity: 0; }
+  30%  { opacity: 0.06; }
+  50%  { opacity: 0; }
+  65%  { opacity: 0.03; }
+  100% { opacity: 0; }
+}
+
+/* Panel exit: clip upward + fade */
+#right-panel, #left-panel, #bottom-panel {
+  transition: opacity 0.2s ease, transform 0.25s ease;
+  will-change: opacity, transform;
+}
+
+body.mode-exit #right-panel {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition-delay: 0s;
+}
+body.mode-exit #left-panel {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition-delay: 0.03s;
+}
+body.mode-exit #bottom-panel {
+  opacity: 0;
+  transform: translateY(6px);
+  transition-delay: 0.06s;
+}
+
+/* Panel enter: slide down from above + fade in — staggered */
+body.mode-enter #right-panel {
+  animation: panelEnter 0.3s ease-out 0.05s both;
+}
+body.mode-enter #left-panel {
+  animation: panelEnter 0.3s ease-out 0.1s both;
+}
+body.mode-enter #bottom-panel {
+  animation: panelEnterUp 0.3s ease-out 0.08s both;
+}
+@keyframes panelEnter {
+  0%   { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes panelEnterUp {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Mode label flash on the active mode button */
+body.mode-enter .mode-btn.active {
+  animation: btnPulse 0.5s ease-out;
+}
+@keyframes btnPulse {
+  0%   { text-shadow: 0 0 0 transparent; }
+  30%  { text-shadow: 0 0 8px var(--accent); }
+  100% { text-shadow: none; }
 }
 body[data-mode="ISR"] #left-panel { width: 0; overflow: hidden; border: none; padding: 0; }
 body[data-mode="ISR"] #right-panel { width: 260px; }
@@ -1929,6 +2007,43 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .map-tool-btn[data-tooltip]::after { bottom: auto; left: auto; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
 .map-tool-sep { height: 1px; background: var(--border); margin: 2px 0; }
 .map-measurement-label { background: var(--panel); border: 1px solid var(--accent); padding: 2px 6px; font-family: var(--font-data); font-size: 10px; color: var(--text-bright); white-space: nowrap; border-radius: 1px; }
+
+/* Route planner — FLY ROUTE execute button on map */
+.route-execute-btn {
+  padding: 6px 16px;
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--green);
+  border: 1px solid var(--green);
+  border-radius: 2px;
+  background: var(--panel);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.route-execute-btn:hover { background: var(--green); color: var(--text-bright); }
+/* Active waypoint pulse during mission */
+.wp-active-pulse { border-radius: 50%; }
+.wp-active-pulse div { animation: wpPulse 1.5s ease-in-out infinite; }
+@keyframes wpPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+/* Route progress label */
+.route-progress-label {
+  background: var(--panel);
+  border: 1px solid var(--text-secondary);
+  padding: 2px 8px;
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  border-radius: 1px;
+  letter-spacing: 0.5px;
+}
 
 /* ============================================================
    ONBOARDING OVERLAY

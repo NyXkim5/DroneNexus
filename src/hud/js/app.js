@@ -35,8 +35,9 @@ function applyMode(mode) {
   });
 }
 
+let _modeTransitioning = false;
 export function setMode(mode) {
-  if (mode === state.currentMode) return;
+  if (mode === state.currentMode || _modeTransitioning) return;
   const isInitial = state.currentMode === null;
 
   // ISR video management (integrated, not monkey-patched)
@@ -62,16 +63,33 @@ export function setMode(mode) {
   };
 
   if (!isInitial) {
-    // Fade out panels briefly before switching
-    document.body.classList.add('mode-transitioning');
+    // Phase 1: scan-line + panel exit
+    const scanline = document.createElement('div');
+    scanline.className = 'mode-scanline';
+    const flash = document.createElement('div');
+    flash.className = 'mode-flash';
+    _modeTransitioning = true;
+    document.body.appendChild(scanline);
+    document.body.appendChild(flash);
+    document.body.classList.add('mode-exit');
+
+    // Phase 2: at midpoint, switch mode data while panels are invisible
     setTimeout(() => {
       applyMode(mode);
       handleVideoPanel();
-      // Fade panels back in
-      requestAnimationFrame(() => {
-        document.body.classList.remove('mode-transitioning');
-      });
-    }, 150);
+
+      // Phase 3: panels enter with stagger
+      document.body.classList.remove('mode-exit');
+      document.body.classList.add('mode-enter');
+
+      // Phase 4: cleanup after animations complete
+      setTimeout(() => {
+        document.body.classList.remove('mode-enter');
+        scanline.remove();
+        flash.remove();
+        _modeTransitioning = false;
+      }, 450);
+    }, 250);
   } else {
     applyMode(mode);
     // On initial mode set, video elements may not exist yet
@@ -448,6 +466,7 @@ function frame(now) {
     }
   });
   updateFormationLines(drones);
+  mapTools.updateRouteProgress(drones[0]);
 
   // 1-second tick for heavier UI updates
   if (now - lastTickTime >= 1000) {
@@ -690,6 +709,11 @@ const mapTools = {
   areaPoints: [],
   areaLayers: L.layerGroup().addTo(state.map),
   annotationLayers: L.layerGroup().addTo(state.map),
+  routePoints: [],
+  routeLayers: L.layerGroup().addTo(state.map),
+  routeExecuteEl: null,
+  routeProgressLayers: L.layerGroup().addTo(state.map),
+  _prevMissionIndex: -1,
 
   activate(tool) {
     if (this.activeTool === tool) { this.deactivate(); return; }
@@ -709,6 +733,14 @@ const mapTools = {
     } else if (tool === 'annotate') {
       state.map.getContainer().style.cursor = 'crosshair';
       state.map.on('click', this._onAnnotateClick, this);
+    } else if (tool === 'route') {
+      this.routePoints = [];
+      this.routeLayers.clearLayers();
+      this._removeRouteExecuteBtn();
+      state.map.getContainer().style.cursor = 'crosshair';
+      state.map.on('click', this._onRouteClick, this);
+      state.map.on('dblclick', this._onRouteFinish, this);
+      showToast('Click to place waypoints. Double-click to finish.');
     }
   },
 
@@ -720,12 +752,18 @@ const mapTools = {
     state.map.off('click', this._onAreaClick, this);
     state.map.off('dblclick', this._onAreaDblClick, this);
     state.map.off('click', this._onAnnotateClick, this);
+    state.map.off('click', this._onRouteClick, this);
+    state.map.off('dblclick', this._onRouteFinish, this);
   },
 
   clearAll() {
     this.measureLayers.clearLayers();
     this.areaLayers.clearLayers();
     this.annotationLayers.clearLayers();
+    this.routeLayers.clearLayers();
+    this.routeProgressLayers.clearLayers();
+    this.routePoints = [];
+    this._removeRouteExecuteBtn();
     this.measurePoints = [];
     this.areaPoints = [];
     this.deactivate();
@@ -829,6 +867,175 @@ const mapTools = {
     }, 100);
 
     this.deactivate();
+  },
+
+  // ---- Route tool handlers ----
+  _onRouteClick(e) {
+    this.routePoints.push(e.latlng);
+    const idx = this.routePoints.length;
+
+    // Numbered waypoint marker
+    const routeGrey = _css('--text-secondary');
+    const marker = L.circleMarker(e.latlng, {
+      radius: 10, color: routeGrey, fillColor: routeGrey, fillOpacity: 0.15, weight: 2,
+    }).addTo(this.routeLayers);
+    marker.bindTooltip('WP-' + idx, { permanent: true, direction: 'top', offset: [0, -10],
+      className: 'map-measurement-label' });
+
+    // Update connecting polyline
+    if (this.routePoints.length > 1) {
+      // Remove old polyline and distance labels
+      this.routeLayers.eachLayer(l => {
+        if (l instanceof L.Polyline && !(l instanceof L.Polygon)) this.routeLayers.removeLayer(l);
+        if (l._isDistLabel) this.routeLayers.removeLayer(l);
+      });
+      // Draw full route line
+      L.polyline(this.routePoints.map(p => [p.lat, p.lng]), {
+        color: _css('--text-secondary'), weight: 2, opacity: 0.8
+      }).addTo(this.routeLayers);
+
+      // Distance label on latest segment
+      const prev = this.routePoints[this.routePoints.length - 2];
+      const curr = e.latlng;
+      const distM = state.map.distance(prev, curr);
+      const midLat = (prev.lat + curr.lat) / 2;
+      const midLng = (prev.lng + curr.lng) / 2;
+      const label = L.marker([midLat, midLng], {
+        icon: L.divIcon({ className: 'map-measurement-label',
+          html: (distM / 1000).toFixed(1) + ' km', iconSize: null })
+      }).addTo(this.routeLayers);
+      label._isDistLabel = true;
+    }
+
+    // Total distance label on last waypoint
+    if (this.routePoints.length > 1) {
+      this.routeLayers.eachLayer(l => { if (l._isTotalLabel) this.routeLayers.removeLayer(l); });
+      let totalM = 0;
+      for (let i = 1; i < this.routePoints.length; i++) {
+        totalM += state.map.distance(this.routePoints[i - 1], this.routePoints[i]);
+      }
+      const totalLabel = L.marker(e.latlng, {
+        icon: L.divIcon({ className: 'route-progress-label',
+          html: 'TOTAL ' + (totalM / 1000).toFixed(1) + ' km \u00B7 ' + this.routePoints.length + ' WP',
+          iconSize: null, iconAnchor: [0, -16] })
+      }).addTo(this.routeLayers);
+      totalLabel._isTotalLabel = true;
+    }
+  },
+
+  _onRouteFinish(e) {
+    e.originalEvent.preventDefault();
+    if (this.routePoints.length < 2) {
+      showToast('Need at least 2 waypoints', 'error');
+      return;
+    }
+    this.deactivate();
+    this._showRouteExecuteBtn();
+  },
+
+  _showRouteExecuteBtn() {
+    this._removeRouteExecuteBtn();
+    const last = this.routePoints[this.routePoints.length - 1];
+    const containerPoint = state.map.latLngToContainerPoint(last);
+    const btn = document.createElement('button');
+    btn.className = 'route-execute-btn';
+    btn.textContent = '\u25B6 FLY ROUTE';
+    btn.style.position = 'absolute';
+    btn.style.left = (containerPoint.x + 20) + 'px';
+    btn.style.top = (containerPoint.y - 15) + 'px';
+    btn.style.zIndex = '1000';
+    btn.addEventListener('click', () => this._executeRoute());
+    state.map.getContainer().appendChild(btn);
+    this.routeExecuteEl = btn;
+
+    // Reposition on map move
+    this._repositionExecuteBtn = () => {
+      if (!this.routeExecuteEl) return;
+      const pt = state.map.latLngToContainerPoint(last);
+      this.routeExecuteEl.style.left = (pt.x + 20) + 'px';
+      this.routeExecuteEl.style.top = (pt.y - 15) + 'px';
+    };
+    state.map.on('move', this._repositionExecuteBtn);
+  },
+
+  _removeRouteExecuteBtn() {
+    if (this.routeExecuteEl) {
+      this.routeExecuteEl.remove();
+      this.routeExecuteEl = null;
+    }
+    if (this._repositionExecuteBtn) {
+      state.map.off('move', this._repositionExecuteBtn);
+      this._repositionExecuteBtn = null;
+    }
+  },
+
+  _executeRoute() {
+    const waypoints = this.routePoints.map(p => ({ lat: p.lat, lng: p.lng }));
+    cmdEngine.execute('EXECUTE_MISSION', { waypoints });
+    this._removeRouteExecuteBtn();
+    this._prevMissionIndex = -1;
+    showToast('Route executing \u2014 ' + waypoints.length + ' waypoints');
+  },
+
+  // ---- Live route progress (called from frame loop) ----
+  updateRouteProgress(leader) {
+    if (!leader || leader.droneState !== 'MISSION' || leader.missionWaypoints.length === 0) {
+      if (this._prevMissionIndex >= 0) {
+        // Mission just completed
+        showToast('Route complete');
+        this._prevMissionIndex = -1;
+        // Fade out route after 3s
+        setTimeout(() => {
+          this.routeProgressLayers.clearLayers();
+          this.routeLayers.clearLayers();
+          this.routePoints = [];
+        }, 3000);
+      }
+      return;
+    }
+    const wps = leader.missionWaypoints;
+    const idx = leader.missionIndex;
+
+    // Only rebuild when waypoint index changes
+    if (idx === this._prevMissionIndex) return;
+    this._prevMissionIndex = idx;
+    this.routeProgressLayers.clearLayers();
+
+    // Completed segments (dim)
+    for (let i = 0; i < idx && i < wps.length - 1; i++) {
+      L.polyline([[wps[i].lat, wps[i].lng], [wps[i + 1].lat, wps[i + 1].lng]], {
+        color: _css('--text-dim'), weight: 2, opacity: 0.4
+      }).addTo(this.routeProgressLayers);
+    }
+
+    // Current segment (bright, animated dash)
+    if (idx < wps.length) {
+      const rGrey = _css('--text-secondary');
+      const from = idx > 0 ? wps[idx - 1] : { lat: leader.lat, lng: leader.lng };
+      L.polyline([[from.lat, from.lng], [wps[idx].lat, wps[idx].lng]], {
+        color: rGrey, weight: 3, opacity: 0.9, dashArray: '8,6'
+      }).addTo(this.routeProgressLayers);
+
+      // Active waypoint pulsing marker
+      L.circleMarker([wps[idx].lat, wps[idx].lng], {
+        radius: 12, color: rGrey, fillColor: rGrey,
+        fillOpacity: 0.2, weight: 2, className: 'wp-active-pulse'
+      }).addTo(this.routeProgressLayers);
+
+      // Progress label
+      L.marker([wps[idx].lat, wps[idx].lng], {
+        icon: L.divIcon({ className: 'route-progress-label',
+          html: 'WP ' + (idx + 1) + '/' + wps.length,
+          iconSize: null, iconAnchor: [0, -18] })
+      }).addTo(this.routeProgressLayers);
+    }
+
+    // Remaining segments (dashed)
+    for (let i = idx; i < wps.length - 1; i++) {
+      L.polyline([[wps[i].lat, wps[i].lng], [wps[i + 1].lat, wps[i + 1].lng]], {
+        color: _css('--text-secondary'), weight: 1.5, opacity: 0.4, dashArray: '4,6'
+      }).addTo(this.routeProgressLayers);
+    }
   }
 };
 
@@ -905,6 +1112,7 @@ const cmdPalette = {
       { label: 'RTB', hint: 'Return to base', action: () => { cmdEngine.execute('RTB', { droneId: state.selectedDroneId }); } },
       { label: 'ABORT', hint: 'Emergency stop all', action: () => { cmdEngine.execute('EMERGENCY_STOP', {}); } },
     ];
+    cmds.push({ label: 'PLAN ROUTE', hint: 'Draw flight route on map (R)', action: () => { mapTools.activate('route'); } });
     cmds.forEach(c => items.push({ category: 'COMMANDS', icon: '\u25B6', label: c.label, hint: c.hint, action: c.action }));
     // Collection patterns
     const patterns = [
@@ -1026,6 +1234,24 @@ document.addEventListener('keydown', (e) => {
   if (key === 'm' && state.currentMode !== 'ISR') {
     e.preventDefault();
     mapTools.activate('measure');
+  }
+  if (key === 'r' && state.currentMode !== 'ISR') {
+    e.preventDefault();
+    mapTools.activate('route');
+  }
+  // Escape cancels active route planning
+  if (key === 'Escape' && mapTools.activeTool === 'route') {
+    e.preventDefault();
+    mapTools.routePoints = [];
+    mapTools.routeLayers.clearLayers();
+    mapTools.deactivate();
+    showToast('Route cancelled');
+  }
+  // Enter finalizes route (same as double-click)
+  if (key === 'Enter' && mapTools.activeTool === 'route' && mapTools.routePoints.length >= 2) {
+    e.preventDefault();
+    mapTools.deactivate();
+    mapTools._showRouteExecuteBtn();
   }
 });
 
