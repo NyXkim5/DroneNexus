@@ -2,11 +2,12 @@
 import { state } from './state.js';
 import { DRONE_STATES, PATTERN_OFFSETS } from './constants.js';
 import { showToast, utcTimeStamp, _css } from './utils.js';
-import { getDiagState } from './panels.js';
-
 /* ==============================================================
    DIRECTIVE ENGINE
    ============================================================== */
+let _getDiagState = () => null;
+export function setDiagStateProvider(fn) { _getDiagState = fn; }
+
 class DirectiveEngine {
   constructor(assets, eventCallback) {
     this.drones = assets; // internal compat
@@ -28,7 +29,7 @@ class DirectiveEngine {
           if (d.battery < 20) failedChecks.push(d.id + ': Battery below 20% (' + d.battery.toFixed(0) + '%)');
           if (d.satellites < 6) failedChecks.push(d.id + ': Insufficient GPS (' + d.satellites + ' sats)');
           if (d.hdop > 2.5) failedChecks.push(d.id + ': GPS accuracy poor (HDOP ' + d.hdop.toFixed(1) + ')');
-          const ds = getDiagState(d.id);
+          const ds = _getDiagState(d.id);
           if (ds && ds.overallHealth < 80) failedChecks.push(d.id + ': System health below 80% (' + ds.overallHealth.toFixed(0) + '%)');
         });
 

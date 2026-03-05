@@ -10,7 +10,7 @@ import { _css, _cssRgba, clamp, rand, degToRad, utcString, utcTimeStamp,
          batteryColor, showToast, playAlert, toMGRS } from './utils.js';
 import { AssetSimulator } from './simulation.js';
 import { Sparkline } from './sparkline.js';
-import { DirectiveEngine, ObjectiveManager, PlatformLink, DebriefSystem } from './engine.js';
+import { DirectiveEngine, ObjectiveManager, PlatformLink, DebriefSystem, setDiagStateProvider } from './engine.js';
 import { initMap, createDroneIcon, updateMapMarker, updateFormationLines,
          updateFovCone } from './map.js';
 import { updateAssetExplorer, selectDrone, updateInspector, getDiagState,
@@ -104,6 +104,7 @@ const sparkBattery = new Sparkline('spark-battery', _css('--accent'));
 const sparkCoverage = new Sparkline('spark-coverage', _css('--cyan'));
 
 // Initialize subsystems
+setDiagStateProvider(getDiagState);
 const cmdEngine = new DirectiveEngine(assets, addEvent);
 const wpManager = new ObjectiveManager(state.map);
 const connManager = new PlatformLink(assets);
