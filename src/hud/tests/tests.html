@@ -14,9 +14,12 @@
 <h1>OVERWATCH Unit Tests</h1>
 <div id="results"></div>
 <script type="module">
-import { DRONE_STATES, ASSET_DEFS, PATTERN_OFFSETS } from '../js/constants.js';
-import { clamp, rand, batteryColor, toMGRS } from '../js/utils.js';
-import { AssetSimulator } from '../js/simulation.js';
+import { DRONE_STATES, ASSET_DEFS, PATTERN_OFFSETS, MAX_EVENTS } from '../js/constants.js';
+import { clamp, rand, batteryColor, toMGRS, utcTimeStamp, utcString, showToast, _css, _cssRgba, degToRad, radToDeg } from '../js/utils.js';
+import { AssetSimulator, VALID_TRANSITIONS } from '../js/simulation.js';
+import { DirectiveEngine, setDiagStateProvider } from '../js/engine.js';
+import { generateActivity, generateStateCorrelatedEvents, addEvent, renderActivityStream, EVENT_TEMPLATES } from '../js/activity.js';
+import { state } from '../js/state.js';
 
 const results = document.getElementById('results');
 let passed = 0, failed = 0;
@@ -40,6 +43,17 @@ function suite(name) {
   h.textContent = name;
   div.appendChild(h);
   results.appendChild(div);
+}
+
+// Helper: create a fresh simulator in a specific state
+function makeSim(index, startState) {
+  const s = new AssetSimulator(ASSET_DEFS[index || 0], index || 0);
+  if (startState) {
+    // Force state directly for test setup (bypasses transition guard)
+    s.droneState = startState;
+    s.armed = (startState !== 'IDLE' && startState !== 'LANDED');
+  }
+  return s;
 }
 
 // ============ STATE MACHINE TESTS ============
@@ -92,6 +106,118 @@ sim2.update(1, 0, sim.lat, sim.lng);
 assert(sim2.battery <= prevBattery, 'Battery drains on update');
 assert(sim2.trail.length > 0, 'Trail grows on update');
 
+// ============ STATE MACHINE TRANSITION GUARDS ============
+suite('State Machine Transition Guards');
+
+// Valid transitions using canTransition() and transition()
+{
+  const s1 = makeSim(0, 'IDLE');
+  assert(s1.canTransition('ARMED') === true, 'canTransition: IDLE -> ARMED is valid');
+  assert(s1.transition('ARMED') === true, 'transition: IDLE -> ARMED succeeds');
+  assert(s1.droneState === 'ARMED', 'transition: state is now ARMED after IDLE -> ARMED');
+}
+
+{
+  const s2 = makeSim(0, 'ARMED');
+  assert(s2.canTransition('TAKING_OFF') === true, 'canTransition: ARMED -> TAKING_OFF is valid');
+  assert(s2.transition('TAKING_OFF') === true, 'transition: ARMED -> TAKING_OFF succeeds');
+}
+
+{
+  const s3 = makeSim(0, 'TAKING_OFF');
+  assert(s3.canTransition('FLYING') === true, 'canTransition: TAKING_OFF -> FLYING is valid');
+  assert(s3.transition('FLYING') === true, 'transition: TAKING_OFF -> FLYING succeeds');
+}
+
+{
+  const s4 = makeSim(0, 'FLYING');
+  assert(s4.canTransition('LANDING') === true, 'canTransition: FLYING -> LANDING is valid');
+}
+
+{
+  const s5 = makeSim(0, 'FLYING');
+  assert(s5.canTransition('RTB') === true, 'canTransition: FLYING -> RTB is valid');
+}
+
+{
+  const s6 = makeSim(0, 'FLYING');
+  assert(s6.canTransition('GOTO') === true, 'canTransition: FLYING -> GOTO is valid');
+}
+
+{
+  const s7 = makeSim(0, 'FLYING');
+  assert(s7.canTransition('MISSION') === true, 'canTransition: FLYING -> MISSION is valid');
+}
+
+{
+  const s8 = makeSim(0, 'LANDING');
+  assert(s8.canTransition('LANDED') === true, 'canTransition: LANDING -> LANDED is valid');
+  assert(s8.transition('LANDED') === true, 'transition: LANDING -> LANDED succeeds');
+}
+
+{
+  const s9 = makeSim(0, 'LANDED');
+  assert(s9.canTransition('ARMED') === true, 'canTransition: LANDED -> ARMED is valid');
+  assert(s9.transition('ARMED') === true, 'transition: LANDED -> ARMED succeeds');
+}
+
+{
+  const s10 = makeSim(0, 'RTB');
+  assert(s10.canTransition('LANDING') === true, 'canTransition: RTB -> LANDING is valid');
+  assert(s10.transition('LANDING') === true, 'transition: RTB -> LANDING succeeds');
+}
+
+// INVALID transitions
+{
+  const si1 = makeSim(0, 'IDLE');
+  assert(si1.canTransition('FLYING') === false, 'canTransition: IDLE -> FLYING is DENIED');
+  assert(si1.transition('FLYING') === false, 'transition: IDLE -> FLYING returns false');
+  assert(si1.droneState === 'IDLE', 'transition: state unchanged after denied IDLE -> FLYING');
+}
+
+{
+  const si2 = makeSim(0, 'ARMED');
+  assert(si2.canTransition('GOTO') === false, 'canTransition: ARMED -> GOTO is DENIED');
+  assert(si2.transition('GOTO') === false, 'transition: ARMED -> GOTO returns false');
+  assert(si2.droneState === 'ARMED', 'transition: state unchanged after denied ARMED -> GOTO');
+}
+
+{
+  const si3 = makeSim(0, 'LANDED');
+  assert(si3.canTransition('FLYING') === false, 'canTransition: LANDED -> FLYING is DENIED');
+}
+
+{
+  const si4 = makeSim(0, 'LANDING');
+  assert(si4.canTransition('FLYING') === false, 'canTransition: LANDING -> FLYING is DENIED');
+}
+
+// EMERGENCY reachability
+{
+  const se1 = makeSim(0, 'FLYING');
+  assert(se1.canTransition('EMERGENCY') === true, 'EMERGENCY reachable from FLYING');
+}
+
+{
+  const se2 = makeSim(0, 'ARMED');
+  assert(se2.canTransition('EMERGENCY') === true, 'EMERGENCY reachable from ARMED');
+}
+
+{
+  const se3 = makeSim(0, 'TAKING_OFF');
+  assert(se3.canTransition('EMERGENCY') === true, 'EMERGENCY reachable from TAKING_OFF');
+}
+
+{
+  const se4 = makeSim(0, 'IDLE');
+  assert(se4.canTransition('EMERGENCY') === false, 'EMERGENCY NOT reachable from IDLE');
+}
+
+{
+  const se5 = makeSim(0, 'LANDED');
+  assert(se5.canTransition('EMERGENCY') === false, 'EMERGENCY NOT reachable from LANDED');
+}
+
 // ============ CONSTANTS TESTS ============
 suite('Constants');
 
@@ -126,6 +252,423 @@ assert(typeof mgrs === 'string', 'toMGRS returns string');
 assert(mgrs.startsWith('11'), 'Irvine CA is in UTM zone 11');
 assert(mgrs.includes('S'), 'Irvine CA latitude band is S');
 assert(mgrs.length > 10, 'MGRS string has sufficient length');
+
+// ============ EXTENDED UTILITY TESTS ============
+suite('Utilities — Extended');
+
+// toMGRS format: zone + band + space + 2 letters + space + 5 digits + space + 5 digits
+{
+  const mgrsStr = toMGRS(33.6846, -117.8265);
+  const parts = mgrsStr.split(' ');
+  assert(parts.length === 4, 'toMGRS: returns 4 space-separated parts (zone+band, grid, easting, northing)');
+  assert(/^\d+[A-Z]$/.test(parts[0]), 'toMGRS: first part is zone number + lat band letter');
+}
+
+// utcTimeStamp returns HH:MM:SS
+{
+  const ts = utcTimeStamp();
+  assert(/^\d{2}:\d{2}:\d{2}$/.test(ts), 'utcTimeStamp: returns HH:MM:SS format');
+}
+
+// utcString returns a DTG-style string ending in Z
+{
+  const us = utcString();
+  assert(us.endsWith('Z'), 'utcString: ends with Z');
+  assert(/\d{2}[A-Z]{3}\d{4}\s\d{4}Z$/.test(us), 'utcString: matches DDmmmYYYY HHMMz pattern');
+}
+
+// showToast creates a DOM element
+{
+  const toastsBefore = document.querySelectorAll('.cmd-toast').length;
+  showToast('Test toast message');
+  const toastsAfter = document.querySelectorAll('.cmd-toast').length;
+  assert(toastsAfter > toastsBefore, 'showToast: creates a toast element in the DOM');
+}
+
+// _css returns empty string when variable not found (no stylesheet match)
+{
+  const val = _css('--nonexistent-test-variable');
+  assert(val === '', '_css: returns empty string for nonexistent CSS variable');
+}
+
+// _cssRgba returns empty/falsy when variable not found
+{
+  const rgbaVal = _cssRgba('--nonexistent-test-variable', 0.5);
+  // When _css returns '' the parseInt returns NaN, so rgba contains NaN
+  assert(typeof rgbaVal === 'string', '_cssRgba: returns a string even for nonexistent variable');
+}
+
+// batteryColor returns different colors for 90 vs 10
+{
+  const high = batteryColor(90);
+  const low = batteryColor(10);
+  assert(high !== low, 'batteryColor: returns different colors for 90 vs 10');
+}
+
+// clamp with negative numbers
+{
+  assert(clamp(-100, -50, 50) === -50, 'clamp: negative value clamped to negative min');
+  assert(clamp(-10, -50, 50) === -10, 'clamp: negative value within range unchanged');
+}
+
+// rand always returns within range (100 iterations)
+{
+  let allInRange = true;
+  for (let i = 0; i < 100; i++) {
+    const v = rand(5, 15);
+    if (v < 5 || v > 15) { allInRange = false; break; }
+  }
+  assert(allInRange, 'rand: 100 iterations all within [5, 15]');
+}
+
+// degToRad and radToDeg are inverse operations
+{
+  const deg = 45;
+  const rad = degToRad(deg);
+  const backToDeg = radToDeg(rad);
+  assert(Math.abs(backToDeg - deg) < 1e-10, 'degToRad/radToDeg: inverse operations (45 deg)');
+  assert(Math.abs(rad - Math.PI / 4) < 1e-10, 'degToRad: 45 degrees equals PI/4 radians');
+}
+
+// ============ DIRECTIVE ENGINE COMMANDS ============
+suite('Directive Engine Commands');
+
+// Set up a dummy diagnostics state provider (engine.js requires it)
+setDiagStateProvider((id) => ({ overallHealth: 100 }));
+
+// Create a mock event log and a cmd-log element for engine rendering
+{
+  const cmdLogEl = document.createElement('div');
+  cmdLogEl.id = 'cmd-log';
+  document.body.appendChild(cmdLogEl);
+}
+
+// Helper: make fresh assets + engine for each test group
+function makeEngine() {
+  const assets = ASSET_DEFS.map((def, i) => new AssetSimulator(def, i));
+  const events = [];
+  const engine = new DirectiveEngine(assets, (ev) => events.push(ev));
+  return { assets, events, engine };
+}
+
+// Test ARM from IDLE
+{
+  const { assets, events, engine } = makeEngine();
+  // Put first asset in IDLE
+  assets[0].droneState = 'IDLE';
+  assets[0].armed = false;
+  assets[0].battery = 80;
+  assets[0].satellites = 14;
+  assets[0].hdop = 0.8;
+  engine.execute('ARM', { droneId: assets[0].id });
+  assert(assets[0].droneState === 'ARMED', 'ARM: IDLE drone transitions to ARMED');
+  assert(assets[0].armed === true, 'ARM: armed flag set to true');
+}
+
+// Test ARM from LANDED
+{
+  const { assets, events, engine } = makeEngine();
+  assets[0].droneState = 'LANDED';
+  assets[0].armed = false;
+  assets[0].battery = 80;
+  assets[0].satellites = 14;
+  assets[0].hdop = 0.8;
+  engine.execute('ARM', { droneId: assets[0].id });
+  assert(assets[0].droneState === 'ARMED', 'ARM: LANDED drone transitions to ARMED');
+}
+
+// Test ARM denial from FLYING (state does not change)
+{
+  const { assets, events, engine } = makeEngine();
+  // assets start FLYING by default
+  engine.execute('ARM', { droneId: assets[0].id });
+  assert(assets[0].droneState === 'FLYING', 'ARM: denied from FLYING, state unchanged');
+}
+
+// Test TAKEOFF from ARMED
+{
+  const { assets, events, engine } = makeEngine();
+  assets[0].droneState = 'ARMED';
+  assets[0].armed = true;
+  assets[0].battery = 80;
+  assets[0].satellites = 14;
+  assets[0].hdop = 0.8;
+  engine.execute('TAKEOFF', { droneId: assets[0].id, altitude: 50 });
+  assert(assets[0].droneState === 'TAKING_OFF', 'TAKEOFF: ARMED drone transitions to TAKING_OFF');
+  assert(assets[0].targetAltitude === 50, 'TAKEOFF: targetAltitude set to param value');
+}
+
+// Test LAND from FLYING
+{
+  const { assets, events, engine } = makeEngine();
+  engine.execute('LAND', { droneId: assets[0].id });
+  assert(assets[0].droneState === 'LANDING', 'LAND: FLYING drone transitions to LANDING');
+}
+
+// Test RTB from FLYING
+{
+  const { assets, events, engine } = makeEngine();
+  engine.execute('RTB', { droneId: assets[0].id });
+  assert(assets[0].droneState === 'RTB', 'RTB: FLYING drone transitions to RTB');
+}
+
+// Test EMERGENCY_STOP from FLYING
+{
+  const { assets, events, engine } = makeEngine();
+  engine.execute('EMERGENCY_STOP', { droneId: assets[0].id });
+  assert(assets[0].droneState === 'EMERGENCY', 'EMERGENCY_STOP: FLYING drone transitions to EMERGENCY');
+  assert(assets[0].armed === false, 'EMERGENCY_STOP: armed set to false');
+}
+
+// Test EMERGENCY_STOP silently ignores IDLE drones
+{
+  const { assets, events, engine } = makeEngine();
+  assets[0].droneState = 'IDLE';
+  assets[0].armed = false;
+  const prevState = assets[0].droneState;
+  engine.execute('EMERGENCY_STOP', { droneId: assets[0].id });
+  assert(assets[0].droneState === 'IDLE', 'EMERGENCY_STOP: IDLE drone state unchanged (silently ignored)');
+}
+
+// Test SET_SPEED changes targetSpeed without changing droneState
+{
+  const { assets, events, engine } = makeEngine();
+  const prevState = assets[0].droneState;
+  engine.execute('SET_SPEED', { droneId: assets[0].id, speed: 25 });
+  assert(assets[0].targetSpeed === 25, 'SET_SPEED: targetSpeed updated to 25');
+  assert(assets[0].droneState === prevState, 'SET_SPEED: droneState unchanged');
+}
+
+// Test SET_ALTITUDE changes targetAltitude without changing droneState
+{
+  const { assets, events, engine } = makeEngine();
+  const prevState = assets[0].droneState;
+  engine.execute('SET_ALTITUDE', { droneId: assets[0].id, altitude: 200 });
+  assert(assets[0].targetAltitude === 200, 'SET_ALTITUDE: targetAltitude updated to 200');
+  assert(assets[0].droneState === prevState, 'SET_ALTITUDE: droneState unchanged');
+}
+
+// Test pre-arm safety check: ARM denied when battery < 20%
+{
+  const { assets, events, engine } = makeEngine();
+  assets[0].droneState = 'IDLE';
+  assets[0].armed = false;
+  assets[0].battery = 15; // Below 20% threshold
+  assets[0].satellites = 14;
+  assets[0].hdop = 0.8;
+  engine.execute('ARM', { droneId: assets[0].id });
+  assert(assets[0].droneState === 'IDLE', 'ARM pre-arm: denied when battery < 20%, state stays IDLE');
+  assert(assets[0].armed === false, 'ARM pre-arm: armed stays false when battery low');
+}
+
+// ============ ACTIVITY / EVENT SYSTEM ============
+suite('Activity / Event System');
+
+// Set up DOM and state for activity tests
+{
+  const eventLog = document.createElement('div');
+  eventLog.id = 'event-log';
+  document.body.appendChild(eventLog);
+  // Reset activity stream
+  state.activityStream = [];
+  state.assetTimelines = {};
+}
+
+// Test generateActivity returns correct shape
+{
+  const mockAssets = ASSET_DEFS.map((def, i) => new AssetSimulator(def, i));
+  const ev = generateActivity(mockAssets);
+  assert(ev.time !== undefined && typeof ev.time === 'string', 'generateActivity: returns object with time (string)');
+  assert(ev.source !== undefined && typeof ev.source === 'string', 'generateActivity: returns object with source (string)');
+  assert(ev.msg !== undefined && typeof ev.msg === 'string', 'generateActivity: returns object with msg (string)');
+  assert(ev.severity !== undefined, 'generateActivity: returns object with severity');
+}
+
+// Test source is either an asset ID or a system name
+{
+  const mockAssets = ASSET_DEFS.map((def, i) => new AssetSimulator(def, i));
+  const assetIds = mockAssets.map(a => a.id);
+  const systemNames = ['COMMS', 'TASKFORCE', 'OVERWATCH'];
+  let allValid = true;
+  for (let i = 0; i < 20; i++) {
+    const ev = generateActivity(mockAssets);
+    if (!assetIds.includes(ev.source) && !systemNames.includes(ev.source)) {
+      allValid = false;
+      break;
+    }
+  }
+  assert(allValid, 'generateActivity: source is always asset ID or system name (20 samples)');
+}
+
+// Test severity is one of: ok, warn, info
+{
+  const mockAssets = ASSET_DEFS.map((def, i) => new AssetSimulator(def, i));
+  const validSeverities = ['ok', 'warn', 'info'];
+  let allValid = true;
+  for (let i = 0; i < 20; i++) {
+    const ev = generateActivity(mockAssets);
+    if (!validSeverities.includes(ev.severity)) {
+      allValid = false;
+      break;
+    }
+  }
+  assert(allValid, 'generateActivity: severity is always ok, warn, or info (20 samples)');
+}
+
+// Test EVENT_TEMPLATES has at least 10 templates
+assert(EVENT_TEMPLATES.length >= 10, 'EVENT_TEMPLATES: has at least 10 templates (has ' + EVENT_TEMPLATES.length + ')');
+
+// Test addEvent adds to state.activityStream
+{
+  state.activityStream = [];
+  addEvent({ time: '00:00:00', source: 'TEST', msg: 'Test event', severity: 'info' });
+  assert(state.activityStream.length === 1, 'addEvent: adds event to state.activityStream');
+  assert(state.activityStream[0].msg === 'Test event', 'addEvent: event content matches');
+}
+
+// Test addEvent does not exceed MAX_EVENTS
+{
+  state.activityStream = [];
+  for (let i = 0; i < MAX_EVENTS + 10; i++) {
+    addEvent({ time: '00:00:00', source: 'TEST', msg: 'Event ' + i, severity: 'info' });
+  }
+  assert(state.activityStream.length <= MAX_EVENTS, 'addEvent: does not exceed MAX_EVENTS (' + MAX_EVENTS + '), got ' + state.activityStream.length);
+}
+
+// Test generateStateCorrelatedEvents emits battery warning when battery < 25
+{
+  state.activityStream = [];
+  const mockAssets = ASSET_DEFS.map((def, i) => new AssetSimulator(def, i));
+  // Set one drone battery to trigger warning (between 24.5 and 25)
+  mockAssets[0].battery = 24.8;
+  generateStateCorrelatedEvents(mockAssets);
+  const batteryWarnings = state.activityStream.filter(e => e.msg.includes('Battery below 25%'));
+  assert(batteryWarnings.length >= 1, 'generateStateCorrelatedEvents: emits battery warning when battery is 24.8%');
+}
+
+// Test renderActivityStream appends DOM elements
+{
+  const eventLog = document.getElementById('event-log');
+  eventLog.innerHTML = '';
+  state.activityStream = [];
+  addEvent({ time: '12:00:00', source: 'ALPHA-1', msg: 'DOM render test', severity: 'ok' });
+  assert(eventLog.children.length > 0, 'renderActivityStream: appends child elements to event-log');
+  assert(eventLog.innerHTML.includes('DOM render test'), 'renderActivityStream: rendered content includes event message');
+}
+
+// ============ SIMULATION PHYSICS ============
+suite('Simulation Physics');
+
+// Test update() advances t (sim time increases)
+{
+  const s = makeSim(0, 'FLYING');
+  const t0 = s.t;
+  s.update(1, 0, s.lat, s.lng);
+  assert(s.t > t0, 'update: sim time t advances after update');
+}
+
+// Test battery drains over time (many updates)
+{
+  const s = makeSim(0, 'FLYING');
+  const battStart = s.battery;
+  for (let i = 0; i < 50; i++) {
+    s.update(1, 0, s.lat, s.lng);
+  }
+  assert(s.battery < battStart, 'update: battery drains after 50 updates (' + battStart.toFixed(1) + ' -> ' + s.battery.toFixed(1) + ')');
+}
+
+// Test formation flying: follower position moves toward leader
+{
+  const leader = makeSim(0, 'FLYING');
+  const follower = makeSim(1, 'FLYING');
+  const leaderLat = leader.lat + 0.01;
+  const leaderLng = leader.lng + 0.01;
+  const initDist = Math.sqrt(
+    Math.pow(follower.lat - leaderLat, 2) + Math.pow(follower.lng - leaderLng, 2)
+  );
+  // Update follower with leader position
+  for (let i = 0; i < 20; i++) {
+    follower.update(0.1, 90, leaderLat, leaderLng);
+  }
+  const finalDist = Math.sqrt(
+    Math.pow(follower.lat - leaderLat, 2) + Math.pow(follower.lng - leaderLng, 2)
+  );
+  assert(finalDist < initDist, 'formation: follower moves toward leader position');
+}
+
+// Test TAKING_OFF: altitude increases toward targetAltitude
+{
+  const s = makeSim(0, 'ARMED');
+  s.transition('TAKING_OFF');
+  s.altitude = 5;
+  s.targetAltitude = 100;
+  const altBefore = s.altitude;
+  for (let i = 0; i < 10; i++) {
+    s.update(1, 0, s.lat, s.lng);
+  }
+  assert(s.altitude > altBefore, 'TAKING_OFF: altitude increases (' + altBefore.toFixed(1) + ' -> ' + s.altitude.toFixed(1) + ')');
+}
+
+// Test LANDING: altitude decreases toward 0
+{
+  const s = makeSim(0, 'FLYING');
+  s.transition('LANDING');
+  s.altitude = 50;
+  const altBefore = s.altitude;
+  for (let i = 0; i < 5; i++) {
+    s.update(1, 0, s.lat, s.lng);
+  }
+  assert(s.altitude < altBefore, 'LANDING: altitude decreases (' + altBefore.toFixed(1) + ' -> ' + s.altitude.toFixed(1) + ')');
+}
+
+// Test RTB: position moves toward homePosition
+{
+  const s = makeSim(0, 'FLYING');
+  s.lat = s.homePosition.lat + 0.01;
+  s.lng = s.homePosition.lng + 0.01;
+  s.transition('RTB');
+  const initDist = Math.sqrt(
+    Math.pow(s.lat - s.homePosition.lat, 2) + Math.pow(s.lng - s.homePosition.lng, 2)
+  );
+  for (let i = 0; i < 20; i++) {
+    s.update(0.5, 0, s.lat, s.lng);
+  }
+  const finalDist = Math.sqrt(
+    Math.pow(s.lat - s.homePosition.lat, 2) + Math.pow(s.lng - s.homePosition.lng, 2)
+  );
+  assert(finalDist < initDist, 'RTB: position moves toward homePosition');
+}
+
+// Test injectFailure() returns null most of the time (probabilistic)
+{
+  const s = makeSim(0, 'FLYING');
+  let nullCount = 0;
+  const trials = 200;
+  for (let i = 0; i < trials; i++) {
+    if (s.injectFailure() === null) nullCount++;
+  }
+  // With p(failure) = 0.009, expect ~98% null results
+  assert(nullCount > trials * 0.9, 'injectFailure: returns null most of the time (' + nullCount + '/' + trials + ' null)');
+}
+
+// Test GOTO: position moves toward target coordinates
+{
+  const s = makeSim(0, 'FLYING');
+  s.targetLat = s.lat + 0.005;
+  s.targetLng = s.lng + 0.005;
+  s.transition('GOTO');
+  const initDist = Math.sqrt(
+    Math.pow(s.lat - s.targetLat, 2) + Math.pow(s.lng - s.targetLng, 2)
+  );
+  // PRIMARY role flies toward target; others follow formation
+  for (let i = 0; i < 20; i++) {
+    s.update(0.5, 0, s.lat, s.lng);
+  }
+  const finalDist = Math.sqrt(
+    Math.pow(s.lat - s.targetLat, 2) + Math.pow(s.lng - s.targetLng, 2)
+  );
+  assert(finalDist < initDist, 'GOTO: PRIMARY position moves toward target coordinates');
+}
 
 // ============ SUMMARY ============
 const summary = document.createElement('div');
