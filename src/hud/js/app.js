@@ -940,37 +940,36 @@ const mapTools = {
 
   _showRouteExecuteBtn() {
     this._removeRouteExecuteBtn();
-    const last = this.routePoints[this.routePoints.length - 1];
-    const containerPoint = state.map.latLngToContainerPoint(last);
-    const btn = document.createElement('button');
-    btn.className = 'route-execute-btn';
-    btn.textContent = '\u25B6 FLY ROUTE';
-    btn.style.position = 'absolute';
-    btn.style.left = (containerPoint.x + 20) + 'px';
-    btn.style.top = (containerPoint.y - 15) + 'px';
-    btn.style.zIndex = '1000';
-    btn.addEventListener('click', () => this._executeRoute());
-    state.map.getContainer().appendChild(btn);
-    this.routeExecuteEl = btn;
-
-    // Reposition on map move
-    this._repositionExecuteBtn = () => {
-      if (!this.routeExecuteEl) return;
-      const pt = state.map.latLngToContainerPoint(last);
-      this.routeExecuteEl.style.left = (pt.x + 20) + 'px';
-      this.routeExecuteEl.style.top = (pt.y - 15) + 'px';
-    };
-    state.map.on('move', this._repositionExecuteBtn);
+    // Calculate total distance
+    let totalM = 0;
+    for (let i = 1; i < this.routePoints.length; i++) {
+      totalM += state.map.distance(this.routePoints[i - 1], this.routePoints[i]);
+    }
+    // Fixed bar at bottom of map
+    const bar = document.createElement('div');
+    bar.className = 'route-execute-bar';
+    bar.innerHTML =
+      '<span class="route-execute-info">' +
+        '<span class="route-execute-label">ROUTE PLANNED</span>' +
+        '<span class="route-execute-stats">' + this.routePoints.length + ' WP \u00B7 ' + (totalM / 1000).toFixed(1) + ' km</span>' +
+      '</span>' +
+      '<button class="route-execute-go">\u25B6 EXECUTE ROUTE</button>' +
+      '<button class="route-execute-cancel">\u2715</button>';
+    bar.querySelector('.route-execute-go').addEventListener('click', () => this._executeRoute());
+    bar.querySelector('.route-execute-cancel').addEventListener('click', () => {
+      this._removeRouteExecuteBtn();
+      this.routeLayers.clearLayers();
+      this.routePoints = [];
+      showToast('Route cleared');
+    });
+    state.map.getContainer().appendChild(bar);
+    this.routeExecuteEl = bar;
   },
 
   _removeRouteExecuteBtn() {
     if (this.routeExecuteEl) {
       this.routeExecuteEl.remove();
       this.routeExecuteEl = null;
-    }
-    if (this._repositionExecuteBtn) {
-      state.map.off('move', this._repositionExecuteBtn);
-      this._repositionExecuteBtn = null;
     }
   },
 

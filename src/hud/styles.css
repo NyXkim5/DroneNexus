@@ -2008,22 +2008,77 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .map-tool-sep { height: 1px; background: var(--border); margin: 2px 0; }
 .map-measurement-label { background: var(--panel); border: 1px solid var(--accent); padding: 2px 6px; font-family: var(--font-data); font-size: 10px; color: var(--text-bright); white-space: nowrap; border-radius: 1px; }
 
-/* Route planner — FLY ROUTE execute button on map */
-.route-execute-btn {
-  padding: 6px 16px;
+/* Override Leaflet popup to match Gotham theme */
+.leaflet-popup-content-wrapper {
+  background: var(--panel-elevated);
+  color: var(--text);
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.leaflet-popup-tip { background: var(--panel-elevated); }
+.leaflet-popup-close-button { color: var(--text-dim) !important; }
+.leaflet-popup-close-button:hover { color: var(--text) !important; }
+
+/* Route planner — execute bar at bottom of map */
+.route-execute-bar {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 8px 16px;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  animation: panelEnterUp 0.3s ease-out both;
+}
+.route-execute-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.route-execute-label {
   font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+.route-execute-stats {
+  font-family: var(--font-data);
   font-size: 11px;
+  color: var(--text);
+}
+.route-execute-go {
+  padding: 8px 20px;
+  font-family: var(--font-label);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.5px;
   color: var(--green);
   border: 1px solid var(--green);
   border-radius: 2px;
-  background: var(--panel);
+  background: transparent;
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
 }
-.route-execute-btn:hover { background: var(--green); color: var(--text-bright); }
+.route-execute-go:hover { background: var(--green); color: var(--text-bright); }
+.route-execute-cancel {
+  padding: 6px 8px;
+  font-size: 14px;
+  color: var(--text-dim);
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.route-execute-cancel:hover { color: var(--red); }
 /* Active waypoint pulse during mission */
 .wp-active-pulse { border-radius: 50%; }
 .wp-active-pulse div { animation: wpPulse 1.5s ease-in-out infinite; }
