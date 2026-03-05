@@ -1,6 +1,19 @@
 import { CENTER_LAT, CENTER_LNG, ORBIT_RADIUS, DRONE_STATES, TRAIL_LENGTH } from './constants.js';
 import { rand, randInt, clamp, lerp, radToDeg, degToRad } from './utils.js';
 
+export const VALID_TRANSITIONS = {
+  IDLE:       ['ARMED'],
+  ARMED:      ['IDLE', 'TAKING_OFF', 'EMERGENCY'],
+  TAKING_OFF: ['FLYING', 'EMERGENCY'],
+  FLYING:     ['LANDING', 'RTB', 'GOTO', 'MISSION', 'EMERGENCY'],
+  GOTO:       ['FLYING', 'RTB', 'EMERGENCY'],
+  MISSION:    ['FLYING', 'RTB', 'EMERGENCY'],
+  LANDING:    ['LANDED', 'EMERGENCY'],
+  LANDED:     ['IDLE', 'ARMED'],
+  RTB:        ['LANDING', 'EMERGENCY'],
+  EMERGENCY:  ['IDLE', 'LANDED'],
+};
+
 export class AssetSimulator {
   constructor(def, index) {
     this.id = def.id;
@@ -66,6 +79,17 @@ export class AssetSimulator {
       video_link: { quality: 95, channel: 1 + index, frequency_mhz: 5740 + index * 20, recording: false, system: 'Simulation' },
       protocol: 'MAVLINK',
     };
+  }
+
+  canTransition(newState) {
+    const allowed = VALID_TRANSITIONS[this.droneState];
+    return allowed && allowed.includes(newState);
+  }
+
+  transition(newState) {
+    if (!this.canTransition(newState)) return false;
+    this.droneState = newState;
+    return true;
   }
 
   _flyFormation(dt, leaderHeading, leaderLat, leaderLng) {
@@ -137,7 +161,7 @@ export class AssetSimulator {
         this.roll = 0; this.pitch = 0;
         if (this.altitude >= this.targetAltitude) {
           this.altitude = this.targetAltitude;
-          this.droneState = DRONE_STATES.FLYING;
+          this.transition(DRONE_STATES.FLYING);
           this.verticalSpeed = 0;
         }
         break;
@@ -149,7 +173,7 @@ export class AssetSimulator {
       case DRONE_STATES.GOTO:
         if (this.role === 'PRIMARY') {
           const arrived = this._flyToward(this.targetLat, this.targetLng, dt);
-          if (arrived) this.droneState = DRONE_STATES.FLYING;
+          if (arrived) this.transition(DRONE_STATES.FLYING);
         } else {
           this._flyFormation(dt, leaderHeading, leaderLat, leaderLng);
         }
@@ -164,7 +188,7 @@ export class AssetSimulator {
             const arrived = this._flyToward(wp.lat, wp.lng, dt);
             if (arrived) this.missionIndex++;
           } else {
-            this.droneState = DRONE_STATES.FLYING;
+            this.transition(DRONE_STATES.FLYING);
             this.missionIndex = 0;
           }
         } else {
@@ -180,14 +204,14 @@ export class AssetSimulator {
         this.speed = Math.max(0, this.speed - 2 * dt);
         this.roll = 0; this.pitch = 0;
         if (this.altitude <= 0.5) {
-          this.altitude = 0; this.droneState = DRONE_STATES.LANDED;
+          this.altitude = 0; this.transition(DRONE_STATES.LANDED);
           this.armed = false; this.verticalSpeed = 0; this.speed = 0;
         }
         break;
 
       case DRONE_STATES.RTB:
         if (this._flyToward(this.homePosition.lat, this.homePosition.lng, dt)) {
-          this.droneState = DRONE_STATES.LANDING;
+          this.transition(DRONE_STATES.LANDING);
         }
         this.altitude = this.targetAltitude + Math.sin(this.t * 0.3) * 2;
         this.verticalSpeed = Math.cos(this.t * 0.3) * 0.3;
@@ -199,7 +223,7 @@ export class AssetSimulator {
         this.speed = Math.max(0, this.speed - 5 * dt);
         this.roll = rand(-15, 15); this.pitch = rand(-10, 10);
         if (this.altitude <= 0) {
-          this.altitude = 0; this.droneState = DRONE_STATES.LANDED;
+          this.altitude = 0; this.transition(DRONE_STATES.LANDED);
           this.armed = false; this.verticalSpeed = 0; this.speed = 0;
         }
         break;

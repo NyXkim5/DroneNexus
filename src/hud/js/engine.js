@@ -39,7 +39,19 @@ class DirectiveEngine {
           return; // ARM failure emits its own event; skip generic post-switch event
         }
 
-        targets.forEach(d => { d.armed = true; d.droneState = DRONE_STATES.ARMED; d.altitude = 0; d.speed = 0; });
+        let armDenied = false;
+        targets.forEach(d => {
+          if (!d.canTransition(DRONE_STATES.ARMED)) {
+            if (!armDenied) {
+              showToast('DENIED: Cannot ARM from ' + d.droneState, 'warning');
+              armDenied = true;
+            }
+            this.addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Denied: ARM invalid from ' + d.droneState, severity: 'warn' });
+            return;
+          }
+          d.transition(DRONE_STATES.ARMED);
+          d.armed = true; d.altitude = 0; d.speed = 0;
+        });
         this._logCmd('ARM', targetLabel);
         showToast('ARMED — ' + targetLabel);
         this.addEvent({ time: utcTimeStamp(), source: targetLabel, msg: 'Pre-arm checks passed. Armed.', severity: 'ok' });
@@ -47,18 +59,40 @@ class DirectiveEngine {
         return; // ARM emits its own event; skip generic post-switch event
       }
 
-      case 'DISARM':
-        targets.forEach(d => { d.armed = false; d.droneState = DRONE_STATES.IDLE; d.speed = 0; });
+      case 'DISARM': {
+        let disarmDenied = false;
+        targets.forEach(d => {
+          if (!d.canTransition(DRONE_STATES.IDLE)) {
+            if (!disarmDenied) {
+              showToast('DENIED: Cannot DISARM from ' + d.droneState, 'warning');
+              disarmDenied = true;
+            }
+            this.addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Denied: DISARM invalid from ' + d.droneState, severity: 'warn' });
+            return;
+          }
+          d.transition(DRONE_STATES.IDLE);
+          d.armed = false; d.speed = 0;
+        });
         this._logCmd('DISARM', targetLabel);
         showToast('DISARMED — ' + targetLabel);
         break;
+      }
 
       case 'TAKEOFF': {
         const alt = params.altitude || 30;
+        let takeoffDenied = false;
         targets.forEach(d => {
+          if (!d.canTransition(DRONE_STATES.TAKING_OFF)) {
+            if (!takeoffDenied) {
+              showToast('DENIED: Cannot TAKEOFF from ' + d.droneState, 'warning');
+              takeoffDenied = true;
+            }
+            this.addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Denied: TAKEOFF invalid from ' + d.droneState, severity: 'warn' });
+            return;
+          }
           if (!d.armed) { d.armed = true; }
           d.targetAltitude = alt;
-          d.droneState = DRONE_STATES.TAKING_OFF;
+          d.transition(DRONE_STATES.TAKING_OFF);
           d.altitude = d.altitude || 0.5;
         });
         this._logCmd('LAUNCH ' + alt + 'm', targetLabel);
@@ -66,27 +100,61 @@ class DirectiveEngine {
         break;
       }
 
-      case 'LAND':
-        targets.forEach(d => { d.droneState = DRONE_STATES.LANDING; });
+      case 'LAND': {
+        let landDenied = false;
+        targets.forEach(d => {
+          if (!d.canTransition(DRONE_STATES.LANDING)) {
+            if (!landDenied) {
+              showToast('DENIED: Cannot LAND from ' + d.droneState, 'warning');
+              landDenied = true;
+            }
+            this.addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Denied: LAND invalid from ' + d.droneState, severity: 'warn' });
+            return;
+          }
+          d.transition(DRONE_STATES.LANDING);
+        });
         this._logCmd('RECOVER', targetLabel);
         showToast('RECOVER — ' + targetLabel);
         break;
+      }
 
-      case 'RTB':
-        targets.forEach(d => { d.droneState = DRONE_STATES.RTB; });
+      case 'RTB': {
+        let rtbDenied = false;
+        targets.forEach(d => {
+          if (!d.canTransition(DRONE_STATES.RTB)) {
+            if (!rtbDenied) {
+              showToast('DENIED: Cannot RTB from ' + d.droneState, 'warning');
+              rtbDenied = true;
+            }
+            this.addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Denied: RTB invalid from ' + d.droneState, severity: 'warn' });
+            return;
+          }
+          d.transition(DRONE_STATES.RTB);
+        });
         this._logCmd('RTB', targetLabel);
         showToast('RTB — ' + targetLabel, 'warning');
         break;
+      }
 
-      case 'GOTO':
+      case 'GOTO': {
+        let gotoDenied = false;
         this.drones.forEach(d => {
+          if (!d.canTransition(DRONE_STATES.GOTO)) {
+            if (!gotoDenied) {
+              showToast('DENIED: Cannot GOTO from ' + d.droneState, 'warning');
+              gotoDenied = true;
+            }
+            this.addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Denied: GOTO invalid from ' + d.droneState, severity: 'warn' });
+            return;
+          }
           d.targetLat = params.lat;
           d.targetLng = params.lng;
-          d.droneState = DRONE_STATES.GOTO;
+          d.transition(DRONE_STATES.GOTO);
         });
         this._logCmd('GOTO ' + params.lat.toFixed(5) + ',' + params.lng.toFixed(5), 'ALL');
         showToast('GOTO — navigating to target');
         break;
+      }
 
       case 'SET_PATTERN': {
         const offsets = PATTERN_OFFSETS[params.pattern];
@@ -111,7 +179,12 @@ class DirectiveEngine {
         break;
 
       case 'EMERGENCY_STOP':
-        targets.forEach(d => { d.droneState = DRONE_STATES.EMERGENCY; d.armed = false; });
+        targets.forEach(d => {
+          if (d.transition(DRONE_STATES.EMERGENCY)) {
+            d.armed = false;
+          }
+          // If transition fails (IDLE/LANDED), silently ignore — no-op on grounded asset
+        });
         this._logCmd('ABORT', targetLabel);
         showToast('ABORT — ' + targetLabel, 'error');
         break;
@@ -120,7 +193,18 @@ class DirectiveEngine {
         const leader = this.drones[0];
         leader.missionWaypoints = params.waypoints || [];
         leader.missionIndex = 0;
-        this.drones.forEach(d => { d.droneState = DRONE_STATES.MISSION; });
+        let missionDenied = false;
+        this.drones.forEach(d => {
+          if (!d.canTransition(DRONE_STATES.MISSION)) {
+            if (!missionDenied) {
+              showToast('DENIED: Cannot EXECUTE_MISSION from ' + d.droneState, 'warning');
+              missionDenied = true;
+            }
+            this.addEvent({ time: utcTimeStamp(), source: d.id, msg: 'Denied: EXECUTE_MISSION invalid from ' + d.droneState, severity: 'warn' });
+            return;
+          }
+          d.transition(DRONE_STATES.MISSION);
+        });
         this._logCmd('MISSION ' + (params.waypoints || []).length + ' waypoints', 'ALL');
         showToast('Mission started — ' + (params.waypoints || []).length + ' waypoints');
         break;
