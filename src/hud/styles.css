@@ -2079,3 +2079,214 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 }
 .critical-dismiss:hover { border-color: var(--border-light); }
 .critical-dismiss:active { transform: scale(0.97); }
+
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
+
+/* --- Connection Modal --- */
+.conn-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.conn-modal-title {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.05em;
+}
+.conn-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 18px;
+}
+.conn-section {
+  margin-bottom: 16px;
+}
+.conn-hint {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+.conn-actions {
+  display: flex;
+  gap: 8px;
+}
+.conn-btn-connect {
+  flex: 1;
+  border-color: var(--green);
+  color: var(--green);
+}
+.conn-btn-disconnect {
+  flex: 1;
+  border-color: var(--red);
+  color: var(--red);
+}
+.conn-status {
+  margin-top: 12px;
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* --- Panel overflow for scrollable cmd panels --- */
+.solo-only.cmd-panel,
+.debrief-only.cmd-panel {
+  overflow-y: auto;
+}
+
+/* --- Compact button --- */
+.btn-compact {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+/* --- Flex spacer --- */
+.flex-spacer {
+  flex: 1;
+}
+
+/* --- Pill container --- */
+.pill-container {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* --- Button row --- */
+.btn-row {
+  display: flex;
+  gap: 6px;
+}
+
+/* --- Scrollable sections --- */
+.scroll-section-sm {
+  max-height: 120px;
+  overflow-y: auto;
+}
+.scroll-section {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+/* --- Compact cmd section padding --- */
+.cmd-section-compact {
+  padding: 6px 12px;
+}
+
+/* --- Spaced cmd button --- */
+.cmd-btn-spaced {
+  margin: 8px 12px;
+}
+
+/* --- Margin-top utilities --- */
+.mt-4  { margin-top: 4px; }
+.mt-6  { margin-top: 6px; }
+.mt-10 { margin-top: 10px; }
+
+/* --- Micro label --- */
+.micro-label {
+  font: 8px var(--font-label);
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+/* --- Data text variants --- */
+.data-text-sm {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+.data-text {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--text);
+}
+.data-text-center {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* --- Hint label --- */
+.hint-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* --- Indicator label/value --- */
+.indicator-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.indicator-value {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--text-bright);
+}
+
+/* --- Help footer --- */
+.help-footer {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* --- Video REC button --- */
+.btn-rec {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* --- Tilt slider labels --- */
+.tilt-label {
+  font-size: 8px;
+  color: var(--text-dim);
+  font-family: var(--font-label);
+  letter-spacing: 0.5px;
+}
+.tilt-value {
+  font-size: 10px;
+  color: var(--text-bright);
+  font-family: var(--font-data);
+}
+
+/* --- Collection pattern label (margin-bottom for slider) --- */
+.mb-6 { margin-bottom: 6px; }
+
+/* --- OPERATIONS inline panel-header override --- */
+.panel-header-inline {
+  border: none;
+  padding: 0;
+  font-size: 10px;
+}
+
+/* --- Command palette hint margin --- */
+.ml-auto { margin-left: auto; }
+
+/* --- Cmd log text --- */
+.cmd-log-text {
+  font-size: 10px;
+  font-family: var(--font-data);
+}
+
+/* --- Sensor COV badge custom --- */
+.cov-badge-active {
+  background: rgba(45,114,210,0.12);
+  color: #4C90F0;
+}

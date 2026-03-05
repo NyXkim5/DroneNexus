@@ -36,7 +36,7 @@
       <div class="live-label" id="live-label">EXERCISE</div>
     </div>
     <span class="tf-callsign" data-tooltip="Task force callsign">TF-SABER-01</span>
-    <button id="audio-toggle" class="quick-connect-btn" data-tooltip="Toggle audio alerts" style="font-size:10px;padding:2px 6px">SND</button>
+    <button id="audio-toggle" class="quick-connect-btn btn-compact" data-tooltip="Toggle audio alerts">SND</button>
     <div class="utc-clock" id="utc-clock" data-tooltip="UTC mission clock">00:00:00Z</div>
   </div>
 
@@ -63,7 +63,7 @@
       <div class="tree-section">
         <div class="tree-section-header" id="tree-ops-toggle" role="button" tabindex="0" aria-expanded="true">
           <span class="tree-toggle" id="tree-ops-arrow">&#x25BC;</span>
-          <span class="panel-header" style="border:none;padding:0;font-size:10px">OPERATIONS</span>
+          <span class="panel-header panel-header-inline">OPERATIONS</span>
           <span class="tree-count">(<span id="ops-count">1</span>)</span>
         </div>
         <div id="ops-list">
@@ -173,17 +173,17 @@
         </div>
         <!-- Camera Tilt -->
         <div class="tilt-slider-wrap" id="tilt-slider-wrap">
-          <span style="font-size:8px;color:var(--text-dim);font-family:var(--font-label);letter-spacing:0.5px">TILT</span>
+          <span class="tilt-label">TILT</span>
           <input type="range" id="camera-tilt" min="-90" max="30" value="0" data-tooltip="Adjust camera tilt angle">
-          <span style="font-size:10px;color:var(--text-bright);font-family:var(--font-data)" id="tilt-value">0&deg;</span>
+          <span class="tilt-value" id="tilt-value">0&deg;</span>
         </div>
         <!-- Video Controls Bar -->
         <div class="video-controls">
           <button class="wp-btn" id="video-fullscreen" data-tooltip="Toggle fullscreen (F)">FULL</button>
           <button class="wp-btn" id="video-pip" data-tooltip="Picture-in-picture mode">PIP</button>
-          <button class="wp-btn" id="video-record" data-tooltip="Start/stop recording (R)" style="border-color:var(--red);color:var(--red)">REC</button>
+          <button class="wp-btn btn-rec" id="video-record" data-tooltip="Start/stop recording (R)">REC</button>
           <button class="wp-btn" id="video-photo" data-tooltip="Capture screenshot (P)">PHOTO</button>
-          <span style="flex:1"></span>
+          <span class="flex-spacer"></span>
           <select class="cmd-select" id="video-source" data-tooltip="Select video input source" style="width:auto;min-width:120px;font-size:10px">
             <option value="canvas">Test Pattern</option>
             <option value="">No Video Source</option>
@@ -201,7 +201,7 @@
         <button class="wp-btn" id="wp-add-mode" data-tooltip="Add waypoint objective on map">+ OBJECTIVE</button>
         <button class="wp-btn" id="wp-loiter" data-tooltip="Loiter at current position">HOLD</button>
         <button class="wp-btn" id="wp-orbit" data-tooltip="Orbit around point">ORBIT</button>
-        <span style="font-family:var(--font-data);font-size:11px;color:var(--text-secondary)" id="wp-count">0 objectives</span>
+        <span class="data-text-center" id="wp-count">0 objectives</span>
         <button class="wp-btn execute" id="wp-execute" data-tooltip="Begin mission execution">EXECUTE OPERATION</button>
         <button class="wp-btn clear" id="wp-clear" data-tooltip="Clear all objectives">CLEAR</button>
       </div>
@@ -216,8 +216,8 @@
       </div>
       <!-- GOTO indicator -->
       <div class="goto-indicator" id="goto-indicator" style="display:none">
-        <div style="font-family:var(--font-label);font-size:9px;color:var(--accent);letter-spacing:0.05em;text-transform:uppercase">GOTO Target</div>
-        <div style="font-family:var(--font-data);font-size:12px;color:var(--text-bright)" id="goto-coords">Awaiting target designation...</div>
+        <div class="indicator-label">GOTO Target</div>
+        <div class="indicator-value" id="goto-coords">Awaiting target designation...</div>
       </div>
     </div>
 
@@ -259,7 +259,7 @@
         <div class="cmd-section">
           <div class="cmd-target-label">TARGET</div>
           <div class="cmd-target-name" id="cmd-target">ALL ASSETS</div>
-          <div style="font-family:var(--font-label);font-size:9px;color:var(--text-secondary);margin-top:4px">Select an asset to target individually</div>
+          <div class="hint-label">Select an asset to target individually</div>
         </div>
         <div class="cmd-section">
           <div class="cmd-section-title">Safety</div>
@@ -295,8 +295,8 @@
             <div class="cmd-slider-header"><span class="cmd-slider-label">Altitude</span><span class="cmd-slider-value" id="alt-val">120m</span></div>
             <input type="range" class="cmd-slider" id="cmd-altitude" min="5" max="200" value="120" step="1">
           </div>
-          <div class="cmd-slider-group" style="margin-top:10px">
-            <div class="cmd-slider-label" style="margin-bottom:6px">Collection Pattern</div>
+          <div class="cmd-slider-group mt-10">
+            <div class="cmd-slider-label mb-6">Collection Pattern</div>
             <select class="cmd-select" id="cmd-pattern" data-tooltip="ISR collection pattern">
               <option value="ORBIT">Orbit</option>
               <option value="RACETRACK">Racetrack</option>
@@ -305,17 +305,17 @@
             </select>
           </div>
         </div>
-        <div class="cmd-section" style="max-height:120px;overflow-y:auto">
+        <div class="cmd-section scroll-section-sm">
           <div class="cmd-section-title">Directive Log</div>
-          <div id="cmd-log" style="font-size:10px;font-family:var(--font-data)"></div>
+          <div id="cmd-log" class="cmd-log-text"></div>
         </div>
       </div>
       <!-- ISR FEED MODE -->
-      <div class="solo-only cmd-panel" style="overflow-y:auto">
+      <div class="solo-only cmd-panel">
         <div class="panel-header">ISR FEED</div>
-        <div class="cmd-section" id="isr-asset-strip" style="padding:6px 12px">
-          <div style="font:8px var(--font-label);color:var(--text-dim);letter-spacing:0.5px;margin-bottom:4px">ASSET SELECT</div>
-          <div id="isr-asset-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+        <div class="cmd-section cmd-section-compact" id="isr-asset-strip">
+          <div class="micro-label">ASSET SELECT</div>
+          <div id="isr-asset-pills" class="pill-container"></div>
         </div>
         <div class="cmd-section">
           <div class="cmd-section-title">Controls</div>
@@ -387,21 +387,21 @@
             P — Photo &nbsp; &uarr;&darr; — Tilt
           </div>
         </div>
-        <button class="cmd-btn danger" id="fpv-estop" data-tooltip="Emergency stop" style="margin:8px 12px">ABORT</button>
+        <button class="cmd-btn danger cmd-btn-spaced" id="fpv-estop" data-tooltip="Emergency stop">ABORT</button>
       </div>
       <!-- DEBRIEF MODE -->
-      <div class="debrief-only cmd-panel" style="overflow-y:auto">
+      <div class="debrief-only cmd-panel">
         <div class="panel-header">DEBRIEF</div>
         <div class="cmd-section">
           <div class="cmd-section-title">Session Info</div>
-          <div id="replay-info" style="font-family:var(--font-data);font-size:11px;color:var(--text)">Recording in progress...</div>
-          <div style="margin-top:6px">
+          <div id="replay-info" class="data-text">Recording in progress...</div>
+          <div class="mt-6">
             <span class="debrief-replay-indicator recording" id="debrief-replay-state">RECORDING</span>
           </div>
         </div>
         <div class="cmd-section">
           <div class="cmd-section-title">Playback Speed</div>
-          <div style="display:flex;gap:6px">
+          <div class="btn-row">
             <button class="replay-speed-btn" data-speed="0.5" data-tooltip="Half speed">0.5x</button>
             <button class="replay-speed-btn active" data-speed="1" data-tooltip="Normal speed">1x</button>
             <button class="replay-speed-btn" data-speed="2" data-tooltip="Double speed">2x</button>
@@ -439,8 +439,8 @@
         </div>
         <div class="cmd-section">
           <div class="cmd-section-title">Key Events</div>
-          <div id="debrief-key-events" style="max-height:150px;overflow-y:auto">
-            <div style="font-family:var(--font-data);font-size:10px;color:var(--text-secondary)">No key events yet</div>
+          <div id="debrief-key-events" class="scroll-section">
+            <div class="data-text-sm">No key events yet</div>
           </div>
         </div>
         <div class="cmd-section">
@@ -491,7 +491,7 @@
     <div class="bottom-metric" data-tooltip="Estimated sensor coverage of AO">
       <div class="bottom-metric-header">
         <span class="bottom-metric-title">Sensor COV</span>
-        <span class="mesh-badge" id="cov-badge" style="background:rgba(45,114,210,0.12);color:#4C90F0">ACTIVE</span>
+        <span class="mesh-badge cov-badge-active" id="cov-badge">ACTIVE</span>
       </div>
       <div>
         <span class="bottom-metric-value" id="bm-coverage">0</span><span class="bottom-metric-unit">%</span>
@@ -505,20 +505,20 @@
   <div id="connection-modal" style="pointer-events:none">
     <div class="connection-panel-backdrop" id="conn-modal-backdrop"></div>
     <div class="connection-panel">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <span style="font-family:var(--font-ui);font-size:14px;font-weight:600;color:var(--text);letter-spacing:0.05em">PLATFORM CONNECTION</span>
-        <button id="conn-close" data-tooltip="Close" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px">&times;</button>
+      <div class="conn-modal-header">
+        <span class="conn-modal-title">PLATFORM CONNECTION</span>
+        <button id="conn-close" class="conn-close-btn" data-tooltip="Close">&times;</button>
       </div>
-      <div style="margin-bottom:16px">
+      <div class="conn-section">
         <div class="cmd-section-title">WebSocket URL</div>
         <input class="conn-input" id="conn-ws-url" placeholder="ws://localhost:8765/ws/v1/stream" value="">
-        <div style="font-family:var(--font-label);font-size:9px;color:var(--text-secondary)">Connect to OVERWATCH platform</div>
+        <div class="conn-hint">Connect to OVERWATCH platform</div>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="cmd-btn" id="conn-connect" data-tooltip="Establish WebSocket connection" style="flex:1;border-color:var(--green);color:var(--green)">CONNECT</button>
-        <button class="cmd-btn" id="conn-disconnect" data-tooltip="Close active connection" style="flex:1;border-color:var(--red);color:var(--red)" disabled>DISCONNECT</button>
+      <div class="conn-actions">
+        <button class="cmd-btn conn-btn-connect" id="conn-connect" data-tooltip="Establish WebSocket connection">CONNECT</button>
+        <button class="cmd-btn conn-btn-disconnect" id="conn-disconnect" data-tooltip="Close active connection" disabled>DISCONNECT</button>
       </div>
-      <div id="conn-status" style="margin-top:12px;font-family:var(--font-data);font-size:11px;color:var(--text-secondary);text-align:center">Not connected — exercise mode</div>
+      <div id="conn-status" class="conn-status">Not connected — exercise mode</div>
     </div>
   </div>
 
@@ -546,7 +546,7 @@
       <div class="shortcut-group-title">Map Tools</div>
       <div class="shortcut-row"><span class="shortcut-key">M</span><span class="shortcut-desc">Measure distance</span></div>
     </div>
-    <div style="font-family:var(--font-data);font-size:10px;color:var(--text-dim);margin-top:8px;text-align:center">Press ? or ESC to close</div>
+    <div class="help-footer">Press ? or ESC to close</div>
   </div>
 </div>
 
@@ -559,7 +559,7 @@
       <span class="cmd-palette-hint">ESC to close</span>
       <span class="cmd-palette-hint">&uarr;&darr; to navigate</span>
       <span class="cmd-palette-hint">ENTER to select</span>
-      <span class="cmd-palette-hint" style="margin-left:auto">CMD/CTRL+K</span>
+      <span class="cmd-palette-hint ml-auto">CMD/CTRL+K</span>
     </div>
   </div>
 </div>
