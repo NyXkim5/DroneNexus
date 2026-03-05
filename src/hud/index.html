@@ -226,30 +226,30 @@
       <!-- OBSERVE MODE -->
       <div class="observe-only">
         <div class="panel-header" id="detail-header">INSPECTOR</div>
-        <div class="inspector-tabs" id="inspector-tabs">
-          <button class="inspector-tab active" data-tab="properties" data-tooltip="Properties">PROPS</button>
-          <button class="inspector-tab" data-tab="relationships" data-tooltip="Relationships">RELS</button>
-          <button class="inspector-tab" data-tab="timeline" data-tooltip="Timeline">TIME</button>
-          <button class="inspector-tab" data-tab="diagnostics" data-tooltip="Diagnostics">DIAG</button>
-          <button class="inspector-tab" data-tab="hardware" data-tooltip="Hardware Manifest">HW</button>
-          <button class="inspector-tab" data-tab="insights" data-tooltip="Intelligence">INTEL</button>
+        <div class="inspector-tabs" id="inspector-tabs" role="tablist" aria-label="Inspector views">
+          <button class="inspector-tab active" data-tab="properties" data-tooltip="Properties" role="tab" aria-selected="true" aria-controls="inspector-properties" id="tab-properties" tabindex="0">PROPS</button>
+          <button class="inspector-tab" data-tab="relationships" data-tooltip="Relationships" role="tab" aria-selected="false" aria-controls="inspector-relationships" id="tab-relationships" tabindex="-1">RELS</button>
+          <button class="inspector-tab" data-tab="timeline" data-tooltip="Timeline" role="tab" aria-selected="false" aria-controls="inspector-timeline" id="tab-timeline" tabindex="-1">TIME</button>
+          <button class="inspector-tab" data-tab="diagnostics" data-tooltip="Diagnostics" role="tab" aria-selected="false" aria-controls="inspector-diagnostics" id="tab-diagnostics" tabindex="-1">DIAG</button>
+          <button class="inspector-tab" data-tab="hardware" data-tooltip="Hardware Manifest" role="tab" aria-selected="false" aria-controls="inspector-hardware" id="tab-hardware" tabindex="-1">HW</button>
+          <button class="inspector-tab" data-tab="insights" data-tooltip="Intelligence" role="tab" aria-selected="false" aria-controls="inspector-insights" id="tab-insights" tabindex="-1">INTEL</button>
         </div>
-        <div id="inspector-properties" class="inspector-tab-content active">
+        <div id="inspector-properties" class="inspector-tab-content active" role="tabpanel" aria-labelledby="tab-properties">
           <div id="detail-content"><div class="no-selection">SELECT AN ASSET</div></div>
         </div>
-        <div id="inspector-relationships" class="inspector-tab-content">
+        <div id="inspector-relationships" class="inspector-tab-content" role="tabpanel" aria-labelledby="tab-relationships">
           <div id="relationships-content"></div>
         </div>
-        <div id="inspector-timeline" class="inspector-tab-content">
+        <div id="inspector-timeline" class="inspector-tab-content" role="tabpanel" aria-labelledby="tab-timeline">
           <div id="timeline-content"></div>
         </div>
-        <div id="inspector-diagnostics" class="inspector-tab-content">
+        <div id="inspector-diagnostics" class="inspector-tab-content" role="tabpanel" aria-labelledby="tab-diagnostics">
           <div id="diagnostics-content"><div class="no-selection">SELECT AN ASSET</div></div>
         </div>
-        <div id="inspector-hardware" class="inspector-tab-content">
+        <div id="inspector-hardware" class="inspector-tab-content" role="tabpanel" aria-labelledby="tab-hardware">
           <div id="hardware-content"></div>
         </div>
-        <div id="inspector-insights" class="inspector-tab-content">
+        <div id="inspector-insights" class="inspector-tab-content" role="tabpanel" aria-labelledby="tab-insights">
           <div id="insights-content"><div class="no-selection">SELECT AN ASSET</div></div>
         </div>
       </div>
@@ -466,7 +466,7 @@
       <div>
         <span class="bottom-metric-value" id="bm-health">98</span><span class="bottom-metric-unit">%</span>
       </div>
-      <canvas class="sparkline-canvas" id="spark-health"></canvas>
+      <canvas class="sparkline-canvas" id="spark-health" role="img" aria-label="Task force health trend"></canvas>
     </div>
     <div class="bottom-metric" data-tooltip="Communication link latency">
       <div class="bottom-metric-header">
@@ -476,7 +476,7 @@
       <div>
         <span class="bottom-metric-value" id="bm-latency">28</span><span class="bottom-metric-unit">ms</span>
       </div>
-      <canvas class="sparkline-canvas" id="spark-latency"></canvas>
+      <canvas class="sparkline-canvas" id="spark-latency" role="img" aria-label="Commlink latency trend"></canvas>
     </div>
     <div class="bottom-metric" data-tooltip="Average fleet battery level">
       <div class="bottom-metric-header">
@@ -486,7 +486,7 @@
         <span class="bottom-metric-value" id="bm-battery">85</span><span class="bottom-metric-unit">%</span>
       </div>
       <div class="bottom-metric-sub" id="bm-bat-spread">Range: 75 - 95%</div>
-      <canvas class="sparkline-canvas" id="spark-battery"></canvas>
+      <canvas class="sparkline-canvas" id="spark-battery" role="img" aria-label="Power state trend"></canvas>
     </div>
     <div class="bottom-metric" data-tooltip="Estimated sensor coverage of AO">
       <div class="bottom-metric-header">
@@ -497,7 +497,7 @@
         <span class="bottom-metric-value" id="bm-coverage">0</span><span class="bottom-metric-unit">%</span>
       </div>
       <div class="bottom-metric-sub" id="bm-cov-assets">0 / 6 sensors</div>
-      <canvas class="sparkline-canvas" id="spark-coverage"></canvas>
+      <canvas class="sparkline-canvas" id="spark-coverage" role="img" aria-label="Sensor coverage trend"></canvas>
     </div>
   </div>
 

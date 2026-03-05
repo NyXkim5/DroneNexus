@@ -1664,15 +1664,41 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 });
 
 // Inspector tab switching
-document.querySelectorAll('.inspector-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.inspector-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.inspector-tab-content').forEach(c => c.classList.remove('active'));
-    tab.classList.add('active');
-    const target = tab.dataset.tab;
-    const targetEl = document.getElementById('inspector-' + target);
-    if (targetEl) targetEl.classList.add('active');
+const tabList = document.getElementById('inspector-tabs');
+const tabs = Array.from(tabList.querySelectorAll('.inspector-tab'));
+
+function activateTab(tab) {
+  tabs.forEach(t => {
+    t.classList.remove('active');
+    t.setAttribute('aria-selected', 'false');
+    t.setAttribute('tabindex', '-1');
   });
+  document.querySelectorAll('.inspector-tab-content').forEach(c => c.classList.remove('active'));
+  tab.classList.add('active');
+  tab.setAttribute('aria-selected', 'true');
+  tab.setAttribute('tabindex', '0');
+  const targetEl = document.getElementById('inspector-' + tab.dataset.tab);
+  if (targetEl) targetEl.classList.add('active');
+}
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => activateTab(tab));
+});
+
+tabList.addEventListener('keydown', (e) => {
+  const currentIndex = tabs.indexOf(document.activeElement);
+  if (currentIndex === -1) return;
+  let newIndex;
+  if (e.key === 'ArrowRight') {
+    newIndex = (currentIndex + 1) % tabs.length;
+  } else if (e.key === 'ArrowLeft') {
+    newIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+  } else {
+    return;
+  }
+  e.preventDefault();
+  tabs[newIndex].focus();
+  activateTab(tabs[newIndex]);
 });
 
 // Tree section toggles
