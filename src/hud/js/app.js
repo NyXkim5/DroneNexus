@@ -33,6 +33,11 @@ function applyMode(mode) {
   document.querySelectorAll('.mode-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.mode === mode);
   });
+  // Deactivate map tools when entering OBSERVE (read-only mode)
+  if (mode === 'OBSERVE' && typeof mapTools !== 'undefined') {
+    mapTools.deactivate();
+    if (gotoMode) disableGotoMode();
+  }
 }
 
 let _modeTransitioning = false;
@@ -152,6 +157,10 @@ setEventCallback(function(ev) {
 let gotoMode = false;
 
 function enableGotoMode() {
+  if (state.currentMode === 'OBSERVE') {
+    showToast('Switch to TASK mode to issue commands', 'warning');
+    return;
+  }
   gotoMode = true;
   state.map.getContainer().style.cursor = 'crosshair';
   document.getElementById('goto-indicator').style.display = '';
@@ -717,6 +726,11 @@ const mapTools = {
 
   activate(tool) {
     if (this.activeTool === tool) { this.deactivate(); return; }
+    // OBSERVE mode is read-only — only measure is allowed
+    if (state.currentMode === 'OBSERVE' && tool !== 'measure' && tool !== 'clear') {
+      showToast('Switch to TASK mode to use map tools', 'warning');
+      return;
+    }
     this.deactivate();
     this.activeTool = tool;
     document.querySelectorAll('.map-tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
