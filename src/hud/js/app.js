@@ -871,6 +871,11 @@ const mapTools = {
 
   // ---- Route tool handlers ----
   _onRouteClick(e) {
+    // Guard against double-click duplicating the last point
+    if (this.routePoints.length > 0) {
+      const last = this.routePoints[this.routePoints.length - 1];
+      if (Math.abs(last.lat - e.latlng.lat) < 0.000001 && Math.abs(last.lng - e.latlng.lng) < 0.000001) return;
+    }
     this.routePoints.push(e.latlng);
     const idx = this.routePoints.length;
 
