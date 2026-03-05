@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OVERWATCH Tests</title>
+  <style>
+    body { font-family: monospace; background: #1a1a1a; color: #e0e0e0; padding: 20px; }
+    .pass { color: #4caf50; } .fail { color: #f44336; }
+    .suite { margin: 16px 0; border-left: 2px solid #333; padding-left: 12px; }
+    h2 { color: #aaa; font-size: 14px; }
+  </style>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<h1>OVERWATCH Unit Tests</h1>
+<div id="results"></div>
+<script type="module">
+import { DRONE_STATES, ASSET_DEFS, PATTERN_OFFSETS } from '../js/constants.js';
+import { clamp, rand, batteryColor, toMGRS } from '../js/utils.js';
+import { AssetSimulator } from '../js/simulation.js';
+
+const results = document.getElementById('results');
+let passed = 0, failed = 0;
+
+function assert(condition, msg) {
+  if (condition) { passed++; log(msg, true); }
+  else { failed++; log(msg, false); }
+}
+
+function log(msg, pass) {
+  const div = document.createElement('div');
+  div.className = pass ? 'pass' : 'fail';
+  div.textContent = (pass ? 'PASS' : 'FAIL') + ': ' + msg;
+  results.appendChild(div);
+}
+
+function suite(name) {
+  const div = document.createElement('div');
+  div.className = 'suite';
+  const h = document.createElement('h2');
+  h.textContent = name;
+  div.appendChild(h);
+  results.appendChild(div);
+}
+
+// ============ STATE MACHINE TESTS ============
+suite('AssetSimulator — State Machine');
+
+const sim = new AssetSimulator(ASSET_DEFS[0], 0);
+
+assert(sim.droneState === 'FLYING', 'Initial state is FLYING');
+assert(sim.armed === true, 'Initial armed is true');
+assert(sim.battery <= 100 && sim.battery >= 0, 'Battery in valid range');
+assert(sim.satellites >= 6, 'Has GPS satellites');
+assert(sim.hdop < 3, 'HDOP is reasonable');
+assert(sim.altitude >= 0, 'Altitude non-negative');
+assert(sim.homePosition.lat !== 0, 'Home position is set');
+assert(sim.homePosition.lng !== 0, 'Home position longitude is set');
+assert(sim.trail.length === 0, 'Trail starts empty');
+assert(sim.id === ASSET_DEFS[0].id, 'ID matches asset def');
+assert(sim.role === ASSET_DEFS[0].role, 'Role matches asset def');
+assert(sim.color === ASSET_DEFS[0].color, 'Color matches asset def');
+
+// Test state transitions
+sim.armed = true;
+sim.droneState = 'ARMED';
+assert(sim.droneState === 'ARMED', 'Can transition to ARMED');
+
+sim.droneState = 'TAKING_OFF';
+sim.altitude = 50;
+assert(sim.droneState === 'TAKING_OFF', 'Can transition to TAKING_OFF');
+
+sim.droneState = 'FLYING';
+assert(sim.droneState === 'FLYING', 'Can transition to FLYING');
+
+sim.droneState = 'GOTO';
+assert(sim.droneState === 'GOTO', 'Can transition to GOTO');
+
+sim.droneState = 'RTB';
+assert(sim.droneState === 'RTB', 'Can transition to RTB');
+
+sim.droneState = 'LANDING';
+assert(sim.droneState === 'LANDING', 'Can transition to LANDING');
+
+sim.droneState = 'LANDED';
+sim.armed = false;
+assert(sim.droneState === 'LANDED', 'Can transition to LANDED');
+
+// Test update method
+const sim2 = new AssetSimulator(ASSET_DEFS[1], 1);
+const prevBattery = sim2.battery;
+sim2.update(1, 0, sim.lat, sim.lng);
+assert(sim2.battery <= prevBattery, 'Battery drains on update');
+assert(sim2.trail.length > 0, 'Trail grows on update');
+
+// ============ CONSTANTS TESTS ============
+suite('Constants');
+
+assert(DRONE_STATES.IDLE === 'IDLE', 'DRONE_STATES.IDLE exists');
+assert(DRONE_STATES.FLYING === 'FLYING', 'DRONE_STATES.FLYING exists');
+assert(DRONE_STATES.RTB === 'RTB', 'DRONE_STATES.RTB exists (not RTL)');
+assert(DRONE_STATES.EMERGENCY === 'EMERGENCY', 'DRONE_STATES.EMERGENCY exists');
+assert(ASSET_DEFS.length === 6, '6 asset definitions');
+assert(ASSET_DEFS[0].role === 'PRIMARY', 'First asset is PRIMARY');
+assert(PATTERN_OFFSETS.ORBIT !== undefined, 'ORBIT pattern exists');
+assert(PATTERN_OFFSETS.RACETRACK !== undefined, 'RACETRACK pattern exists');
+assert(PATTERN_OFFSETS.SEARCH_GRID !== undefined, 'SEARCH_GRID pattern exists');
+assert(PATTERN_OFFSETS.POINT_STARE !== undefined, 'POINT_STARE pattern exists');
+
+// ============ UTILITY TESTS ============
+suite('Utilities');
+
+assert(clamp(5, 0, 10) === 5, 'clamp: value in range');
+assert(clamp(-5, 0, 10) === 0, 'clamp: below min');
+assert(clamp(15, 0, 10) === 10, 'clamp: above max');
+
+assert(typeof batteryColor(100) === 'string', 'batteryColor returns string');
+assert(batteryColor(100).length > 0, 'batteryColor high returns non-empty');
+assert(batteryColor(10).length > 0, 'batteryColor low returns non-empty');
+assert(batteryColor(100) !== batteryColor(10), 'batteryColor: high and low return different colors');
+
+assert(rand(0, 10) >= 0 && rand(0, 10) <= 10, 'rand in range');
+
+// MGRS tests
+const mgrs = toMGRS(33.6846, -117.8265);
+assert(typeof mgrs === 'string', 'toMGRS returns string');
+assert(mgrs.startsWith('11'), 'Irvine CA is in UTM zone 11');
+assert(mgrs.includes('S'), 'Irvine CA latitude band is S');
+assert(mgrs.length > 10, 'MGRS string has sufficient length');
+
+// ============ SUMMARY ============
+const summary = document.createElement('div');
+summary.style.marginTop = '20px';
+summary.style.fontSize = '16px';
+summary.style.fontWeight = 'bold';
+summary.style.color = failed === 0 ? '#4caf50' : '#f44336';
+summary.textContent = passed + '/' + (passed + failed) + ' tests passed';
+results.appendChild(summary);
+</script>
+</body>
+</html>
