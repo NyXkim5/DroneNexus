@@ -4,7 +4,7 @@
    ============================================================== */
 
 import { state } from './state.js';
-import { ASSET_DEFS,
+import { ASSET_DEFS, PAYLOAD_DEFS,
          EVENT_INTERVAL_MIN, EVENT_INTERVAL_MAX } from './constants.js';
 import { _css, clamp, rand, degToRad, utcString, utcTimeStamp,
          showToast } from './utils.js';
@@ -492,6 +492,9 @@ function frame(now) {
 
     // Update command target
     updateCmdTarget();
+
+    // Update controller view if visible
+    if (isControllerVisible()) updateControllerView();
 
     // Coverage
     const coverage = calcCoverage();
@@ -1066,6 +1069,138 @@ document.querySelectorAll('.map-tool-btn').forEach(btn => {
     else mapTools.activate(tool);
   });
 });
+
+// ---- Bottom Panel Toggle (TELEMETRY | CONTROLLER) ----
+const _activePayloads = {};  // track toggled payloads per drone
+
+document.querySelectorAll('.bottom-toggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const view = btn.dataset.view;
+    document.querySelectorAll('.bottom-toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('bottom-telemetry').style.display = view === 'telemetry' ? '' : 'none';
+    document.getElementById('bottom-controller').style.display = view === 'controller' ? '' : 'none';
+    if (view === 'controller') updateControllerView();
+  });
+});
+
+function isControllerVisible() {
+  return document.getElementById('bottom-controller').style.display !== 'none';
+}
+
+function updateControllerView() {
+  const drone = drones.find(d => d.id === state.selectedDroneId);
+  const infoEl = document.getElementById('ctrl-asset-info');
+  const flightEl = document.getElementById('ctrl-flight-cmds');
+  const payloadEl = document.getElementById('ctrl-payload');
+  const adjEl = document.getElementById('ctrl-adjusters');
+
+  if (!drone) {
+    infoEl.innerHTML = '<span class="ctrl-no-asset">Select an asset to control</span>';
+    flightEl.innerHTML = '';
+    payloadEl.innerHTML = '';
+    adjEl.innerHTML = '';
+    return;
+  }
+
+  const def = ASSET_DEFS.find(a => a.id === drone.id);
+  const stateColor = { FLYING: 'var(--green)', GOTO: 'var(--accent)', MISSION: 'var(--accent)',
+    ARMED: 'var(--amber)', TAKING_OFF: 'var(--amber)', LANDING: 'var(--amber)',
+    RTB: 'var(--amber)', IDLE: 'var(--text-dim)', LANDED: 'var(--text-dim)',
+    EMERGENCY: 'var(--red)' }[drone.droneState] || 'var(--text-dim)';
+
+  // Asset info
+  infoEl.innerHTML =
+    '<span class="ctrl-asset-name" style="color:' + (def ? def.color : 'var(--text)') + '">' + drone.id + '</span>' +
+    '<span class="ctrl-asset-role">' + (def ? def.role : '') + '</span>' +
+    '<span class="ctrl-asset-state" style="color:' + stateColor + '">' + drone.droneState + '</span>';
+
+  // Flight commands — context-sensitive
+  const ds = drone.droneState;
+  flightEl.innerHTML = '<span class="ctrl-section-label">FLIGHT</span>';
+  const flightCmds = [];
+  if (ds === 'IDLE' || ds === 'LANDED') flightCmds.push({ label: 'ARM', cls: 'primary', cmd: 'ARM' });
+  if (ds === 'ARMED') {
+    flightCmds.push({ label: 'TAKEOFF', cls: 'primary', cmd: 'TAKEOFF' });
+    flightCmds.push({ label: 'DISARM', cls: '', cmd: 'DISARM' });
+  }
+  if (['FLYING', 'GOTO', 'MISSION'].includes(ds)) {
+    flightCmds.push({ label: 'LAND', cls: '', cmd: 'LAND' });
+    flightCmds.push({ label: 'RTB', cls: '', cmd: 'RTB' });
+    flightCmds.push({ label: 'GOTO', cls: 'primary', cmd: '_GOTO' });
+  }
+  if (['FLYING', 'GOTO', 'MISSION', 'ARMED', 'TAKING_OFF', 'LANDING', 'RTB'].includes(ds)) {
+    flightCmds.push({ label: 'ESTOP', cls: 'danger', cmd: 'EMERGENCY_STOP' });
+  }
+  flightCmds.forEach(fc => {
+    const b = document.createElement('button');
+    b.className = 'ctrl-cmd-btn ' + fc.cls;
+    b.textContent = fc.label;
+    b.addEventListener('click', () => {
+      if (fc.cmd === '_GOTO') { enableGotoMode(); return; }
+      cmdEngine.execute(fc.cmd, { droneId: drone.id });
+      setTimeout(updateControllerView, 100);
+    });
+    flightEl.appendChild(b);
+  });
+
+  // Payload actions
+  const payloads = def && def.payload ? def.payload : [];
+  payloadEl.innerHTML = '<span class="ctrl-section-label">PAYLOAD</span>';
+  payloads.forEach(pKey => {
+    const pd = PAYLOAD_DEFS[pKey];
+    if (!pd) return;
+    const isActive = _activePayloads[drone.id + ':' + pKey];
+    const b = document.createElement('button');
+    b.className = 'ctrl-cmd-btn payload' + (isActive ? ' active' : '');
+    b.textContent = pd.icon + ' ' + pd.label;
+    b.title = pd.desc;
+    b.addEventListener('click', () => {
+      const key = drone.id + ':' + pKey;
+      _activePayloads[key] = !_activePayloads[key];
+      const action = _activePayloads[key] ? 'activated' : 'deactivated';
+      showToast(drone.id + ': ' + pd.label + ' ' + action);
+      addEvent({ time: utcTimeStamp(), source: drone.id, msg: pd.label + ' ' + action, severity: 'info' });
+      b.classList.toggle('active', _activePayloads[key]);
+    });
+    payloadEl.appendChild(b);
+  });
+
+  // Speed / Altitude adjusters
+  adjEl.innerHTML =
+    '<span class="ctrl-section-label">ADJUST</span>' +
+    '<div class="ctrl-adjuster-row">' +
+      '<span class="ctrl-adjuster-label">SPD</span>' +
+      '<button class="ctrl-adj-btn" id="ctrl-spd-dn">\u2212</button>' +
+      '<span class="ctrl-adjuster-val" id="ctrl-spd-val">' + drone.targetSpeed.toFixed(0) + '</span>' +
+      '<button class="ctrl-adj-btn" id="ctrl-spd-up">+</button>' +
+      '<span class="ctrl-adjuster-label">m/s</span>' +
+    '</div>' +
+    '<div class="ctrl-adjuster-row">' +
+      '<span class="ctrl-adjuster-label">ALT</span>' +
+      '<button class="ctrl-adj-btn" id="ctrl-alt-dn">\u2212</button>' +
+      '<span class="ctrl-adjuster-val" id="ctrl-alt-val">' + drone.targetAltitude.toFixed(0) + '</span>' +
+      '<button class="ctrl-adj-btn" id="ctrl-alt-up">+</button>' +
+      '<span class="ctrl-adjuster-label">m</span>' +
+    '</div>';
+  document.getElementById('ctrl-spd-up').addEventListener('click', () => {
+    cmdEngine.execute('SET_SPEED', { speed: Math.min(drone.targetSpeed + 5, 50), droneId: drone.id });
+    updateControllerView();
+  });
+  document.getElementById('ctrl-spd-dn').addEventListener('click', () => {
+    cmdEngine.execute('SET_SPEED', { speed: Math.max(drone.targetSpeed - 5, 5), droneId: drone.id });
+    updateControllerView();
+  });
+  document.getElementById('ctrl-alt-up').addEventListener('click', () => {
+    cmdEngine.execute('SET_ALTITUDE', { altitude: Math.min(drone.targetAltitude + 25, 500), droneId: drone.id });
+    updateControllerView();
+  });
+  document.getElementById('ctrl-alt-dn').addEventListener('click', () => {
+    cmdEngine.execute('SET_ALTITUDE', { altitude: Math.max(drone.targetAltitude - 25, 25), droneId: drone.id });
+    updateControllerView();
+  });
+}
+
+// Re-render controller when drone selection changes (via 1s tick)
 
 // ---- Command Palette (Cmd+K) ----
 const cmdPalette = {

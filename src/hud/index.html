@@ -455,6 +455,11 @@
 
   <!-- ==================== BOTTOM PANEL ==================== -->
   <div id="bottom-panel">
+    <div class="bottom-toggle" id="bottom-toggle">
+      <button class="bottom-toggle-btn active" data-view="telemetry">TELEMETRY</button>
+      <button class="bottom-toggle-btn" data-view="controller">CONTROLLER</button>
+    </div>
+    <div class="bottom-telemetry" id="bottom-telemetry">
     <div class="event-log-section">
       <div class="bottom-metric-header">
         <span class="bottom-metric-title notification-badge">ACTIVITY STREAM<span class="badge-count hidden" id="event-badge">0</span></span>
@@ -500,6 +505,13 @@
       </div>
       <div class="bottom-metric-sub" id="bm-cov-assets">0 / 6 sensors</div>
       <canvas class="sparkline-canvas" id="spark-coverage" role="img" aria-label="Sensor coverage trend"></canvas>
+    </div>
+    </div><!-- /bottom-telemetry -->
+    <div class="bottom-controller" id="bottom-controller" style="display:none">
+      <div class="ctrl-asset-info" id="ctrl-asset-info"></div>
+      <div class="ctrl-flight-cmds" id="ctrl-flight-cmds"></div>
+      <div class="ctrl-payload" id="ctrl-payload"></div>
+      <div class="ctrl-adjusters" id="ctrl-adjusters"></div>
     </div>
   </div>
 
