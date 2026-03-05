@@ -1,6 +1,6 @@
 # OVERWATCH -- ISR Asset Coordination Platform
 
-Built on Palantir Gotham. Multi-asset ISR coordination and telemetry platform. Hardware-agnostic, plug-and-play, designed for 2-50 assets.
+Multi-asset ISR coordination and telemetry platform. Hardware-agnostic, plug-and-play, designed for 2-50 assets.
 
 ## Project Structure
 
