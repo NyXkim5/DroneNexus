@@ -1,7 +1,10 @@
 import { state } from './state.js';
 
-// Convert decimal lat/lng to MGRS string
+// Convert decimal lat/lng to MGRS string (memoized — same 5-decimal position returns cached result)
+const _mgrsCache = {};
 export function toMGRS(lat, lng) {
+  const key = lat.toFixed(5) + ',' + lng.toFixed(5);
+  if (_mgrsCache[key]) return _mgrsCache[key];
   const MGRS_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   const setOrigin = [1, 0]; // false easting/northing for UTM
 
@@ -45,7 +48,9 @@ export function toMGRS(lat, lng) {
   const e5 = String(Math.round(easting % 100000)).padStart(5, '0');
   const n5 = String(Math.round(northing % 100000)).padStart(5, '0');
 
-  return zone + latBand + ' ' + col + row + ' ' + e5 + ' ' + n5;
+  const result = zone + latBand + ' ' + col + row + ' ' + e5 + ' ' + n5;
+  _mgrsCache[key] = result;
+  return result;
 }
 
 // ---- CSS VARIABLE HELPER ----
@@ -135,6 +140,28 @@ export function rssiColor(v) {
   if (v > 80) return _css('--green');
   if (v > 50) return _css('--amber');
   return _css('--red');
+}
+
+// ---- SAFE DOM BUILDER ----
+/** Safe DOM element builder — avoids innerHTML XSS vectors */
+export function el(tag, attrs, ...children) {
+  const e = document.createElement(tag);
+  if (attrs) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'className') e.className = v;
+      else if (k === 'textContent') e.textContent = v;
+      else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'dataset') Object.entries(v).forEach(([dk, dv]) => e.dataset[dk] = dv);
+      else e.setAttribute(k, v);
+    }
+  }
+  children.forEach(c => {
+    if (c == null) return;
+    if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+    else e.appendChild(c);
+  });
+  return e;
 }
 
 // ---- TOAST NOTIFICATION ----

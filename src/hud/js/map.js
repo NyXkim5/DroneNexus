@@ -101,20 +101,28 @@ function initMap() {
   });
 }
 
+/* Icon cache: only regenerate SVG when heading changes by > 2 degrees */
+const _iconCache = {};
+
 function createDroneIcon(color, heading) {
+  const quantized = Math.round(heading / 2) * 2;
+  const key = color + '|' + quantized;
+  if (_iconCache[key]) return _iconCache[key];
   const size = 30;
   const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-    <g transform="rotate(${heading}, ${size/2}, ${size/2})">
+    <g transform="rotate(${quantized}, ${size/2}, ${size/2})">
       <polygon points="${size/2},4 ${size-6},${size-6} ${size/2},${size-10} 6,${size-6}" fill="${color}" fill-opacity="0.85" stroke="${color}" stroke-width="1.2"/>
     </g>
   </svg>`;
-  return L.divIcon({
+  const icon = L.divIcon({
     html: svg,
     className: '',
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     tooltipAnchor: [0, -size / 2],
   });
+  _iconCache[key] = icon;
+  return icon;
 }
 
 function updateMapMarker(drone) {

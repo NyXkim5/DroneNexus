@@ -2,16 +2,7 @@
    CLASSIFICATION BANNERS
    ============================================================ */
 .classification-banner {
-  height: 22px;
-  background: #007A33;
-  color: #ffffff;
-  font: bold 11px/22px 'Inter', system-ui, sans-serif;
-  text-align: center;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  flex-shrink: 0;
-  z-index: 10001;
-  user-select: none;
+  display: none;
 }
 
 /* ============================================================
@@ -20,26 +11,26 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --bg:             #111418;
-  --panel:          #1C2127;
-  --panel-elevated: #252A31;
-  --border:         #2F343C;
-  --border-light:   #383E47;
-  --text:           #F6F7F9;
-  --text-secondary: #ABB3BF;
-  --text-tertiary:  #5F6B7C;
-  --text-dim:       #738091;
-  --text-bright:    #F6F7F9;
-  --accent:         #2D72D2;
-  --green:          #238551;
-  --amber:          #C87619;
-  --red:            #CD4246;
-  --cyan:           #4C90F0;
-  --blue:           #2D72D2;
-  --purple:         #7961DB;
-  --bg-deep:        #000000;
-  --sky:            #1a2a3a;
-  --ground:         #3a2a1a;
+  --bg:             #0B0E11;
+  --panel:          #141820;
+  --panel-elevated: #1A1F28;
+  --border:         #252B35;
+  --border-light:   #2E3642;
+  --text:           #D4DAE0;
+  --text-secondary: #8A96A3;
+  --text-tertiary:  #6B7785;
+  --text-dim:       #7A8899;
+  --text-bright:    #E8ECF0;
+  --accent:         #3B82C4;
+  --green:          #1E7A4A;
+  --amber:          #B86E17;
+  --red:            #C23A3E;
+  --cyan:           #4888D8;
+  --blue:           #3B82C4;
+  --purple:         #6E58C7;
+  --bg-deep:        #060809;
+  --sky:            #0F1A26;
+  --ground:         #261A0F;
   --font-data:  'JetBrains Mono', 'IBM Plex Mono', monospace;
   --font-ui:    'Inter', system-ui, -apple-system, sans-serif;
   --font-label: 'Inter', system-ui, sans-serif;
@@ -83,7 +74,9 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   z-index: 1000;
-  gap: 16px;
+  gap: 12px;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 #main-area {
@@ -93,13 +86,14 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
 }
 
 #left-panel {
-  width: 280px;
+  width: 240px;
   flex-shrink: 0;
   background: var(--panel);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 #map-container {
@@ -114,12 +108,13 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
 }
 
 #right-panel {
-  width: 320px;
+  width: 340px;
   flex-shrink: 0;
   background: var(--panel);
   border-left: 1px solid var(--border);
   overflow-y: auto;
   overflow-x: hidden;
+  padding-right: 4px;
 }
 
 #bottom-panel {
@@ -175,7 +170,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   font-family: var(--font-label);
   font-size: 11px;
   font-weight: 500;
-  padding: 14px 16px 12px;
+  padding: 14px 12px 12px;
   border: none;
   border-bottom: 2px solid transparent;
   border-radius: 0;
@@ -226,10 +221,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
 .mode-btn:active { transform: scale(0.97); }
 
 .live-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 16px;
+  display: none;
 }
 
 .live-dot {
@@ -259,9 +251,8 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   font-weight: 500;
   color: var(--text-secondary);
   letter-spacing: 0.5px;
-  margin-left: 16px;
-  min-width: 140px;
-  text-align: right;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* TF callsign */
@@ -327,7 +318,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   background: transparent;
   border: none;
   border-left: 3px solid transparent;
-  padding: 8px 12px;
+  padding: 8px 16px 8px 12px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.1s;
   position: relative;
@@ -516,7 +507,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
 }
 
 .detail-section {
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -695,6 +686,9 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   border: 1px solid var(--border);
   border-radius: 2px;
   padding: 8px 10px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .telem-cell-label {
@@ -2289,4 +2283,39 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .cov-badge-active {
   background: rgba(45,114,210,0.12);
   color: #4C90F0;
+}
+
+/* ============================================================
+   RESPONSIVE BREAKPOINTS
+   ============================================================ */
+
+/* Narrow displays (< 1400px): compress side panels */
+@media (max-width: 1400px) {
+  #left-panel { width: 200px; }
+  #right-panel { width: 300px; padding-right: 2px; }
+  .mode-btn { padding: 14px 8px 12px; font-size: 10px; }
+  .brand { font-size: 14px; }
+  .brand-sub { font-size: 9px; }
+  .bottom-metric-value { font-size: 18px; }
+}
+
+/* Small displays (< 1200px): collapse left panel, narrow right */
+@media (max-width: 1200px) {
+  #left-panel { width: 0; overflow: hidden; border: none; padding: 0; }
+  #right-panel { width: 280px; }
+  #top-bar { gap: 8px; padding: 0 10px; }
+  .mode-btn { padding: 14px 6px 12px; }
+  .tf-callsign { display: none; }
+  .connection-badge span { display: none; }
+  .bottom-metric-value { font-size: 16px; }
+  .event-log-section { flex: 1; }
+}
+
+/* Very small displays (< 1024px): minimal chrome */
+@media (max-width: 1024px) {
+  #right-panel { width: 240px; }
+  #bottom-panel { height: 80px; }
+  .sparkline-canvas { display: none; }
+  .bottom-metric-sub { display: none; }
+  .inspector-tab { font-size: 9px; padding: 6px 8px; }
 }

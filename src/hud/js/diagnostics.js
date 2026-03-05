@@ -1,6 +1,6 @@
 // diagnostics.js — Diagnostics + Hardware panels
 import { state } from './state.js';
-import { _css, clamp, rand, randInt, utcTimeStamp, showToast } from './utils.js';
+import { _css, clamp, rand, randInt, utcTimeStamp, showToast, el } from './utils.js';
 
 /* ==============================================================
    DIAGNOSTICS PANEL RENDERER (Feature #4)
@@ -60,8 +60,8 @@ function diagSensorDotClass(status) {
 }
 
 function updateDiagnosticsPanel(asset) {
-  const el = document.getElementById('diagnostics-content');
-  if (!el) return;
+  const container = document.getElementById('diagnostics-content');
+  if (!container) return;
   const ds = getDiagState(asset.id);
 
   // Add slight jitter each render to make it look live
@@ -76,104 +76,204 @@ function updateDiagnosticsPanel(asset) {
   const healthOffset = circ - (ds.overallHealth / 100) * circ;
   const healthColor = diagHealthColor(ds.overallHealth);
 
-  // Full innerHTML rebuild only when asset changes
+  // Full DOM rebuild only when asset changes
   if (state.diagRenderedAsset !== asset.id) {
     state.diagRenderedAsset = asset.id;
 
-    let html = '';
+    // Helper to create SVG elements (el() creates HTML elements only)
+    const svgNS = 'http://www.w3.org/2000/svg';
+    function svgEl(tag, attrs) {
+      const e = document.createElementNS(svgNS, tag);
+      if (attrs) Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+      return e;
+    }
 
-    // System Health
-    html += '<div class="diag-section"><div class="diag-section-title">System Health</div>';
-  html += '<div class="diag-health-score">';
-  html += '<div class="diag-health-ring"><svg viewBox="0 0 64 64"><circle class="ring-bg" cx="32" cy="32" r="26"/>';
-  html += '<circle id="dg-health-ring" class="ring-fill" cx="32" cy="32" r="26" stroke="' + healthColor + '" stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + healthOffset.toFixed(1) + '"/>';
-  html += '</svg><div id="dg-health-pct" class="diag-health-pct" style="color:' + healthColor + '">' + ds.overallHealth.toFixed(0) + '</div></div>';
-  html += '<div><div class="diag-health-label">Overall System Health</div>';
-  html += '<div style="font-family:var(--font-data);font-size:10px;color:var(--text-dim);margin-top:2px">' + asset.id + ' // ' + asset.role + '</div></div></div>';
+    // System Health section
+    const svgRoot = svgEl('svg', { viewBox: '0 0 64 64' });
+    const ringBg = svgEl('circle', { class: 'ring-bg', cx: '32', cy: '32', r: '26' });
+    const ringFill = svgEl('circle', { id: 'dg-health-ring', class: 'ring-fill', cx: '32', cy: '32', r: '26', stroke: healthColor, 'stroke-dasharray': circ.toFixed(1), 'stroke-dashoffset': healthOffset.toFixed(1) });
+    svgRoot.appendChild(ringBg);
+    svgRoot.appendChild(ringFill);
 
-  // Subsystem breakdown
-  Object.entries(ds.subsystems).forEach(([name, val]) => {
-    const c = diagHealthColor(val);
-    html += '<div class="diag-subsystem"><span class="diag-subsystem-name">' + name.charAt(0).toUpperCase() + name.slice(1) + '</span>';
-    html += '<div class="diag-subsystem-bar"><div id="dg-sub-' + name + '-bar" class="diag-subsystem-bar-fill" style="width:' + val + '%;background:' + c + '"></div></div>';
-    html += '<span id="dg-sub-' + name + '" class="diag-subsystem-val" style="color:' + c + '">' + val.toFixed(0) + '%</span></div>';
-  });
-  html += '</div>';
+    const healthPct = el('div', { id: 'dg-health-pct', className: 'diag-health-pct', style: { color: healthColor }, textContent: ds.overallHealth.toFixed(0) });
+    const healthRing = el('div', { className: 'diag-health-ring' }, svgRoot, healthPct);
 
-  // Hardware — Motors
-  html += '<div class="diag-section"><div class="diag-section-title">Hardware Status</div>';
-  html += '<div class="diag-motor-grid">';
-  ds.motors.forEach((m, i) => {
-    const mc = diagHealthColor(m.health);
-    html += '<div class="diag-motor-card"><div class="diag-motor-label">Motor ' + (i + 1) + '</div>';
-    html += '<div class="diag-motor-stat">RPM: <span id="dg-motor-' + i + '-rpm" style="color:var(--text-bright)">' + m.rpm.toFixed(0) + '</span></div>';
-    html += '<div class="diag-motor-stat">Temp: <span id="dg-motor-' + i + '-temp" style="color:' + (m.temp > 50 ? 'var(--amber)' : 'var(--text-bright)') + '">' + m.temp.toFixed(1) + '&deg;C</span></div>';
-    html += '<div class="diag-motor-stat">Health: <span id="dg-motor-' + i + '-health" style="color:' + mc + '">' + m.health.toFixed(0) + '%</span></div></div>';
-  });
-  html += '</div>';
-  html += '<div style="margin-top:8px"><div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">ESC: ' + ds.escStatus + '</span></div>';
-  html += '<div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">IMU: ' + ds.imuCalibration + '</span></div></div>';
-  html += '</div>';
+    const healthInfo = el('div', null,
+      el('div', { className: 'diag-health-label', textContent: 'Overall System Health' }),
+      el('div', { style: { fontFamily: 'var(--font-data)', fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px' }, textContent: asset.id + ' // ' + asset.role })
+    );
 
-  // Sensor Health
-  html += '<div class="diag-section"><div class="diag-section-title">Sensor Health</div>';
-  html += '<div class="diag-sensor-grid">';
-  Object.entries(ds.sensors).forEach(([name, status]) => {
-    const dc = diagSensorDotClass(status);
-    html += '<div class="diag-status-indicator"><span class="diag-status-dot ' + dc + '"></span>';
-    html += '<span style="color:var(--text)">' + name.charAt(0).toUpperCase() + name.slice(1) + '</span>';
-    html += '<span style="color:' + (status === 'OK' ? 'var(--green)' : status === 'WARNING' ? 'var(--amber)' : 'var(--red)') + ';font-size:9px;margin-left:auto"> ' + status + '</span></div>';
-  });
-  html += '</div></div>';
+    const healthScore = el('div', { className: 'diag-health-score' }, healthRing, healthInfo);
 
-  // Communication
-  html += '<div class="diag-section"><div class="diag-section-title">Communication</div>';
-  html += '<div class="diag-subsystem"><span class="diag-subsystem-name">Radio Link</span>';
-  html += '<div class="diag-subsystem-bar"><div id="dg-sub-radio-bar" class="diag-subsystem-bar-fill" style="width:' + ds.radioLink + '%;background:' + diagHealthColor(ds.radioLink) + '"></div></div>';
-  html += '<span id="dg-sub-radio" class="diag-subsystem-val" style="color:' + diagHealthColor(ds.radioLink) + '">' + ds.radioLink.toFixed(0) + '%</span></div>';
-  html += '<div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">Antenna: ' + ds.antennaStatus + '</span></div>';
-  html += '<div class="diag-subsystem"><span class="diag-subsystem-name">Signal Quality</span>';
-  const sq = asset.linkQuality || 95;
-  html += '<div class="diag-subsystem-bar"><div id="dg-sub-signal-bar" class="diag-subsystem-bar-fill" style="width:' + sq + '%;background:' + diagHealthColor(sq) + '"></div></div>';
-  html += '<span id="dg-sub-signal" class="diag-subsystem-val" style="color:' + diagHealthColor(sq) + '">' + sq.toFixed(0) + '%</span></div>';
-  html += '</div>';
+    const systemHealthSection = el('div', { className: 'diag-section' },
+      el('div', { className: 'diag-section-title', textContent: 'System Health' }),
+      healthScore
+    );
 
-  // Power Systems
-  html += '<div class="diag-section"><div class="diag-section-title">Power Systems (6S)</div>';
-  ds.cellVoltages.forEach((v, i) => {
-    const pct = clamp(((v - 3.3) / (4.2 - 3.3)) * 100, 0, 100);
-    const cc = v < 3.5 ? 'var(--red)' : v < 3.7 ? 'var(--amber)' : 'var(--green)';
-    html += '<div class="diag-cell-row"><span style="color:var(--text-dim);min-width:24px">C' + (i + 1) + '</span>';
-    html += '<div class="diag-cell-bar"><div id="dg-cell-' + i + '-bar" class="diag-cell-bar-fill" style="width:' + pct.toFixed(0) + '%;background:' + cc + '"></div></div>';
-    html += '<span id="dg-cell-' + i + '" style="color:' + cc + ';min-width:40px;text-align:right">' + v.toFixed(2) + 'V</span></div>';
-  });
-  html += '<div style="margin-top:6px"><div class="diag-status-indicator"><span class="diag-status-dot ok"></span><span style="color:var(--text)">BMS Health: ' + ds.bmsHealth + '%</span></div></div>';
-  html += '</div>';
-
-  // Run Diagnostics
-  html += '<div class="diag-section">';
-  html += '<button class="diag-run-btn" id="diag-run-btn" data-asset-id="' + asset.id + '"' + (ds.scanning ? ' disabled' : '') + '>' + (ds.scanning ? 'SCANNING...' : 'RUN DIAGNOSTICS') + '</button>';
-  html += '<div class="diag-progress" id="diag-progress" style="' + (ds.scanning ? '' : 'display:none') + '"><div class="diag-progress-fill" id="diag-progress-fill" style="width:' + ds.scanProgress + '%"></div></div>';
-  if (ds.lastScanResults) {
-    html += '<div class="diag-results" id="diag-results">';
-    html += '<div style="font-family:var(--font-label);font-size:9px;color:var(--text-dim);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px">Scan Results</div>';
-    ds.lastScanResults.forEach(r => {
-      const ic = r.severity === 'ok' ? 'var(--green)' : r.severity === 'warning' ? 'var(--amber)' : 'var(--red)';
-      const dot = r.severity === 'ok' ? 'ok' : r.severity === 'warning' ? 'warning' : 'fault';
-      html += '<div class="diag-result-item"><span class="diag-result-icon"><span class="diag-status-dot ' + dot + '"></span></span><span style="color:' + ic + '">' + r.msg + '</span></div>';
+    // Subsystem breakdown
+    Object.entries(ds.subsystems).forEach(([name, val]) => {
+      const c = diagHealthColor(val);
+      systemHealthSection.appendChild(
+        el('div', { className: 'diag-subsystem' },
+          el('span', { className: 'diag-subsystem-name', textContent: name.charAt(0).toUpperCase() + name.slice(1) }),
+          el('div', { className: 'diag-subsystem-bar' },
+            el('div', { id: 'dg-sub-' + name + '-bar', className: 'diag-subsystem-bar-fill', style: { width: val + '%', background: c } })
+          ),
+          el('span', { id: 'dg-sub-' + name, className: 'diag-subsystem-val', style: { color: c }, textContent: val.toFixed(0) + '%' })
+        )
+      );
     });
-    html += '</div>';
-  }
-  html += '</div>';
 
-  el.innerHTML = html;
-  // Attach click handler after innerHTML (button is dynamically created)
-  const diagBtn = document.getElementById('diag-run-btn');
-  if (diagBtn) {
-    diagBtn.addEventListener('click', function() {
-      runDiagnosticScan(diagBtn.getAttribute('data-asset-id'));
+    // Hardware — Motors section
+    const motorGrid = el('div', { className: 'diag-motor-grid' });
+    ds.motors.forEach((m, i) => {
+      const mc = diagHealthColor(m.health);
+      motorGrid.appendChild(
+        el('div', { className: 'diag-motor-card' },
+          el('div', { className: 'diag-motor-label', textContent: 'Motor ' + (i + 1) }),
+          el('div', { className: 'diag-motor-stat' },
+            'RPM: ',
+            el('span', { id: 'dg-motor-' + i + '-rpm', style: { color: 'var(--text-bright)' }, textContent: m.rpm.toFixed(0) })
+          ),
+          el('div', { className: 'diag-motor-stat' },
+            'Temp: ',
+            el('span', { id: 'dg-motor-' + i + '-temp', style: { color: m.temp > 50 ? 'var(--amber)' : 'var(--text-bright)' }, textContent: m.temp.toFixed(1) + '\u00b0C' })
+          ),
+          el('div', { className: 'diag-motor-stat' },
+            'Health: ',
+            el('span', { id: 'dg-motor-' + i + '-health', style: { color: mc }, textContent: m.health.toFixed(0) + '%' })
+          )
+        )
+      );
     });
-  }
+
+    const hwStatusSection = el('div', { className: 'diag-section' },
+      el('div', { className: 'diag-section-title', textContent: 'Hardware Status' }),
+      motorGrid,
+      el('div', { style: { marginTop: '8px' } },
+        el('div', { className: 'diag-status-indicator' },
+          el('span', { className: 'diag-status-dot ok' }),
+          el('span', { style: { color: 'var(--text)' }, textContent: 'ESC: ' + ds.escStatus })
+        ),
+        el('div', { className: 'diag-status-indicator' },
+          el('span', { className: 'diag-status-dot ok' }),
+          el('span', { style: { color: 'var(--text)' }, textContent: 'IMU: ' + ds.imuCalibration })
+        )
+      )
+    );
+
+    // Sensor Health section
+    const sensorGrid = el('div', { className: 'diag-sensor-grid' });
+    Object.entries(ds.sensors).forEach(([name, status]) => {
+      const dc = diagSensorDotClass(status);
+      const statusColor = status === 'OK' ? 'var(--green)' : status === 'WARNING' ? 'var(--amber)' : 'var(--red)';
+      sensorGrid.appendChild(
+        el('div', { className: 'diag-status-indicator' },
+          el('span', { className: 'diag-status-dot ' + dc }),
+          el('span', { style: { color: 'var(--text)' }, textContent: name.charAt(0).toUpperCase() + name.slice(1) }),
+          el('span', { style: { color: statusColor, fontSize: '9px', marginLeft: 'auto' }, textContent: ' ' + status })
+        )
+      );
+    });
+
+    const sensorSection = el('div', { className: 'diag-section' },
+      el('div', { className: 'diag-section-title', textContent: 'Sensor Health' }),
+      sensorGrid
+    );
+
+    // Communication section
+    const sq = asset.linkQuality || 95;
+    const commSection = el('div', { className: 'diag-section' },
+      el('div', { className: 'diag-section-title', textContent: 'Communication' }),
+      el('div', { className: 'diag-subsystem' },
+        el('span', { className: 'diag-subsystem-name', textContent: 'Radio Link' }),
+        el('div', { className: 'diag-subsystem-bar' },
+          el('div', { id: 'dg-sub-radio-bar', className: 'diag-subsystem-bar-fill', style: { width: ds.radioLink + '%', background: diagHealthColor(ds.radioLink) } })
+        ),
+        el('span', { id: 'dg-sub-radio', className: 'diag-subsystem-val', style: { color: diagHealthColor(ds.radioLink) }, textContent: ds.radioLink.toFixed(0) + '%' })
+      ),
+      el('div', { className: 'diag-status-indicator' },
+        el('span', { className: 'diag-status-dot ok' }),
+        el('span', { style: { color: 'var(--text)' }, textContent: 'Antenna: ' + ds.antennaStatus })
+      ),
+      el('div', { className: 'diag-subsystem' },
+        el('span', { className: 'diag-subsystem-name', textContent: 'Signal Quality' }),
+        el('div', { className: 'diag-subsystem-bar' },
+          el('div', { id: 'dg-sub-signal-bar', className: 'diag-subsystem-bar-fill', style: { width: sq + '%', background: diagHealthColor(sq) } })
+        ),
+        el('span', { id: 'dg-sub-signal', className: 'diag-subsystem-val', style: { color: diagHealthColor(sq) }, textContent: sq.toFixed(0) + '%' })
+      )
+    );
+
+    // Power Systems section
+    const powerSection = el('div', { className: 'diag-section' },
+      el('div', { className: 'diag-section-title', textContent: 'Power Systems (6S)' })
+    );
+    ds.cellVoltages.forEach((v, i) => {
+      const pct = clamp(((v - 3.3) / (4.2 - 3.3)) * 100, 0, 100);
+      const cc = v < 3.5 ? 'var(--red)' : v < 3.7 ? 'var(--amber)' : 'var(--green)';
+      powerSection.appendChild(
+        el('div', { className: 'diag-cell-row' },
+          el('span', { style: { color: 'var(--text-dim)', minWidth: '24px' }, textContent: 'C' + (i + 1) }),
+          el('div', { className: 'diag-cell-bar' },
+            el('div', { id: 'dg-cell-' + i + '-bar', className: 'diag-cell-bar-fill', style: { width: pct.toFixed(0) + '%', background: cc } })
+          ),
+          el('span', { id: 'dg-cell-' + i, style: { color: cc, minWidth: '40px', textAlign: 'right' }, textContent: v.toFixed(2) + 'V' })
+        )
+      );
+    });
+    powerSection.appendChild(
+      el('div', { style: { marginTop: '6px' } },
+        el('div', { className: 'diag-status-indicator' },
+          el('span', { className: 'diag-status-dot ok' }),
+          el('span', { style: { color: 'var(--text)' }, textContent: 'BMS Health: ' + ds.bmsHealth + '%' })
+        )
+      )
+    );
+
+    // Run Diagnostics section
+    const diagButton = el('button', {
+      className: 'diag-run-btn',
+      id: 'diag-run-btn',
+      dataset: { assetId: asset.id },
+      textContent: ds.scanning ? 'SCANNING...' : 'RUN DIAGNOSTICS',
+      onClick: function() { runDiagnosticScan(asset.id); }
+    });
+    if (ds.scanning) diagButton.disabled = true;
+
+    const progressFill = el('div', { className: 'diag-progress-fill', id: 'diag-progress-fill', style: { width: ds.scanProgress + '%' } });
+    const progressBar = el('div', { className: 'diag-progress', id: 'diag-progress' }, progressFill);
+    if (!ds.scanning) progressBar.style.display = 'none';
+
+    const runSection = el('div', { className: 'diag-section' }, diagButton, progressBar);
+
+    if (ds.lastScanResults) {
+      const resultsDiv = el('div', { className: 'diag-results', id: 'diag-results' },
+        el('div', { style: { fontFamily: 'var(--font-label)', fontSize: '9px', color: 'var(--text-dim)', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }, textContent: 'Scan Results' })
+      );
+      ds.lastScanResults.forEach(r => {
+        const ic = r.severity === 'ok' ? 'var(--green)' : r.severity === 'warning' ? 'var(--amber)' : 'var(--red)';
+        const dot = r.severity === 'ok' ? 'ok' : r.severity === 'warning' ? 'warning' : 'fault';
+        resultsDiv.appendChild(
+          el('div', { className: 'diag-result-item' },
+            el('span', { className: 'diag-result-icon' },
+              el('span', { className: 'diag-status-dot ' + dot })
+            ),
+            el('span', { style: { color: ic }, textContent: r.msg })
+          )
+        );
+      });
+      runSection.appendChild(resultsDiv);
+    }
+
+    // Assemble and replace content
+    container.textContent = '';
+    container.appendChild(systemHealthSection);
+    container.appendChild(hwStatusSection);
+    container.appendChild(sensorSection);
+    container.appendChild(commSection);
+    container.appendChild(powerSection);
+    container.appendChild(runSection);
     return;
   }
 
@@ -207,7 +307,7 @@ function updateDiagnosticsPanel(asset) {
     if (rpmEl) rpmEl.textContent = m.rpm.toFixed(0);
     const tempEl = document.getElementById('dg-motor-' + i + '-temp');
     if (tempEl) {
-      tempEl.innerHTML = m.temp.toFixed(1) + '&deg;C';
+      tempEl.textContent = m.temp.toFixed(1) + '\u00b0C';
       tempEl.style.color = m.temp > 50 ? 'var(--amber)' : 'var(--text-bright)';
     }
     const healthEl = document.getElementById('dg-motor-' + i + '-health');
@@ -304,9 +404,9 @@ function runDiagnosticScan(assetId) {
    ============================================================== */
 
 function updateHardwarePanel(asset) {
-  const el = document.getElementById('hardware-content');
-  if (!el) return;
-  if (!asset) { el.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>'; state.hwRenderedAsset = null; return; }
+  const hwContainer = document.getElementById('hardware-content');
+  if (!hwContainer) return;
+  if (!asset) { hwContainer.innerHTML = '<div class="no-selection">SELECT AN ASSET</div>'; state.hwRenderedAsset = null; return; }
 
   const ds = getDiagState(asset.id);
 
@@ -334,16 +434,26 @@ function updateHardwarePanel(asset) {
     return 'var(--red)';
   }
 
-  // Status helpers
-  function motorStatus(health, idx) {
-    if (health > 90) return '<span id="hw-motor-' + idx + '-status" class="hw-part-status nominal">NOMINAL</span>';
-    if (health >= 70) return '<span id="hw-motor-' + idx + '-status" class="hw-part-status warning">DEGRADED</span>';
-    return '<span id="hw-motor-' + idx + '-status" class="hw-part-status fault">FAULT</span>';
+  // Status helpers — return DOM elements instead of HTML strings
+  function motorStatusEl(health, idx) {
+    if (health > 90) return el('span', { id: 'hw-motor-' + idx + '-status', className: 'hw-part-status nominal', textContent: 'NOMINAL' });
+    if (health >= 70) return el('span', { id: 'hw-motor-' + idx + '-status', className: 'hw-part-status warning', textContent: 'DEGRADED' });
+    return el('span', { id: 'hw-motor-' + idx + '-status', className: 'hw-part-status fault', textContent: 'FAULT' });
   }
-  function subsysStatus(val) {
-    if (val > 90) return '<span class="hw-part-status nominal">NOMINAL</span>';
-    if (val >= 70) return '<span class="hw-part-status warning">WARNING</span>';
-    return '<span class="hw-part-status fault">FAULT</span>';
+  function subsysStatusEl(val) {
+    if (val > 90) return el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' });
+    if (val >= 70) return el('span', { className: 'hw-part-status warning', textContent: 'WARNING' });
+    return el('span', { className: 'hw-part-status fault', textContent: 'FAULT' });
+  }
+
+  // Helper to build a part row
+  function partRow(dotColor, name, model, statusNode) {
+    return el('div', { className: 'hw-part-row' },
+      el('span', { className: 'hw-part-dot', style: { background: dotColor } }),
+      el('span', { className: 'hw-part-name', textContent: name }),
+      el('span', { className: 'hw-part-model', textContent: model }),
+      statusNode
+    );
   }
 
   // Motor colors from diagnostics
@@ -361,132 +471,131 @@ function updateHardwarePanel(asset) {
   const fcColor = 'var(--accent)';
   const rxColor = 'var(--purple)';
 
-  // ---- SVG DIAGRAM ----
-  const svg = `<div class="hw-diagram"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-    <!-- Arms (diagonals from center to motor positions) -->
-    <line x1="60" y1="60" x2="100" y2="100" stroke="${armColor}" stroke-width="3" stroke-linecap="round"/>
-    <line x1="140" y1="60" x2="100" y2="100" stroke="${armColor}" stroke-width="3" stroke-linecap="round"/>
-    <line x1="60" y1="140" x2="100" y2="100" stroke="${armColor}" stroke-width="3" stroke-linecap="round"/>
-    <line x1="140" y1="140" x2="100" y2="100" stroke="${armColor}" stroke-width="3" stroke-linecap="round"/>
-
-    <!-- Center body (frame/FC) -->
-    <rect class="hw-component" x="80" y="80" width="40" height="40" rx="6" ry="6" fill="${bodyColor}" opacity="0.7"/>
-
-    <!-- Flight controller (inside body) -->
-    <rect class="hw-component" x="88" y="88" width="16" height="12" rx="2" ry="2" fill="${fcColor}" opacity="0.6"/>
-    <text class="hw-label" x="96" y="96" font-size="6" fill="${labelColor}">FC</text>
-
-    <!-- Battery (inside body, offset below FC) -->
-    <rect class="hw-component" x="86" y="103" width="20" height="10" rx="2" ry="2" fill="${batColor}" opacity="0.5"/>
-    <text class="hw-label" x="96" y="110" font-size="6" fill="${labelColor}">BAT</text>
-
-    <!-- Motor 1 (front-left) -->
-    <circle class="hw-component" cx="60" cy="60" r="14" fill="none" stroke="${m1c}" stroke-width="2" opacity="0.8"/>
-    <circle cx="60" cy="60" r="4" fill="${m1c}" opacity="0.9"/>
-    <text class="hw-label" x="60" y="42" font-size="7" fill="${labelColor}">M1</text>
-
-    <!-- Motor 2 (front-right) -->
-    <circle class="hw-component" cx="140" cy="60" r="14" fill="none" stroke="${m2c}" stroke-width="2" opacity="0.8"/>
-    <circle cx="140" cy="60" r="4" fill="${m2c}" opacity="0.9"/>
-    <text class="hw-label" x="140" y="42" font-size="7" fill="${labelColor}">M2</text>
-
-    <!-- Motor 3 (rear-left) -->
-    <circle class="hw-component" cx="60" cy="140" r="14" fill="none" stroke="${m3c}" stroke-width="2" opacity="0.8"/>
-    <circle cx="60" cy="140" r="4" fill="${m3c}" opacity="0.9"/>
-    <text class="hw-label" x="60" y="162" font-size="7" fill="${labelColor}">M3</text>
-
-    <!-- Motor 4 (rear-right) -->
-    <circle class="hw-component" cx="140" cy="140" r="14" fill="none" stroke="${m4c}" stroke-width="2" opacity="0.8"/>
-    <circle cx="140" cy="140" r="4" fill="${m4c}" opacity="0.9"/>
-    <text class="hw-label" x="140" y="162" font-size="7" fill="${labelColor}">M4</text>
-
-    <!-- GPS module (top-center) -->
-    <rect class="hw-component" x="93" y="66" width="14" height="8" rx="2" ry="2" fill="${gpsColor}" opacity="0.6"/>
-    <text class="hw-label" x="100" y="64" font-size="6" fill="${labelColor}">GPS</text>
-
-    <!-- Camera/Gimbal (bottom-center) -->
-    <rect class="hw-component" x="92" y="126" width="16" height="10" rx="2" ry="2" fill="${camColor}" opacity="0.6"/>
-    <text class="hw-label" x="100" y="143" font-size="6" fill="${labelColor}">CAM</text>
-
-    <!-- RX antenna (right side of body) -->
-    <circle class="hw-component" cx="126" cy="96" r="4" fill="${rxColor}" opacity="0.6"/>
-    <text class="hw-label" x="126" y="88" font-size="6" fill="${labelColor}">RX</text>
-
-    <!-- VTX (left side of body) -->
-    <rect class="hw-component" x="68" y="93" width="8" height="6" rx="1" ry="1" fill="${camColor}" opacity="0.4"/>
-    <text class="hw-label" x="72" y="88" font-size="6" fill="${labelColor}">VTX</text>
-  </svg></div>`;
-
-  // ---- PARTS MANIFEST ----
-  // Role-based payload variation
-  const role = asset.role || 'PRIMARY';
-  let payloadParts = '';
-  if (role === 'ISR') {
-    payloadParts = `
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Gimbal</span><span class="hw-part-model">Gremsy S1V3</span>${subsysStatus(ds.subsystems.sensors)}</div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Camera</span><span class="hw-part-model">Sony A7R IV + 85mm</span><span class="hw-part-status nominal">NOMINAL</span></div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">IR Sensor</span><span class="hw-part-model">FLIR Boson 640</span><span class="hw-part-status nominal">NOMINAL</span></div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">SAR Module</span><span class="hw-part-model">uRAD A1-160GHz</span><span class="hw-part-status nominal">NOMINAL</span></div>`;
-  } else if (role === 'OVERWATCH') {
-    payloadParts = `
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Gimbal</span><span class="hw-part-model">Gremsy T3V3</span>${subsysStatus(ds.subsystems.sensors)}</div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Camera</span><span class="hw-part-model">Sony A7R IV + 200mm</span><span class="hw-part-status nominal">NOMINAL</span></div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">IR Sensor</span><span class="hw-part-model">FLIR Boson 640</span><span class="hw-part-status nominal">NOMINAL</span></div>`;
-  } else if (role === 'LOGISTICS') {
-    payloadParts = `
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Gimbal</span><span class="hw-part-model">Gremsy S1V3</span>${subsysStatus(ds.subsystems.sensors)}</div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Camera</span><span class="hw-part-model">Sony A6400 + 20mm</span><span class="hw-part-status nominal">NOMINAL</span></div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Drop Module</span><span class="hw-part-model">SkyDrop DM-200</span><span class="hw-part-status nominal">NOMINAL</span></div>`;
-  } else if (role === 'ESCORT') {
-    payloadParts = `
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Gimbal</span><span class="hw-part-model">Gremsy Pixy U</span>${subsysStatus(ds.subsystems.sensors)}</div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Camera</span><span class="hw-part-model">Sony A7R IV + 35mm</span><span class="hw-part-status nominal">NOMINAL</span></div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">IR Sensor</span><span class="hw-part-model">FLIR Boson 320</span><span class="hw-part-status nominal">NOMINAL</span></div>`;
-  } else {
-    // PRIMARY / default
-    payloadParts = `
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Gimbal</span><span class="hw-part-model">Gremsy S1V3</span><span class="hw-part-status nominal">NOMINAL</span></div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Camera</span><span class="hw-part-model">Sony A7R IV + 35mm</span><span class="hw-part-status nominal">NOMINAL</span></div>
-      <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">IR Sensor</span><span class="hw-part-model">FLIR Boson 640</span><span class="hw-part-status nominal">NOMINAL</span></div>`;
+  // ---- SVG DIAGRAM (built with SVG namespace) ----
+  const svgNS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS(svgNS, tag);
+    if (attrs) Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+    return e;
+  }
+  function svgText(tag, attrs, text) {
+    const e = svgEl(tag, attrs);
+    e.textContent = text;
+    return e;
   }
 
-  const partsHtml = `<div class="hw-parts-list">
-    <!-- Frame & Propulsion -->
-    <div class="hw-section-title">Frame &amp; Propulsion</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${armColor}"></span><span class="hw-part-name">Frame</span><span class="hw-part-model">Sentinel X4 Carbon 450mm</span>${subsysStatus(ds.subsystems.propulsion)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m1c}"></span><span class="hw-part-name">Motor 1</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[0].health, 0)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m2c}"></span><span class="hw-part-name">Motor 2</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[1].health, 1)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m3c}"></span><span class="hw-part-name">Motor 3</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[2].health, 2)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${m4c}"></span><span class="hw-part-name">Motor 4</span><span class="hw-part-model">T-Motor U8 Lite KV100</span>${motorStatus(ds.motors[3].health, 3)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${armColor}"></span><span class="hw-part-name">ESC</span><span class="hw-part-model">Hobbywing X-Rotor 40A</span>${subsysStatus(ds.subsystems.propulsion)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${armColor}"></span><span class="hw-part-name">Propeller</span><span class="hw-part-model">T-Motor P18x6.1 CF</span><span class="hw-part-status nominal">NOMINAL</span></div>
+  const svgRoot = svgEl('svg', { viewBox: '0 0 200 200', xmlns: svgNS });
 
-    <!-- Avionics -->
-    <div class="hw-section-title">Avionics</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${fcColor}"></span><span class="hw-part-name">Flight Controller</span><span class="hw-part-model">Cube Orange+ H7</span>${subsysStatus(ds.subsystems.avionics)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${gpsColor}"></span><span class="hw-part-name">GPS/GNSS</span><span class="hw-part-model">Here3+ RTK</span>${subsysStatus(ds.subsystems.avionics)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${fcColor}"></span><span class="hw-part-name">IMU</span><span class="hw-part-model">ICM-42688-P (x2 redundant)</span>${subsysStatus(ds.subsystems.sensors)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${fcColor}"></span><span class="hw-part-name">Barometer</span><span class="hw-part-model">MS5611 (x2 redundant)</span>${subsysStatus(ds.subsystems.sensors)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${fcColor}"></span><span class="hw-part-name">Magnetometer</span><span class="hw-part-model">RM3100</span>${subsysStatus(ds.subsystems.sensors)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${fcColor}"></span><span class="hw-part-name">LiDAR Altimeter</span><span class="hw-part-model">TFMini-S</span>${subsysStatus(ds.subsystems.sensors)}</div>
+  // Arms
+  [[60,60],[140,60],[60,140],[140,140]].forEach(([x, y]) => {
+    svgRoot.appendChild(svgEl('line', { x1: String(x), y1: String(y), x2: '100', y2: '100', stroke: armColor, 'stroke-width': '3', 'stroke-linecap': 'round' }));
+  });
 
-    <!-- Communications -->
-    <div class="hw-section-title">Communications</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${rxColor}"></span><span class="hw-part-name">Telemetry Radio</span><span class="hw-part-model">RFD900x 900MHz</span>${subsysStatus(ds.subsystems.comms)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${rxColor}"></span><span class="hw-part-name">RC Receiver</span><span class="hw-part-model">TBS Crossfire Nano</span>${subsysStatus(ds.subsystems.comms)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${camColor}"></span><span class="hw-part-name">Video TX</span><span class="hw-part-model">DJI O3 Air Unit</span>${subsysStatus(ds.subsystems.comms)}</div>
+  // Center body
+  svgRoot.appendChild(svgEl('rect', { class: 'hw-component', x: '80', y: '80', width: '40', height: '40', rx: '6', ry: '6', fill: bodyColor, opacity: '0.7' }));
 
-    <!-- Power -->
-    <div class="hw-section-title">Power</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${batColor}"></span><span class="hw-part-name">Battery</span><span class="hw-part-model">Tattu 6S 10000mAh 25C</span>${subsysStatus(ds.subsystems.power)}</div>
-    <div class="hw-part-row"><span class="hw-part-dot" style="background:${batColor}"></span><span class="hw-part-name">PDB/BEC</span><span class="hw-part-model">Matek FCHUB-6S</span><span class="hw-part-status nominal">NOMINAL</span></div>
+  // Flight controller
+  svgRoot.appendChild(svgEl('rect', { class: 'hw-component', x: '88', y: '88', width: '16', height: '12', rx: '2', ry: '2', fill: fcColor, opacity: '0.6' }));
+  svgRoot.appendChild(svgText('text', { class: 'hw-label', x: '96', y: '96', 'font-size': '6', fill: labelColor }, 'FC'));
 
-    <!-- Payload -->
-    <div class="hw-section-title">Payload</div>
-    ${payloadParts}
-  </div>`;
+  // Battery
+  svgRoot.appendChild(svgEl('rect', { class: 'hw-component', x: '86', y: '103', width: '20', height: '10', rx: '2', ry: '2', fill: batColor, opacity: '0.5' }));
+  svgRoot.appendChild(svgText('text', { class: 'hw-label', x: '96', y: '110', 'font-size': '6', fill: labelColor }, 'BAT'));
 
-  el.innerHTML = svg + partsHtml;
+  // Motors
+  const motorConfigs = [
+    { cx: '60', cy: '60', labelY: '42', mc: m1c, label: 'M1' },
+    { cx: '140', cy: '60', labelY: '42', mc: m2c, label: 'M2' },
+    { cx: '60', cy: '140', labelY: '162', mc: m3c, label: 'M3' },
+    { cx: '140', cy: '140', labelY: '162', mc: m4c, label: 'M4' },
+  ];
+  motorConfigs.forEach(cfg => {
+    svgRoot.appendChild(svgEl('circle', { class: 'hw-component', cx: cfg.cx, cy: cfg.cy, r: '14', fill: 'none', stroke: cfg.mc, 'stroke-width': '2', opacity: '0.8' }));
+    svgRoot.appendChild(svgEl('circle', { cx: cfg.cx, cy: cfg.cy, r: '4', fill: cfg.mc, opacity: '0.9' }));
+    svgRoot.appendChild(svgText('text', { class: 'hw-label', x: cfg.cx, y: cfg.labelY, 'font-size': '7', fill: labelColor }, cfg.label));
+  });
+
+  // GPS
+  svgRoot.appendChild(svgEl('rect', { class: 'hw-component', x: '93', y: '66', width: '14', height: '8', rx: '2', ry: '2', fill: gpsColor, opacity: '0.6' }));
+  svgRoot.appendChild(svgText('text', { class: 'hw-label', x: '100', y: '64', 'font-size': '6', fill: labelColor }, 'GPS'));
+
+  // Camera/Gimbal
+  svgRoot.appendChild(svgEl('rect', { class: 'hw-component', x: '92', y: '126', width: '16', height: '10', rx: '2', ry: '2', fill: camColor, opacity: '0.6' }));
+  svgRoot.appendChild(svgText('text', { class: 'hw-label', x: '100', y: '143', 'font-size': '6', fill: labelColor }, 'CAM'));
+
+  // RX antenna
+  svgRoot.appendChild(svgEl('circle', { class: 'hw-component', cx: '126', cy: '96', r: '4', fill: rxColor, opacity: '0.6' }));
+  svgRoot.appendChild(svgText('text', { class: 'hw-label', x: '126', y: '88', 'font-size': '6', fill: labelColor }, 'RX'));
+
+  // VTX
+  svgRoot.appendChild(svgEl('rect', { class: 'hw-component', x: '68', y: '93', width: '8', height: '6', rx: '1', ry: '1', fill: camColor, opacity: '0.4' }));
+  svgRoot.appendChild(svgText('text', { class: 'hw-label', x: '72', y: '88', 'font-size': '6', fill: labelColor }, 'VTX'));
+
+  const diagramDiv = el('div', { className: 'hw-diagram' }, svgRoot);
+
+  // ---- PARTS MANIFEST ----
+  const partsList = el('div', { className: 'hw-parts-list' });
+
+  // Frame & Propulsion
+  partsList.appendChild(el('div', { className: 'hw-section-title', textContent: 'Frame & Propulsion' }));
+  partsList.appendChild(partRow(armColor, 'Frame', 'Sentinel X4 Carbon 450mm', subsysStatusEl(ds.subsystems.propulsion)));
+  partsList.appendChild(partRow(m1c, 'Motor 1', 'T-Motor U8 Lite KV100', motorStatusEl(ds.motors[0].health, 0)));
+  partsList.appendChild(partRow(m2c, 'Motor 2', 'T-Motor U8 Lite KV100', motorStatusEl(ds.motors[1].health, 1)));
+  partsList.appendChild(partRow(m3c, 'Motor 3', 'T-Motor U8 Lite KV100', motorStatusEl(ds.motors[2].health, 2)));
+  partsList.appendChild(partRow(m4c, 'Motor 4', 'T-Motor U8 Lite KV100', motorStatusEl(ds.motors[3].health, 3)));
+  partsList.appendChild(partRow(armColor, 'ESC', 'Hobbywing X-Rotor 40A', subsysStatusEl(ds.subsystems.propulsion)));
+  partsList.appendChild(partRow(armColor, 'Propeller', 'T-Motor P18x6.1 CF', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+
+  // Avionics
+  partsList.appendChild(el('div', { className: 'hw-section-title', textContent: 'Avionics' }));
+  partsList.appendChild(partRow(fcColor, 'Flight Controller', 'Cube Orange+ H7', subsysStatusEl(ds.subsystems.avionics)));
+  partsList.appendChild(partRow(gpsColor, 'GPS/GNSS', 'Here3+ RTK', subsysStatusEl(ds.subsystems.avionics)));
+  partsList.appendChild(partRow(fcColor, 'IMU', 'ICM-42688-P (x2 redundant)', subsysStatusEl(ds.subsystems.sensors)));
+  partsList.appendChild(partRow(fcColor, 'Barometer', 'MS5611 (x2 redundant)', subsysStatusEl(ds.subsystems.sensors)));
+  partsList.appendChild(partRow(fcColor, 'Magnetometer', 'RM3100', subsysStatusEl(ds.subsystems.sensors)));
+  partsList.appendChild(partRow(fcColor, 'LiDAR Altimeter', 'TFMini-S', subsysStatusEl(ds.subsystems.sensors)));
+
+  // Communications
+  partsList.appendChild(el('div', { className: 'hw-section-title', textContent: 'Communications' }));
+  partsList.appendChild(partRow(rxColor, 'Telemetry Radio', 'RFD900x 900MHz', subsysStatusEl(ds.subsystems.comms)));
+  partsList.appendChild(partRow(rxColor, 'RC Receiver', 'TBS Crossfire Nano', subsysStatusEl(ds.subsystems.comms)));
+  partsList.appendChild(partRow(camColor, 'Video TX', 'DJI O3 Air Unit', subsysStatusEl(ds.subsystems.comms)));
+
+  // Power
+  partsList.appendChild(el('div', { className: 'hw-section-title', textContent: 'Power' }));
+  partsList.appendChild(partRow(batColor, 'Battery', 'Tattu 6S 10000mAh 25C', subsysStatusEl(ds.subsystems.power)));
+  partsList.appendChild(partRow(batColor, 'PDB/BEC', 'Matek FCHUB-6S', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+
+  // Payload (role-based)
+  partsList.appendChild(el('div', { className: 'hw-section-title', textContent: 'Payload' }));
+  const role = asset.role || 'PRIMARY';
+  if (role === 'ISR') {
+    partsList.appendChild(partRow(camColor, 'Gimbal', 'Gremsy S1V3', subsysStatusEl(ds.subsystems.sensors)));
+    partsList.appendChild(partRow(camColor, 'Camera', 'Sony A7R IV + 85mm', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+    partsList.appendChild(partRow(camColor, 'IR Sensor', 'FLIR Boson 640', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+    partsList.appendChild(partRow(camColor, 'SAR Module', 'uRAD A1-160GHz', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+  } else if (role === 'OVERWATCH') {
+    partsList.appendChild(partRow(camColor, 'Gimbal', 'Gremsy T3V3', subsysStatusEl(ds.subsystems.sensors)));
+    partsList.appendChild(partRow(camColor, 'Camera', 'Sony A7R IV + 200mm', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+    partsList.appendChild(partRow(camColor, 'IR Sensor', 'FLIR Boson 640', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+  } else if (role === 'LOGISTICS') {
+    partsList.appendChild(partRow(camColor, 'Gimbal', 'Gremsy S1V3', subsysStatusEl(ds.subsystems.sensors)));
+    partsList.appendChild(partRow(camColor, 'Camera', 'Sony A6400 + 20mm', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+    partsList.appendChild(partRow(camColor, 'Drop Module', 'SkyDrop DM-200', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+  } else if (role === 'ESCORT') {
+    partsList.appendChild(partRow(camColor, 'Gimbal', 'Gremsy Pixy U', subsysStatusEl(ds.subsystems.sensors)));
+    partsList.appendChild(partRow(camColor, 'Camera', 'Sony A7R IV + 35mm', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+    partsList.appendChild(partRow(camColor, 'IR Sensor', 'FLIR Boson 320', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+  } else {
+    // PRIMARY / default
+    partsList.appendChild(partRow(camColor, 'Gimbal', 'Gremsy S1V3', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+    partsList.appendChild(partRow(camColor, 'Camera', 'Sony A7R IV + 35mm', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+    partsList.appendChild(partRow(camColor, 'IR Sensor', 'FLIR Boson 640', el('span', { className: 'hw-part-status nominal', textContent: 'NOMINAL' })));
+  }
+
+  hwContainer.textContent = '';
+  hwContainer.appendChild(diagramDiv);
+  hwContainer.appendChild(partsList);
 }
 
 export { getDiagState, updateDiagnosticsPanel, runDiagnosticScan, updateHardwarePanel };

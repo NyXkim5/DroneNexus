@@ -407,4 +407,4 @@ function updateInspector(asset) {
   updateInsightsPanel(asset);
 }
 
-export { updateInspector, buildPropsHTML, pulseValue, setModeProvider };
+export { updateInspector, buildPropsHTML, pulseValue };

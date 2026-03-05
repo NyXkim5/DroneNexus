@@ -1,6 +1,6 @@
 // insights.js — Insights/INTEL panel
 import { state } from './state.js';
-import { _css, clamp, utcTimeStamp } from './utils.js';
+import { _css, clamp, utcTimeStamp, el } from './utils.js';
 import { getDiagState } from './diagnostics.js';
 
 /* ==============================================================
@@ -199,83 +199,144 @@ function updateInsightsPanel(asset) {
   const altTrend = trendIndicator(is.altHistory);
   const sigTrend = trendIndicator(is.signalHistory);
 
-  // Build HTML
-  let html = '';
-
-  // Section 1: Predictive Analytics
-  html += '<div class="insight-section"><div class="insight-section-title">Predictive Analytics</div>';
-  html += '<div class="insight-card"><div class="insight-label">Battery Depletion ETA</div>';
-  html += '<div class="insight-value"><span id="in-eta">' + etaStr + '</span> remaining<span id="in-batt-trend" class="insight-trend ' + battTrend.cls + '">' + battTrend.sym + '</span></div>';
-  html += '<div class="insight-sub">Drain rate: <span id="in-drain">' + drainRate.toFixed(2) + '</span>%/min</div></div>';
-  html += '<div class="insight-card"><div class="insight-label">Estimated Range</div>';
-  html += '<div class="insight-value"><span id="in-range">' + rangeKm + '</span> km</div>';
-  html += '<div class="insight-sub">At current speed: <span id="in-speed">' + speed.toFixed(1) + '</span> m/s</div></div>';
-  html += '<div class="insight-card"><div class="insight-label">Optimal RTB Window</div>';
-  html += '<div class="insight-value" id="in-rtb">' + rtbStr + '</div>';
-  html += '<div class="insight-sub">Safety margin: 10% battery reserve</div></div>';
-  html += '<div class="insight-card' + (missionProb < 40 ? ' critical' : missionProb < 70 ? ' warning' : ' positive') + '" id="in-prob-card">';
-  html += '<div class="insight-label">Mission Completion Probability</div>';
-  html += '<div class="insight-value" id="in-prob">' + missionProb + '%</div>';
-  html += '<div class="insight-sub">Based on battery, health, signal composite</div></div>';
-  html += '</div>';
-
-  // Section 2: Anomaly Detection
-  html += '<div class="insight-section"><div class="insight-section-title">Anomaly Detection</div>';
-  anomalies.forEach(a => {
-    const cardCls = a.severity === 'critical' ? ' critical' : a.severity === 'warning' ? ' warning' : ' positive';
-    html += '<div class="insight-card' + cardCls + '">';
-    html += '<div class="insight-label">' + a.icon + ' ' + (a.severity === 'ok' ? 'NOMINAL' : a.severity.toUpperCase()) + '</div>';
-    html += '<div class="insight-sub">' + a.msg + '</div></div>';
-  });
-  html += '</div>';
-
-  // Section 3: Trend Sparklines
-  html += '<div class="insight-section"><div class="insight-section-title">Telemetry Trends</div>';
+  // Build DOM
   const sparkData = [
     { label: 'Battery', data: is.batteryHistory, color: _css('--accent'), val: battery.toFixed(0) + '%', trend: battTrend },
     { label: 'Speed', data: is.speedHistory, color: _css('--green'), val: speed.toFixed(1) + ' m/s', trend: spdTrend },
     { label: 'Alt', data: is.altHistory, color: _css('--amber'), val: alt.toFixed(0) + ' m', trend: altTrend },
     { label: 'Signal', data: is.signalHistory, color: _css('--text'), val: signal.toFixed(0) + '%', trend: sigTrend },
   ];
-  sparkData.forEach((s, idx) => {
-    html += '<div class="insight-sparkline-row">';
-    html += '<span class="insight-sparkline-label">' + s.label + '</span>';
-    html += '<canvas class="insight-mini-spark" id="insight-spark-' + idx + '"></canvas>';
-    html += '<span style="font-family:var(--font-data);font-size:10px;color:var(--text);min-width:55px;text-align:right">' + s.val + '</span>';
-    html += '<span class="insight-trend ' + s.trend.cls + '">' + s.trend.sym + '</span>';
-    html += '</div>';
-  });
-  html += '</div>';
-
-  // Section 4: Risk Assessment
-  html += '<div class="insight-section"><div class="insight-section-title">Risk Assessment</div>';
-  html += '<div class="insight-card' + (riskScore >= 60 ? ' critical' : riskScore >= 30 ? ' warning' : ' positive') + '" id="in-risk-card">';
-  html += '<div class="insight-label">Composite Risk Score</div>';
-  html += '<div class="insight-value" id="in-risk-val" style="color:' + riskColor + '">' + riskScore + ' / 100 \u2014 ' + riskLabel + '</div>';
-  html += '<div class="insight-risk-meter"><div class="insight-risk-fill" id="in-risk-fill" style="width:' + riskScore + '%;background:' + riskColor + '"></div></div>';
-  html += '</div>';
-  // Risk factors
-  html += '<div style="margin-top:4px">';
-  html += '<div class="insight-correlation"><span class="insight-corr-pair">Battery depletion</span><span id="in-rf-batt" class="insight-corr-val" style="color:' + (battery < 30 ? 'var(--red)' : battery < 50 ? 'var(--amber)' : 'var(--green)') + '">' + (100 - battery).toFixed(0) + '%</span></div>';
-  html += '<div class="insight-correlation"><span class="insight-corr-pair">System health</span><span id="in-rf-health" class="insight-corr-val" style="color:' + (healthScore < 70 ? 'var(--red)' : healthScore < 85 ? 'var(--amber)' : 'var(--green)') + '">' + healthScore.toFixed(0) + '%</span></div>';
-  html += '<div class="insight-correlation"><span class="insight-corr-pair">Signal integrity</span><span id="in-rf-signal" class="insight-corr-val" style="color:' + (signal < 75 ? 'var(--red)' : signal < 90 ? 'var(--amber)' : 'var(--green)') + '">' + signal.toFixed(0) + '%</span></div>';
-  html += '<div class="insight-correlation"><span class="insight-corr-pair">Active anomalies</span><span id="in-rf-anom" class="insight-corr-val" style="color:' + (anomalies.filter(a => a.severity !== 'ok').length > 0 ? 'var(--amber)' : 'var(--green)') + '">' + anomalies.filter(a => a.severity !== 'ok').length + '</span></div>';
-  html += '</div></div>';
-
-  // Section 5: Decision Intelligence
-  html += '<div class="insight-section"><div class="insight-section-title">Decision Intelligence</div>';
-  recs.forEach(r => {
-    html += '<div class="insight-rec">';
-    html += '<div class="insight-rec-icon">' + r.icon + '</div>';
-    html += '<div class="insight-rec-text">' + r.text + '</div>';
-    html += '</div>';
-  });
-  html += '</div>';
 
   if (state.insightsRenderedAsset !== asset.id) {
     // Full rebuild on asset switch
     state.insightsRenderedAsset = asset.id;
-    container.innerHTML = html;
+
+    // Section 1: Predictive Analytics
+    const probCardCls = 'insight-card' + (missionProb < 40 ? ' critical' : missionProb < 70 ? ' warning' : ' positive');
+    const predictiveSection = el('div', { className: 'insight-section' },
+      el('div', { className: 'insight-section-title', textContent: 'Predictive Analytics' }),
+      el('div', { className: 'insight-card' },
+        el('div', { className: 'insight-label', textContent: 'Battery Depletion ETA' }),
+        el('div', { className: 'insight-value' },
+          el('span', { id: 'in-eta', textContent: etaStr }),
+          ' remaining',
+          el('span', { id: 'in-batt-trend', className: 'insight-trend ' + battTrend.cls, textContent: battTrend.sym })
+        ),
+        el('div', { className: 'insight-sub' },
+          'Drain rate: ',
+          el('span', { id: 'in-drain', textContent: drainRate.toFixed(2) }),
+          '%/min'
+        )
+      ),
+      el('div', { className: 'insight-card' },
+        el('div', { className: 'insight-label', textContent: 'Estimated Range' }),
+        el('div', { className: 'insight-value' },
+          el('span', { id: 'in-range', textContent: rangeKm }),
+          ' km'
+        ),
+        el('div', { className: 'insight-sub' },
+          'At current speed: ',
+          el('span', { id: 'in-speed', textContent: speed.toFixed(1) }),
+          ' m/s'
+        )
+      ),
+      el('div', { className: 'insight-card' },
+        el('div', { className: 'insight-label', textContent: 'Optimal RTB Window' }),
+        el('div', { className: 'insight-value', id: 'in-rtb', textContent: rtbStr }),
+        el('div', { className: 'insight-sub', textContent: 'Safety margin: 10% battery reserve' })
+      ),
+      el('div', { className: probCardCls, id: 'in-prob-card' },
+        el('div', { className: 'insight-label', textContent: 'Mission Completion Probability' }),
+        el('div', { className: 'insight-value', id: 'in-prob', textContent: missionProb + '%' }),
+        el('div', { className: 'insight-sub', textContent: 'Based on battery, health, signal composite' })
+      )
+    );
+
+    // Section 2: Anomaly Detection
+    const anomalySection = el('div', { className: 'insight-section' },
+      el('div', { className: 'insight-section-title', textContent: 'Anomaly Detection' })
+    );
+    anomalies.forEach(a => {
+      const cardCls = 'insight-card' + (a.severity === 'critical' ? ' critical' : a.severity === 'warning' ? ' warning' : ' positive');
+      anomalySection.appendChild(
+        el('div', { className: cardCls },
+          el('div', { className: 'insight-label', textContent: a.icon + ' ' + (a.severity === 'ok' ? 'NOMINAL' : a.severity.toUpperCase()) }),
+          el('div', { className: 'insight-sub', textContent: a.msg })
+        )
+      );
+    });
+
+    // Section 3: Trend Sparklines
+    const trendsSection = el('div', { className: 'insight-section' },
+      el('div', { className: 'insight-section-title', textContent: 'Telemetry Trends' })
+    );
+    sparkData.forEach((s, idx) => {
+      trendsSection.appendChild(
+        el('div', { className: 'insight-sparkline-row' },
+          el('span', { className: 'insight-sparkline-label', textContent: s.label }),
+          el('canvas', { className: 'insight-mini-spark', id: 'insight-spark-' + idx }),
+          el('span', { style: { fontFamily: 'var(--font-data)', fontSize: '10px', color: 'var(--text)', minWidth: '55px', textAlign: 'right' }, textContent: s.val }),
+          el('span', { className: 'insight-trend ' + s.trend.cls, textContent: s.trend.sym })
+        )
+      );
+    });
+
+    // Section 4: Risk Assessment
+    const riskCardCls = 'insight-card' + (riskScore >= 60 ? ' critical' : riskScore >= 30 ? ' warning' : ' positive');
+    const battRfColor = battery < 30 ? 'var(--red)' : battery < 50 ? 'var(--amber)' : 'var(--green)';
+    const healthRfColor = healthScore < 70 ? 'var(--red)' : healthScore < 85 ? 'var(--amber)' : 'var(--green)';
+    const signalRfColor = signal < 75 ? 'var(--red)' : signal < 90 ? 'var(--amber)' : 'var(--green)';
+    const anomCount = anomalies.filter(a => a.severity !== 'ok').length;
+    const anomRfColor = anomCount > 0 ? 'var(--amber)' : 'var(--green)';
+
+    const riskSection = el('div', { className: 'insight-section' },
+      el('div', { className: 'insight-section-title', textContent: 'Risk Assessment' }),
+      el('div', { className: riskCardCls, id: 'in-risk-card' },
+        el('div', { className: 'insight-label', textContent: 'Composite Risk Score' }),
+        el('div', { className: 'insight-value', id: 'in-risk-val', style: { color: riskColor }, textContent: riskScore + ' / 100 \u2014 ' + riskLabel }),
+        el('div', { className: 'insight-risk-meter' },
+          el('div', { className: 'insight-risk-fill', id: 'in-risk-fill', style: { width: riskScore + '%', background: riskColor } })
+        )
+      ),
+      el('div', { style: { marginTop: '4px' } },
+        el('div', { className: 'insight-correlation' },
+          el('span', { className: 'insight-corr-pair', textContent: 'Battery depletion' }),
+          el('span', { id: 'in-rf-batt', className: 'insight-corr-val', style: { color: battRfColor }, textContent: (100 - battery).toFixed(0) + '%' })
+        ),
+        el('div', { className: 'insight-correlation' },
+          el('span', { className: 'insight-corr-pair', textContent: 'System health' }),
+          el('span', { id: 'in-rf-health', className: 'insight-corr-val', style: { color: healthRfColor }, textContent: healthScore.toFixed(0) + '%' })
+        ),
+        el('div', { className: 'insight-correlation' },
+          el('span', { className: 'insight-corr-pair', textContent: 'Signal integrity' }),
+          el('span', { id: 'in-rf-signal', className: 'insight-corr-val', style: { color: signalRfColor }, textContent: signal.toFixed(0) + '%' })
+        ),
+        el('div', { className: 'insight-correlation' },
+          el('span', { className: 'insight-corr-pair', textContent: 'Active anomalies' }),
+          el('span', { id: 'in-rf-anom', className: 'insight-corr-val', style: { color: anomRfColor }, textContent: String(anomCount) })
+        )
+      )
+    );
+
+    // Section 5: Decision Intelligence
+    const decisionSection = el('div', { className: 'insight-section' },
+      el('div', { className: 'insight-section-title', textContent: 'Decision Intelligence' })
+    );
+    recs.forEach(r => {
+      decisionSection.appendChild(
+        el('div', { className: 'insight-rec' },
+          el('div', { className: 'insight-rec-icon', textContent: r.icon }),
+          el('div', { className: 'insight-rec-text', textContent: r.text })
+        )
+      );
+    });
+
+    container.textContent = '';
+    container.appendChild(predictiveSection);
+    container.appendChild(anomalySection);
+    container.appendChild(trendsSection);
+    container.appendChild(riskSection);
+    container.appendChild(decisionSection);
   } else {
     // Targeted DOM updates for same asset
     const u = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };

@@ -4,7 +4,7 @@
    ============================================================== */
 
 import { state } from './state.js';
-import { batteryColor } from './utils.js';
+import { batteryColor, el } from './utils.js';
 
 export function updateDebriefPanel(drones, debriefTracker, cmdEngine, replaySystem) {
   const elapsedSec = (Date.now() - debriefTracker.startTime) / 1000;
@@ -18,15 +18,15 @@ export function updateDebriefPanel(drones, debriefTracker, cmdEngine, replaySyst
 
   const avgBat = drones.reduce((s, d) => s + d.battery, 0) / drones.length;
   const abEl = document.getElementById('debrief-avg-batt');
-  if (abEl) abEl.innerHTML = avgBat.toFixed(0) + '<span class="debrief-stat-unit">%</span>';
+  if (abEl) { abEl.textContent = ''; abEl.appendChild(document.createTextNode(avgBat.toFixed(0))); abEl.appendChild(el('span', { className: 'debrief-stat-unit', textContent: '%' })); }
 
   const avgSpd = drones.reduce((s, d) => s + d.speed, 0) / drones.length;
   const asEl = document.getElementById('debrief-avg-speed');
-  if (asEl) asEl.innerHTML = avgSpd.toFixed(1) + '<span class="debrief-stat-unit">m/s</span>';
+  if (asEl) { asEl.textContent = ''; asEl.appendChild(document.createTextNode(avgSpd.toFixed(1))); asEl.appendChild(el('span', { className: 'debrief-stat-unit', textContent: 'm/s' })); }
 
   const distKm = debriefTracker.totalDistance / 1000;
   const distEl = document.getElementById('debrief-distance');
-  if (distEl) distEl.innerHTML = distKm.toFixed(2) + '<span class="debrief-stat-unit">km</span>';
+  if (distEl) { distEl.textContent = ''; distEl.appendChild(document.createTextNode(distKm.toFixed(2))); distEl.appendChild(el('span', { className: 'debrief-stat-unit', textContent: 'km' })); }
 
   const evEl = document.getElementById('debrief-events');
   if (evEl) evEl.textContent = state.activityStream.length;
@@ -34,29 +34,40 @@ export function updateDebriefPanel(drones, debriefTracker, cmdEngine, replaySyst
   // Key events
   const keEl = document.getElementById('debrief-key-events');
   if (keEl) {
+    keEl.textContent = '';
     if (debriefTracker.keyEvents.length === 0) {
-      keEl.innerHTML = '<div style="font-family:var(--font-data);font-size:10px;color:var(--text-secondary)">No key events yet</div>';
+      keEl.appendChild(el('div', { style: { fontFamily: 'var(--font-data)', fontSize: '10px', color: 'var(--text-secondary)' }, textContent: 'No key events yet' }));
     } else {
-      keEl.innerHTML = debriefTracker.keyEvents.slice().reverse().map(e => {
+      debriefTracker.keyEvents.slice().reverse().forEach(e => {
         const dotColor = e.severity === 'ok' ? 'var(--green)' : e.severity === 'warn' ? 'var(--amber)' : e.severity === 'alert' ? 'var(--red)' : 'var(--accent)';
-        return '<div class="debrief-timeline-item"><span class="debrief-timeline-time">' + e.time + '</span>' +
-          '<span class="debrief-timeline-dot" style="background:' + dotColor + '"></span>' +
-          '<span class="debrief-timeline-msg">' + e.msg + '</span></div>';
-      }).join('');
+        keEl.appendChild(
+          el('div', { className: 'debrief-timeline-item' },
+            el('span', { className: 'debrief-timeline-time', textContent: e.time }),
+            el('span', { className: 'debrief-timeline-dot', style: { background: dotColor } }),
+            el('span', { className: 'debrief-timeline-msg', textContent: e.msg })
+          )
+        );
+      });
     }
   }
 
   // Per-asset performance
   const perfEl = document.getElementById('debrief-asset-perf');
   if (perfEl) {
-    perfEl.innerHTML = drones.map(d => {
+    perfEl.textContent = '';
+    drones.forEach(d => {
       const bc = batteryColor(d.battery);
-      return '<div class="debrief-asset-row">' +
-        '<span style="width:6px;height:6px;border-radius:50%;background:' + d.color + ';flex-shrink:0"></span>' +
-        '<span class="debrief-asset-name">' + d.id + '</span>' +
-        '<div class="debrief-asset-bar"><div class="debrief-asset-bar-fill" style="width:' + d.battery + '%;background:' + bc + '"></div></div>' +
-        '<span class="debrief-asset-pct" style="color:' + bc + '">' + d.battery.toFixed(0) + '%</span></div>';
-    }).join('');
+      perfEl.appendChild(
+        el('div', { className: 'debrief-asset-row' },
+          el('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: d.color, flexShrink: '0' } }),
+          el('span', { className: 'debrief-asset-name', textContent: d.id }),
+          el('div', { className: 'debrief-asset-bar' },
+            el('div', { className: 'debrief-asset-bar-fill', style: { width: d.battery + '%', background: bc } })
+          ),
+          el('span', { className: 'debrief-asset-pct', style: { color: bc }, textContent: d.battery.toFixed(0) + '%' })
+        )
+      );
+    });
   }
 
   // Replay state indicator
