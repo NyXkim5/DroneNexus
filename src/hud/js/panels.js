@@ -470,8 +470,8 @@ function updateInspector(asset) {
     actionBtns.forEach(function(btn) {
       btn.addEventListener('click', function() {
         const action = btn.getAttribute('data-action');
-        if (action === 'command') { _setMode('TASK'); }
-        else if (action === 'isr') { _setMode('ISR'); }
+        if (action === 'command') { if (_setMode) _setMode('TASK'); }
+        else if (action === 'isr') { if (_setMode) _setMode('ISR'); }
         else if (action === 'focus') { state.map.setView([asset.lat, asset.lng], 17); }
         else if (action === 'history') {
           const timeTab = document.querySelector('.inspector-tab[data-tab="timeline"]');
