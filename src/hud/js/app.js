@@ -15,7 +15,7 @@ import { initMap, createDroneIcon, updateMapMarker, updateFormationLines,
          updateFovCone } from './map.js';
 import { updateAssetExplorer, selectDrone, updateInspector, getDiagState,
          updateDiagnosticsPanel, updateHardwarePanel, addEvent,
-         renderActivityStream, setEventCallback,
+         renderActivityStream, setEventCallback, setModeProvider,
          generateActivity, generateStateCorrelatedEvents } from './panels.js';
 
 /* ==============================================================
@@ -74,8 +74,8 @@ export function setMode(mode) {
   }
 }
 
-// Expose setMode globally so panels.js action buttons can use it
-window.setMode = setMode;
+// Inject setMode into panels.js via callback provider
+setModeProvider(setMode);
 
 /* ==============================================================
    MAIN APPLICATION
@@ -86,7 +86,7 @@ const assets = ASSET_DEFS.map((def, i) => new AssetSimulator(def, i));
 const drones = assets; // local alias used throughout app.js
 state.assets = assets;
 state.drones = assets;
-window._overwatchAssets = assets; // expose for diagnostics panel
+// assets are available via state.assets (set above)
 
 // Initialize map
 try {
@@ -1468,7 +1468,7 @@ const cmdPalette = {
   buildItems() {
     const items = [];
     // Assets
-    (window._overwatchAssets || []).forEach(d => {
+    (state.assets || []).forEach(d => {
       items.push({ category: 'ASSETS', icon: '\u25C6', label: d.id, hint: d.role + ' // ' + d.status, action: () => { selectDrone(d.id); } });
     });
     // Commands

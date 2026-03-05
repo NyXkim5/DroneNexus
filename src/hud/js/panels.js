@@ -4,6 +4,12 @@ import { ASSET_DEFS, MAX_EVENTS } from './constants.js';
 import { _css, clamp, rand, randInt, utcTimeStamp, batteryColor, rssiColor, showToast, toMGRS } from './utils.js';
 
 /* ==============================================================
+   MODE CALLBACK PROVIDER
+   ============================================================== */
+let _setMode = null;
+export function setModeProvider(fn) { _setMode = fn; }
+
+/* ==============================================================
    ACTIVITY GENERATOR
    ============================================================== */
 const EVENT_TEMPLATES = [
@@ -464,8 +470,8 @@ function updateInspector(asset) {
     actionBtns.forEach(function(btn) {
       btn.addEventListener('click', function() {
         const action = btn.getAttribute('data-action');
-        if (action === 'command') { window.setMode('TASK'); }
-        else if (action === 'isr') { window.setMode('ISR'); }
+        if (action === 'command') { _setMode('TASK'); }
+        else if (action === 'isr') { _setMode('ISR'); }
         else if (action === 'focus') { state.map.setView([asset.lat, asset.lng], 17); }
         else if (action === 'history') {
           const timeTab = document.querySelector('.inspector-tab[data-tab="timeline"]');
@@ -949,7 +955,7 @@ function updateDiagnosticsPanel(asset) {
 
   // Run Diagnostics
   html += '<div class="diag-section">';
-  html += '<button class="diag-run-btn" id="diag-run-btn" onclick="runDiagnosticScan(\'' + asset.id + '\')"' + (ds.scanning ? ' disabled' : '') + '>' + (ds.scanning ? 'SCANNING...' : 'RUN DIAGNOSTICS') + '</button>';
+  html += '<button class="diag-run-btn" id="diag-run-btn" data-asset-id="' + asset.id + '"' + (ds.scanning ? ' disabled' : '') + '>' + (ds.scanning ? 'SCANNING...' : 'RUN DIAGNOSTICS') + '</button>';
   html += '<div class="diag-progress" id="diag-progress" style="' + (ds.scanning ? '' : 'display:none') + '"><div class="diag-progress-fill" id="diag-progress-fill" style="width:' + ds.scanProgress + '%"></div></div>';
   if (ds.lastScanResults) {
     html += '<div class="diag-results" id="diag-results">';
@@ -964,6 +970,13 @@ function updateDiagnosticsPanel(asset) {
   html += '</div>';
 
   el.innerHTML = html;
+  // Attach click handler after innerHTML (button is dynamically created)
+  const diagBtn = document.getElementById('diag-run-btn');
+  if (diagBtn) {
+    diagBtn.addEventListener('click', function() {
+      runDiagnosticScan(diagBtn.getAttribute('data-asset-id'));
+    });
+  }
     return;
   }
 
@@ -1081,7 +1094,7 @@ function runDiagnosticScan(assetId) {
       if (!ds.scanning && ds.lastScanResults) {
         // Full re-render to show results (reset tracking so full rebuild fires)
         state.diagRenderedAsset = null;
-        const allAssets = window._overwatchAssets || [];
+        const allAssets = state.assets || [];
         const asset = allAssets.find(a => a.id === assetId);
         if (asset) updateDiagnosticsPanel(asset);
       }
@@ -1432,9 +1445,6 @@ function renderActivityStream() {
 
   container.scrollTop = container.scrollHeight;
 }
-
-// Expose runDiagnosticScan globally for onclick handler
-window.runDiagnosticScan = runDiagnosticScan;
 
 export { updateAssetExplorer, selectDrone, buildPropsHTML, updateInspector,
          getDiagState, updateDiagnosticsPanel, runDiagnosticScan,
