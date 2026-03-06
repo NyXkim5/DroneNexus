@@ -20,6 +20,7 @@ export const state = {
   diagRenderedAsset: null,
   hwRenderedAsset: null,
   insightsRenderedAsset: null,
+  cameraLock: false,
   _lastTimelineCount: {},
   _prevTelemValues: {},
   assets: [],       // populated during init

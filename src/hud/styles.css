@@ -125,14 +125,14 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
   display: flex;
   z-index: 1000;
 }
-.bottom-telemetry { display: flex; flex: 1; overflow: hidden; }
+.bottom-telemetry { display: flex; flex: 1; overflow: hidden; gap: 0; }
+.bottom-telemetry > .bottom-metric:last-child { border-right: none; }
 
 /* Bottom toggle (TELEMETRY | CONTROLLER) */
 .bottom-toggle {
   display: flex;
-  flex-direction: column;
   gap: 0;
-  padding: 0 8px;
+  padding: 0 10px;
   align-items: center;
   justify-content: center;
   border-right: 1px solid var(--border);
@@ -140,20 +140,19 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
 }
 .bottom-toggle-btn {
   font-family: var(--font-label);
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  padding: 8px 10px;
+  padding: 6px 12px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
   transition: all 0.15s;
-  width: 100%;
   text-align: center;
 }
-.bottom-toggle-btn:first-child { border-radius: 2px 2px 0 0; }
-.bottom-toggle-btn:last-child { border-radius: 0 0 2px 2px; border-top: none; }
+.bottom-toggle-btn:first-child { border-radius: 2px 0 0 2px; }
+.bottom-toggle-btn:last-child { border-radius: 0 2px 2px 0; border-left: none; }
 .bottom-toggle-btn.active { background: var(--accent); border-color: var(--accent); color: var(--text-bright); }
 .bottom-toggle-btn:hover:not(.active) { color: var(--text); border-color: var(--border-light); }
 
@@ -171,8 +170,16 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
 .ctrl-asset-name { font-family: var(--font-data); font-size: 15px; font-weight: 700; color: var(--text-bright); }
 .ctrl-asset-role { font-family: var(--font-label); font-size: 9px; color: var(--text-dim); letter-spacing: 0.5px; }
 .ctrl-asset-state { font-family: var(--font-data); font-size: 11px; }
-.ctrl-no-asset { font-family: var(--font-label); font-size: 10px; color: var(--text-dim); letter-spacing: 0.5px; padding: 10px 16px; display: flex; align-items: center; }
-.ctrl-section-label { font-family: var(--font-label); font-size: 8px; color: var(--text-dim); letter-spacing: 0.5px; margin-bottom: 4px; width: 100%; }
+.ctrl-no-asset {
+  font-family: var(--font-label); font-size: 10px; color: var(--text-dim);
+  letter-spacing: 0.5px; display: flex; align-items: center;
+  justify-content: center; flex: 1; padding: 0 24px;
+}
+.ctrl-section-label {
+  font-family: var(--font-label); font-size: 8px; color: var(--text-dim);
+  letter-spacing: 0.8px; margin-bottom: 4px; width: 100%;
+  border-bottom: 1px solid var(--border); padding-bottom: 3px;
+}
 .ctrl-flight-cmds {
   padding: 8px 12px;
   border-right: 1px solid var(--border);
@@ -211,8 +218,13 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; bor
 .ctrl-cmd-btn.primary:hover { background: var(--accent); color: var(--text-bright); }
 .ctrl-cmd-btn.payload { border-color: var(--amber); color: var(--amber); }
 .ctrl-cmd-btn.payload:hover { background: var(--amber); color: var(--text-bright); }
-.ctrl-cmd-btn.payload.active { background: rgba(184,110,23,0.15); }
+.ctrl-cmd-btn.payload.active {
+  background: rgba(184,110,23,0.2); border-color: var(--amber);
+  box-shadow: 0 0 6px rgba(184,110,23,0.3);
+}
 .ctrl-cmd-btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+@keyframes ctrl-pulse { 0%,100% { box-shadow: none; } 50% { box-shadow: 0 0 8px rgba(184,110,23,0.5); } }
+.ctrl-cmd-btn.payload-firing { animation: ctrl-pulse 0.4s ease-out; }
 .ctrl-adjusters {
   padding: 8px 14px;
   display: flex;
@@ -1226,7 +1238,17 @@ body.mode-enter .mode-btn.active {
 }
 body[data-mode="ISR"] #left-panel { width: 0; overflow: hidden; border: none; padding: 0; }
 body[data-mode="ISR"] #right-panel { width: 260px; }
-body[data-mode="ISR"] #bottom-panel { height: 48px; }
+body[data-mode="ISR"] #bottom-panel { height: 48px; overflow: hidden; }
+body[data-mode="ISR"] .bottom-toggle { display: none; }
+body[data-mode="ISR"] .bottom-controller { display: none !important; }
+body[data-mode="ISR"] .bottom-telemetry { display: flex !important; }
+body[data-mode="ISR"] .bottom-metric-value { font-size: 16px; }
+body[data-mode="ISR"] .bottom-metric { padding: 4px 12px; }
+body[data-mode="ISR"] .bottom-metric-header { margin-bottom: 2px; }
+body[data-mode="ISR"] .sparkline-canvas { display: none; }
+body[data-mode="ISR"] .bottom-metric-sub { display: none; }
+body[data-mode="ISR"] .event-log-section { flex: 0.8; }
+body[data-mode="ISR"] .event-log-section .bottom-metric-header { margin-bottom: 0; }
 
 /* ============================================================
    CONNECTION BADGE
@@ -1275,7 +1297,8 @@ body[data-mode="ISR"] #bottom-panel { height: 48px; }
   background: var(--red); font-size: 13px; padding: 14px;
   margin-top: 6px;
 }
-.cmd-btn.danger:hover { background: color-mix(in srgb, var(--red) 80%, black); }
+.cmd-btn.danger:hover { background: color-mix(in srgb, var(--red) 80%, black); color: var(--text-bright); }
+.cmd-btn.danger:active { background: color-mix(in srgb, var(--red) 60%, black); color: var(--text-bright); }
 
 /* Sliders */
 .cmd-slider-group { margin: 8px 0; }
@@ -2414,6 +2437,7 @@ body[data-mode="ISR"] .isr-only { display: block !important; }
 .solo-only.cmd-panel,
 .debrief-only.cmd-panel {
   overflow-y: auto;
+  padding-bottom: 12px;
 }
 
 /* --- Compact button --- */

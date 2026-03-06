@@ -474,6 +474,13 @@ function frame(now) {
       state.mapMarkers[d.id]._pulseRing.setLatLng([d.lat, d.lng]);
     }
   });
+
+  // Camera lock — keep map centered on selected drone
+  if (state.cameraLock && state.selectedDroneId) {
+    const lockDrone = drones.find(d => d.id === state.selectedDroneId);
+    if (lockDrone) state.map.panTo([lockDrone.lat, lockDrone.lng], { animate: false });
+  }
+
   updateFormationLines(drones);
   mapTools.updateRouteProgress(drones[0]);
 
@@ -1070,6 +1077,22 @@ document.querySelectorAll('.map-tool-btn').forEach(btn => {
   });
 });
 
+// ---- Camera Lock ----
+const camLockBtn = document.getElementById('cam-lock-btn');
+function setCameraLock(enabled) {
+  state.cameraLock = enabled;
+  camLockBtn.classList.toggle('active', enabled);
+  if (enabled) showToast('Camera locked to ' + (state.selectedDroneId || 'asset'));
+}
+camLockBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setCameraLock(!state.cameraLock);
+});
+// Auto-disable lock when user drags the map
+state.map.on('dragstart', () => {
+  if (state.cameraLock) setCameraLock(false);
+});
+
 // ---- Bottom Panel Toggle (TELEMETRY | CONTROLLER) ----
 const _activePayloads = {};  // track toggled payloads per drone
 
@@ -1095,11 +1118,22 @@ function updateControllerView() {
   const adjEl = document.getElementById('ctrl-adjusters');
 
   if (!drone) {
-    infoEl.innerHTML = '<span class="ctrl-no-asset">Select an asset to control</span>';
+    infoEl.innerHTML = '';
     flightEl.innerHTML = '';
     payloadEl.innerHTML = '';
     adjEl.innerHTML = '';
+    document.getElementById('bottom-controller').innerHTML =
+      '<span class="ctrl-no-asset">SELECT AN ASSET TO CONTROL</span>';
     return;
+  }
+  // Restore structure if it was replaced by no-asset message
+  if (!document.getElementById('ctrl-asset-info')) {
+    document.getElementById('bottom-controller').innerHTML =
+      '<div class="ctrl-asset-info" id="ctrl-asset-info"></div>' +
+      '<div class="ctrl-flight-cmds" id="ctrl-flight-cmds"></div>' +
+      '<div class="ctrl-payload" id="ctrl-payload"></div>' +
+      '<div class="ctrl-adjusters" id="ctrl-adjusters"></div>';
+    return updateControllerView();
   }
 
   const def = ASSET_DEFS.find(a => a.id === drone.id);
@@ -1161,6 +1195,8 @@ function updateControllerView() {
       showToast(drone.id + ': ' + pd.label + ' ' + action);
       addEvent({ time: utcTimeStamp(), source: drone.id, msg: pd.label + ' ' + action, severity: 'info' });
       b.classList.toggle('active', _activePayloads[key]);
+      b.classList.add('payload-firing');
+      setTimeout(() => b.classList.remove('payload-firing'), 400);
     });
     payloadEl.appendChild(b);
   });
@@ -1384,6 +1420,10 @@ document.addEventListener('keydown', (e) => {
     if (key.toLowerCase() === 'i') { e.preventDefault(); setMode('ISR'); return; }
   }
 
+  if (key === 'l' && state.currentMode !== 'ISR') {
+    e.preventDefault();
+    setCameraLock(!state.cameraLock);
+  }
   if (key === 'm' && state.currentMode !== 'ISR') {
     e.preventDefault();
     mapTools.activate('measure');
