@@ -269,6 +269,41 @@ def test_handles_thousand_contacts() -> None:
     assert confirmed <= n
 
 
+def test_multi_sensor_does_not_multiply_tracks() -> None:
+    """Three sensors viewing the same targets must fuse, not triplicate.
+
+    This is the core multi-sensor fusion contract. Each of K well-separated
+    targets is seen by three sensors every tick, so the manager receives 3*K
+    detections per tick. A correct fusion engine holds about K tracks, not 3*K.
+    """
+    rng = random.Random(7)
+    mgr = TrackManager()
+    k = 200
+    sensors = ("radar-1", "radar-2", "eo-1")
+    truths: List[Tuple[Vec3, Vec3]] = []
+    for _ in range(k):
+        px = rng.uniform(-5000, 5000)
+        py = rng.uniform(-5000, 5000)
+        truths.append(((px, py, 80.0), (rng.uniform(-8, 8), rng.uniform(-8, 8), 0.0)))
+    t = 0.0
+    for step in range(6):
+        t += 0.1
+        dets = []
+        nxt = []
+        for ti, (pos, vel) in enumerate(truths):
+            pos = _advance(pos, vel, 0.1)
+            nxt.append((pos, vel))
+            for sensor in sensors:
+                noisy = (pos[0] + rng.gauss(0, 2.0), pos[1] + rng.gauss(0, 2.0), pos[2])
+                dets.append(_det(f"d{step}-{ti}-{sensor}", noisy, vel, t, sensor=sensor))
+        truths = nxt
+        mgr.update(dets, t)
+    held = len(mgr.tracks())
+    confirmed = len(mgr.confirmed_tracks())
+    assert held <= int(1.15 * k), f"track inflation: {held} tracks for {k} targets"
+    assert confirmed >= int(0.9 * k), f"too few confirmed: {confirmed} of {k}"
+
+
 def test_empty_update_is_safe() -> None:
     mgr = TrackManager()
     assert mgr.update([], 0.0) == []

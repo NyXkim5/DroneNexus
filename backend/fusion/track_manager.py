@@ -33,8 +33,10 @@ from __future__ import annotations
 
 import itertools
 import logging
+from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from math import floor
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
@@ -45,6 +47,53 @@ logger = logging.getLogger("overwatch.fusion")
 
 # Cap on the position-history ring stored on each Track for the HUD trail.
 _MAX_HISTORY = 64
+
+
+class _SpatialGrid:
+    """Uniform spatial hash over 3D positions for near-linear neighbor lookup.
+
+    Cells are cubes of side cell_m. Insert points by index, then query the 27
+    cells around a position to get candidate neighbors. This replaces the dense
+    detection-by-track scan so gating and clustering stay linear at swarm scale.
+    """
+
+    def __init__(self, cell_m: float) -> None:
+        self._cell = max(1.0, cell_m)
+        self._buckets: Dict[Tuple[int, int, int], List[int]] = defaultdict(list)
+        self._points: List[Vec3] = []
+
+    def insert(self, index: int, pos: Vec3) -> None:
+        """Store a point index under its cell key."""
+        self._points.append(pos)
+        self._buckets[self._key(pos)].append(index)
+
+    def neighbors(self, pos: Vec3) -> Iterable[int]:
+        """Yield indices in the 27 cells around pos."""
+        cx, cy, cz = self._key(pos)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    yield from self._buckets.get((cx + dx, cy + dy, cz + dz), ())
+
+    def _key(self, pos: Vec3) -> Tuple[int, int, int]:
+        """Integer cell coordinates for a position."""
+        c = self._cell
+        return (int(floor(pos[0] / c)), int(floor(pos[1] / c)), int(floor(pos[2] / c)))
+
+
+@dataclass
+class _Measurement:
+    """One fused observation built from co-located detections this tick.
+
+    Multiple sensors that see the same physical object produce detections within
+    a small radius. We collapse those into a single measurement before track
+    association so one object yields one track, not one track per sensor.
+    """
+
+    position: Vec3
+    velocity: Vec3
+    confidence: float
+    source_ids: List[str]
 
 
 @dataclass(frozen=True)
@@ -69,6 +118,10 @@ class FusionConfig:
     gate_radius_m: float = 150.0
     confidence_gain: float = 0.4
     confidence_decay: float = 0.3
+    cluster_radius_m: float = 40.0
+    dup_radius_m: float = 45.0
+    merge_radius_m: float = 30.0
+    merge_vel_ms: float = 12.0
 
 
 @dataclass
@@ -128,12 +181,185 @@ class TrackManager:
         or expire unconfirmed tracks. Returns the full current track list.
         """
         self._advance_all(now)
-        matches, unmatched = self._associate(detections)
-        self._apply_matches(matches, detections, now)
-        self._spawn_tracks([detections[i] for i in unmatched], now)
+        measurements = self._fuse_detections(detections)
+        matches, unmatched = self._associate(measurements)
+        self._apply_matches(matches, measurements, now)
+        fresh = self._reject_duplicates(measurements, unmatched)
+        self._spawn_tracks(fresh, now)
+        self._merge_duplicates()
         self._expire(now)
         self._last_now = now
         return self.tracks()
+
+    def _merge_duplicates(self) -> None:
+        """Collapse track pairs that are co-located and moving together.
+
+        Early ticks have no tracks to suppress against, so one object can seed two
+        tracks that both confirm. This pass merges any pair within merge_radius_m
+        whose velocities agree within merge_vel_ms, keeping the better-supported
+        track and folding the other one's source lineage into it.
+        """
+        entries = list(self._entries.items())
+        if len(entries) < 2:
+            return
+        grid = _SpatialGrid(self._config.merge_radius_m)
+        positions = [e.kalman.position for _tid, e in entries]
+        for idx, pos in enumerate(positions):
+            grid.insert(idx, pos)
+        radius_sq = self._config.merge_radius_m**2
+        dead: set[str] = set()
+        for i, (tid_i, ent_i) in enumerate(entries):
+            if tid_i in dead:
+                continue
+            self._merge_neighbors(i, entries, positions, grid, radius_sq, dead)
+        for tid in dead:
+            del self._entries[tid]
+
+    def _merge_neighbors(
+        self,
+        i: int,
+        entries: List[Tuple[str, _TrackEntry]],
+        positions: List[Vec3],
+        grid: _SpatialGrid,
+        radius_sq: float,
+        dead: set,
+    ) -> None:
+        """Merge any later track that duplicates entry i into the survivor."""
+        for j in set(grid.neighbors(positions[i])):
+            if j <= i:
+                continue
+            tid_j, ent_j = entries[j]
+            if tid_j in dead or entries[i][0] in dead:
+                continue
+            if _dist_sq(positions[i], positions[j]) > radius_sq:
+                continue
+            if _vel_diff(entries[i][1].kalman.velocity, ent_j.kalman.velocity) > self._config.merge_vel_ms:
+                continue
+            self._fold_track(entries[i][1], ent_j, dead, tid_j, entries[i][0])
+
+    def _fold_track(
+        self, a: _TrackEntry, b: _TrackEntry, dead: set, tid_b: str, tid_a: str,
+    ) -> None:
+        """Keep the better-supported of two tracks and retire the other."""
+        keep, drop, drop_id = (a, b, tid_b) if a.hits >= b.hits else (b, a, tid_a)
+        keep.track.source_detection_ids.extend(drop.track.source_detection_ids)
+        if len(keep.track.source_detection_ids) > _MAX_HISTORY:
+            del keep.track.source_detection_ids[:-_MAX_HISTORY]
+        keep.hits = max(keep.hits, drop.hits)
+        dead.add(drop_id)
+
+    def _reject_duplicates(
+        self, measurements: List[_Measurement], unmatched: List[int],
+    ) -> List[_Measurement]:
+        """Drop unmatched measurements that sit on top of an existing track.
+
+        Per-tick clustering is imperfect, so one object can yield a main cluster
+        plus a stray that lost the greedy match. Without this guard each stray
+        seeds a duplicate track. A measurement within dup_radius_m of any current
+        track is treated as a duplicate of a tracked object and not spawned.
+        """
+        if not unmatched or not self._entries:
+            return [measurements[i] for i in unmatched]
+        grid = _SpatialGrid(self._config.dup_radius_m)
+        positions = [e.kalman.position for e in self._entries.values()]
+        for ti, pos in enumerate(positions):
+            grid.insert(ti, pos)
+        radius_sq = self._config.dup_radius_m**2
+        fresh: List[_Measurement] = []
+        for i in unmatched:
+            meas = measurements[i]
+            near = any(
+                _dist_sq(positions[ti], meas.position) <= radius_sq
+                for ti in set(grid.neighbors(meas.position))
+            )
+            if not near:
+                fresh.append(meas)
+        return fresh
+
+    def _fuse_detections(self, detections: List[Detection]) -> List[_Measurement]:
+        """Collapse co-located detections into one measurement per object.
+
+        Sensors overlap, so the same drone is seen several times per tick. We
+        single-link cluster detections within cluster_radius_m using a spatial
+        grid, then fuse each cluster into one confidence-weighted measurement.
+        This is what stops one object from spawning one track per sensor.
+        """
+        if not detections:
+            return []
+        clusters = self._cluster_detections(detections)
+        return [self._fuse_cluster([detections[i] for i in idxs]) for idxs in clusters]
+
+    def _cluster_detections(self, detections: List[Detection]) -> List[List[int]]:
+        """Group cross-sensor detections of one object, keep distinct objects apart.
+
+        A single sensor reports each physical object at most once per tick, so two
+        detections from the same sensor are always two different objects and must
+        never share a cluster. We grow each cluster around a seed detection,
+        admitting nearby detections only from sensors the cluster has not used.
+        This separates distinct drones even when they fall inside one radius, as
+        long as a sensor resolves them, while still fusing genuine duplicates.
+        """
+        grid = _SpatialGrid(self._config.cluster_radius_m)
+        seeds: List[Vec3] = []
+        members: List[List[int]] = []
+        used_sensors: List[set] = []
+        radius_sq = self._config.cluster_radius_m**2
+        order = sorted(
+            range(len(detections)), key=lambda i: -detections[i].confidence,
+        )
+        for i in order:
+            det = detections[i]
+            ci = self._best_cluster(det, grid, seeds, used_sensors, radius_sq)
+            if ci is None:
+                grid.insert(len(seeds), det.position)
+                seeds.append(det.position)
+                members.append([i])
+                used_sensors.append({det.sensor_id})
+            else:
+                members[ci].append(i)
+                used_sensors[ci].add(det.sensor_id)
+        return members
+
+    def _best_cluster(
+        self,
+        det: Detection,
+        grid: _SpatialGrid,
+        seeds: List[Vec3],
+        used_sensors: List[set],
+        radius_sq: float,
+    ) -> Optional[int]:
+        """Nearest seeded cluster within radius that has not used this sensor."""
+        best: Optional[int] = None
+        best_d2 = radius_sq
+        for ci in set(grid.neighbors(det.position)):
+            if det.sensor_id in used_sensors[ci]:
+                continue
+            d2 = _dist_sq(seeds[ci], det.position)
+            if d2 <= best_d2:
+                best_d2 = d2
+                best = ci
+        return best
+
+    def _fuse_cluster(self, group: List[Detection]) -> _Measurement:
+        """Confidence-weighted fusion of one cluster into a single measurement.
+
+        Position and velocity are weighted by detection confidence so a sharp
+        sensor pulls harder. Fused confidence is a probabilistic OR across the
+        independent looks, so more sensors seeing an object raise certainty.
+        """
+        weights = [max(0.05, d.confidence) for d in group]
+        total = sum(weights)
+        pos = _weighted_vec([d.position for d in group], weights, total)
+        vel = _weighted_vec([d.velocity for d in group], weights, total)
+        miss = 1.0
+        for d in group:
+            miss *= 1.0 - max(0.0, min(1.0, d.confidence))
+        return _Measurement(
+            position=pos,
+            velocity=vel,
+            confidence=1.0 - miss,
+            source_ids=[d.id for d in group],
+        )
 
     def _advance_all(self, now: float) -> None:
         """Predict every track filter forward to now and refresh its Track view."""
@@ -151,123 +377,108 @@ class TrackManager:
         return max(0.0, now - base)
 
     def _associate(
-        self, detections: List[Detection],
+        self, measurements: List[_Measurement],
     ) -> Tuple[List[Tuple[str, int]], List[int]]:
-        """Match detections to tracks by gated greedy nearest neighbor.
+        """Match fused measurements to tracks by gated greedy nearest neighbor.
 
-        Returns a list of (track_id, detection_index) matches and the indices of
-        unmatched detections. The spatial pre-filter restricts each detection to
-        nearby tracks so the Mahalanobis scoring stays cheap at scale.
+        Returns a list of (track_id, measurement_index) matches and the indices
+        of unmatched measurements. A spatial grid over track positions restricts
+        each measurement to nearby tracks so Mahalanobis scoring stays linear.
         """
-        if not detections:
+        if not measurements:
             return [], []
         entries = list(self._entries.values())
         if not entries:
-            return [], list(range(len(detections)))
-        candidates = self._gate_pairs(detections, entries)
-        return self._resolve_greedy(candidates, entries, len(detections))
+            return [], list(range(len(measurements)))
+        candidates = self._gate_pairs(measurements, entries)
+        return self._resolve_greedy(candidates, len(measurements))
 
     def _gate_pairs(
-        self, detections: List[Detection], entries: List[_TrackEntry],
+        self, measurements: List[_Measurement], entries: List[_TrackEntry],
     ) -> List[Tuple[float, str, int]]:
-        """Build scored (cost, track_id, det_index) pairs that pass both gates.
+        """Build scored (cost, track_id, meas_index) pairs that pass both gates.
 
-        First a vectorized radius pre-filter prunes far pairs. Then the survivors
-        get an exact Mahalanobis score and the chi-square gate. This two-stage
-        gate is what keeps association near linear in contact count.
+        A spatial grid keyed on the gate radius prunes far pairs in near-linear
+        time. Survivors get an exact Mahalanobis score and the chi-square gate.
         """
-        track_pos = np.array(
-            [e.kalman.position for e in entries], dtype=np.float64,
-        )
-        det_pos = np.array([d.position for d in detections], dtype=np.float64)
+        grid = _SpatialGrid(self._config.gate_radius_m)
+        for ei, entry in enumerate(entries):
+            grid.insert(ei, entry.kalman.position)
         radius_sq = self._config.gate_radius_m**2
         pairs: List[Tuple[float, str, int]] = []
-        for di in range(det_pos.shape[0]):
-            diff = track_pos - det_pos[di]
-            dist_sq = np.einsum("ij,ij->i", diff, diff)
-            near = np.nonzero(dist_sq <= radius_sq)[0]
-            self._score_near(near, entries, detections[di], di, pairs)
+        for mi, meas in enumerate(measurements):
+            sigma = self._meas_sigma(meas)
+            for ei in set(grid.neighbors(meas.position)):
+                entry = entries[ei]
+                if _dist_sq(entry.kalman.position, meas.position) > radius_sq:
+                    continue
+                cost = entry.kalman.mahalanobis_sq(meas.position, sigma)
+                if cost <= self._config.gate_chi2:
+                    pairs.append((cost, entry.track.id, mi))
         return pairs
-
-    def _score_near(
-        self,
-        near: np.ndarray,
-        entries: List[_TrackEntry],
-        detection: Detection,
-        det_index: int,
-        out: List[Tuple[float, str, int]],
-    ) -> None:
-        """Score gated track candidates for one detection and append to out."""
-        sigma = self._meas_sigma(detection)
-        for ti in near:
-            entry = entries[int(ti)]
-            cost = entry.kalman.mahalanobis_sq(detection.position, sigma)
-            if cost <= self._config.gate_chi2:
-                out.append((cost, entry.track.id, det_index))
 
     def _resolve_greedy(
         self,
         candidates: List[Tuple[float, str, int]],
-        entries: List[_TrackEntry],
-        n_detections: int,
+        n_measurements: int,
     ) -> Tuple[List[Tuple[str, int]], List[int]]:
-        """Pick cheapest non-conflicting pairs greedily, one per track and det."""
+        """Pick cheapest non-conflicting pairs greedily, one per track and meas."""
         candidates.sort(key=lambda c: c[0])
         used_tracks: set[str] = set()
-        used_dets: set[int] = set()
+        used_meas: set[int] = set()
         matches: List[Tuple[str, int]] = []
-        for _cost, track_id, det_index in candidates:
-            if track_id in used_tracks or det_index in used_dets:
+        for _cost, track_id, meas_index in candidates:
+            if track_id in used_tracks or meas_index in used_meas:
                 continue
             used_tracks.add(track_id)
-            used_dets.add(det_index)
-            matches.append((track_id, det_index))
-        unmatched = [i for i in range(n_detections) if i not in used_dets]
+            used_meas.add(meas_index)
+            matches.append((track_id, meas_index))
+        unmatched = [i for i in range(n_measurements) if i not in used_meas]
         return matches, unmatched
 
     def _apply_matches(
         self,
         matches: List[Tuple[str, int]],
-        detections: List[Detection],
+        measurements: List[_Measurement],
         now: float,
     ) -> None:
-        """Correct each matched track with its detection and bump confidence."""
-        for track_id, det_index in matches:
+        """Correct each matched track with its measurement and bump confidence."""
+        for track_id, meas_index in matches:
             entry = self._entries[track_id]
-            detection = detections[det_index]
-            entry.kalman.update(detection.position, self._meas_sigma(detection))
+            meas = measurements[meas_index]
+            entry.kalman.update(meas.position, self._meas_sigma(meas))
             entry.hits += 1
             entry.last_seen = now
             if entry.hits >= self._config.confirm_hits:
                 entry.confirmed = True
-            self._record_source(entry, detection)
+            self._record_source(entry, meas)
             self._raise_confidence(entry)
             self._sync_track(entry, now)
 
-    def _spawn_tracks(self, detections: List[Detection], now: float) -> None:
-        """Seed a tentative track for each unmatched detection."""
-        for detection in detections:
+    def _spawn_tracks(self, measurements: List[_Measurement], now: float) -> None:
+        """Seed a tentative track for each unmatched measurement."""
+        for meas in measurements:
             track_id = f"trk-{next(self._id_counter)}"
             kalman = ConstantVelocityKalman(
-                position=detection.position,
-                velocity=detection.velocity,
+                position=meas.position,
+                velocity=meas.velocity,
                 pos_sigma=self._config.init_pos_sigma_m,
                 vel_sigma=self._config.init_vel_sigma_m,
                 process_noise=self._config.process_noise,
             )
             track = Track(
                 id=track_id,
-                position=detection.position,
-                velocity=detection.velocity,
+                position=meas.position,
+                velocity=meas.velocity,
                 covariance=kalman.position_sigma,
                 last_update=now,
-                confidence=detection.confidence * self._config.confidence_gain,
-                source_detection_ids=[detection.id],
+                confidence=meas.confidence * self._config.confidence_gain,
+                source_detection_ids=list(meas.source_ids),
             )
             entry = _TrackEntry(
                 track=track, kalman=kalman, hits=1, last_seen=now,
             )
-            entry.history.append(detection.position)
+            entry.history.append(meas.position)
             track.history = list(entry.history)
             self._entries[track_id] = entry
 
@@ -288,10 +499,10 @@ class TrackManager:
         """Final confidence floor before a track is removed."""
         entry.track.confidence = 0.0
 
-    def _record_source(self, entry: _TrackEntry, detection: Detection) -> None:
-        """Append a contributing detection id, bounded to recent sources."""
+    def _record_source(self, entry: _TrackEntry, meas: _Measurement) -> None:
+        """Append the fused contributing detection ids, bounded to recent."""
         ids = entry.track.source_detection_ids
-        ids.append(detection.id)
+        ids.extend(meas.source_ids)
         if len(ids) > _MAX_HISTORY:
             del ids[:-_MAX_HISTORY]
 
@@ -331,13 +542,13 @@ class TrackManager:
         """Earliest known time for a track, used to compute age."""
         return entry.track.last_update - entry.track.age
 
-    def _meas_sigma(self, detection: Detection) -> float:
-        """Measurement stddev for a detection, scaled by its confidence.
+    def _meas_sigma(self, meas: _Measurement) -> float:
+        """Measurement stddev for a fused measurement, scaled by its confidence.
 
         A high-confidence contact gets a tighter sigma so it pulls the estimate
         harder. We clamp confidence away from zero to avoid an infinite sigma.
         """
-        conf = max(0.05, min(1.0, detection.confidence))
+        conf = max(0.05, min(1.0, meas.confidence))
         return self._config.meas_sigma_m / conf
 
     def classify_track(self, track_id: str, label: TrackClass) -> None:
@@ -348,3 +559,27 @@ class TrackManager:
         the track is unknown.
         """
         self._entries[track_id].track.classification = label
+
+
+def _dist_sq(a: Vec3, b: Vec3) -> float:
+    """Squared Euclidean distance between two ENU points."""
+    dx = a[0] - b[0]
+    dy = a[1] - b[1]
+    dz = a[2] - b[2]
+    return dx * dx + dy * dy + dz * dz
+
+
+def _vel_diff(a: Vec3, b: Vec3) -> float:
+    """Euclidean speed difference between two velocity vectors in m/s."""
+    return _dist_sq(a, b) ** 0.5
+
+
+def _weighted_vec(vecs: List[Vec3], weights: List[float], total: float) -> Vec3:
+    """Confidence-weighted average of 3D vectors with a guarded denominator."""
+    if total <= 0.0:
+        total = float(len(vecs)) or 1.0
+        weights = [1.0] * len(vecs)
+    sx = sum(v[0] * w for v, w in zip(vecs, weights))
+    sy = sum(v[1] * w for v, w in zip(vecs, weights))
+    sz = sum(v[2] * w for v, w in zip(vecs, weights))
+    return (sx / total, sy / total, sz / total)

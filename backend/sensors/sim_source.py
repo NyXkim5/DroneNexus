@@ -72,8 +72,8 @@ class SimSensorSpec:
     fov_deg: float = 360.0
     bearing_deg: float = 0.0
     detection_prob: float = 0.9
-    pos_noise_m: float = 8.0
-    vel_noise_ms: float = 1.5
+    pos_noise_m: float = 4.0
+    vel_noise_ms: float = 1.0
     base_confidence: float = 0.85
 
 
