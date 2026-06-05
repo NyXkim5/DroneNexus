@@ -266,6 +266,303 @@ class GreedyAllocator(Allocator):
         )
 
 
+class _Grid:
+    """Tiny uniform spatial hash for counting threats near an aim point."""
+
+    def __init__(self, cell_m: float) -> None:
+        self._cell = max(1.0, cell_m)
+        self._buckets: Dict[tuple, List[int]] = {}
+
+    def insert(self, index: int, pos: Vec3) -> None:
+        self._buckets.setdefault(self._key(pos), []).append(index)
+
+    def neighbors(self, pos: Vec3) -> List[int]:
+        cx, cy, cz = self._key(pos)
+        out: List[int] = []
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    out.extend(self._buckets.get((cx + dx, cy + dy, cz + dz), ()))
+        return out
+
+    def _key(self, pos: Vec3) -> tuple:
+        c = self._cell
+        return (int(pos[0] // c), int(pos[1] // c), int(pos[2] // c))
+
+
+class LayeredAllocator(Allocator):
+    """Layered counter-swarm allocation: cheap area effects first, kinetic last.
+
+    Phase one assigns non-kinetic area effectors (effect_radius_m > 0) to the
+    densest clusters of unengaged threats, maximizing drones neutralized per shot.
+    This is a greedy max-coverage approximation, the layer that wins on cost since
+    one reusable shot kills many drones. Phase two assigns the remaining point
+    effectors to the highest-value surviving threats with an auction that solves
+    the assignment near optimally. Kinetic interceptors are the expensive last
+    resort for leakers. This is the optimization a human operator cannot do at
+    swarm scale: set cover plus optimal assignment, every tick, in milliseconds.
+    """
+
+    def __init__(
+        self,
+        resolve_position: Optional[PositionResolver] = None,
+        cost_weight: float = 1e-6,
+        auction_eps: float = 1e-3,
+        imminent_s: float = 12.0,
+        attacker_cost_ref: float = 500.0,
+    ) -> None:
+        self._resolve_position = resolve_position
+        self._cost_weight = cost_weight
+        self._auction_eps = auction_eps
+        self._imminent_s = imminent_s
+        self._attacker_cost_ref = attacker_cost_ref
+
+    def allocate(
+        self,
+        threats: List[Threat],
+        defenders: List[Defender],
+        now: float,
+    ) -> List[Engagement]:
+        positions = self._threat_positions(threats)
+        ranked = [t for t in threats if positions.get(t.id) is not None]
+        engaged: set = set()
+        engagements: List[Engagement] = []
+        area = [d for d in defenders if _is_engageable(d) and d.effect_radius_m > 0.0]
+        point = [d for d in defenders if _is_engageable(d) and d.effect_radius_m <= 0.0]
+        engagements += self._area_phase(area, ranked, positions, engaged, now)
+        engagements += self._point_phase(point, ranked, positions, engaged, now)
+        return engagements
+
+    def _threat_positions(self, threats: List[Threat]) -> Dict[str, Optional[Vec3]]:
+        """Resolve every threat position once for the whole pass."""
+        if self._resolve_position is None:
+            return {t.id: t.id and None for t in threats}
+        return {t.id: self._resolve_position(t) for t in threats}
+
+    def _area_phase(
+        self,
+        defenders: List[Defender],
+        threats: List[Threat],
+        positions: Dict[str, Optional[Vec3]],
+        engaged: set,
+        now: float,
+    ) -> List[Engagement]:
+        """Greedy max-coverage: each cheap area shot covers the densest cluster."""
+        engagements: List[Engagement] = []
+        order = sorted(defenders, key=self._cost_per_kill)
+        for defender in order:
+            shots = defender.capacity
+            while shots > 0:
+                aim, covered = self._best_aim(defender, threats, positions, engaged)
+                if aim is None or not covered:
+                    break
+                for tid in covered:
+                    engaged.add(tid)
+                engagements.append(self._area_engagement(defender, aim, covered, now))
+                shots -= 1
+        return engagements
+
+    def _cost_per_kill(self, defender: Defender) -> float:
+        """Expected dollars per kill for ranking which area effector fires first."""
+        expected = max(1, defender.max_simultaneous) * max(0.05, defender.kill_prob)
+        return defender.unit_cost / expected
+
+    def _best_aim(
+        self,
+        defender: Defender,
+        threats: List[Threat],
+        positions: Dict[str, Optional[Vec3]],
+        engaged: set,
+    ) -> tuple:
+        """Pick the aim point covering the most unengaged in-reach threats.
+
+        Candidate aim points are the unengaged threat positions themselves. A
+        spatial grid counts how many unengaged threats fall within the effect
+        radius of each candidate, capped at the effector simultaneous limit.
+        """
+        live = [
+            t for t in threats
+            if t.id not in engaged
+            and self._in_range(defender, positions[t.id])
+        ]
+        if not live:
+            return None, []
+        grid = _Grid(defender.effect_radius_m)
+        pts = [positions[t.id] for t in live]
+        for i, pos in enumerate(pts):
+            grid.insert(i, pos)
+        radius_sq = defender.effect_radius_m**2
+        best_aim: Optional[Vec3] = None
+        best_cov: List[str] = []
+        for i, center in enumerate(pts):
+            covered = [
+                live[j].id for j in grid.neighbors(center)
+                if _dist_sq(pts[j], center) <= radius_sq
+            ]
+            if len(covered) > len(best_cov):
+                best_cov = covered[: defender.max_simultaneous]
+                best_aim = center
+        return best_aim, best_cov
+
+    def _point_phase(
+        self,
+        defenders: List[Defender],
+        threats: List[Threat],
+        positions: Dict[str, Optional[Vec3]],
+        engaged: set,
+        now: float,
+    ) -> List[Engagement]:
+        """Assign point effectors to surviving threats by auction."""
+        slots = self._expand_slots(defenders)
+        live = [t for t in threats if t.id not in engaged]
+        if not slots or not live:
+            return []
+        cand = live[: max(1, 3 * len(slots))]
+        benefit = self._benefit_matrix(slots, cand, positions)
+        assignment = _auction(benefit, len(slots), len(cand), self._auction_eps)
+        engagements: List[Engagement] = []
+        for si, ci in enumerate(assignment):
+            if ci < 0:
+                continue
+            threat = cand[ci]
+            engaged.add(threat.id)
+            engagements.append(self._point_engagement(slots[si], threat, now))
+        return engagements
+
+    def _expand_slots(self, defenders: List[Defender]) -> List[Defender]:
+        """One slot per available shot so a defender can take several targets."""
+        slots: List[Defender] = []
+        for defender in defenders:
+            slots.extend([defender] * max(0, defender.capacity))
+        return slots
+
+    def _benefit_matrix(
+        self,
+        slots: List[Defender],
+        threats: List[Threat],
+        positions: Dict[str, Optional[Vec3]],
+    ) -> List[List[float]]:
+        """Benefit of each slot-threat pair, with -inf for out-of-range pairs."""
+        matrix: List[List[float]] = []
+        for defender in slots:
+            row: List[float] = []
+            for threat in threats:
+                if not self._in_range(defender, positions[threat.id]):
+                    row.append(-math.inf)
+                    continue
+                if not self._worth_spending(defender, threat):
+                    row.append(-math.inf)
+                    continue
+                reward = threat.score * defender.kill_prob
+                row.append(reward - self._cost_weight * defender.unit_cost)
+            matrix.append(row)
+        return matrix
+
+    def _worth_spending(self, defender: Defender, threat: Threat) -> bool:
+        """True when committing this point effector to this threat wins on cost.
+
+        The cost war is defender dollars per kill against attacker dollars per
+        airframe. An effector whose cost per expected kill beats the attacker
+        airframe cost is always worth firing. An expensive one, like a kinetic
+        interceptor, fires only as last resort against an imminent leaker, so it
+        never blows the cost-exchange ratio on a cheap or distant drone.
+        """
+        cost_per_kill = defender.unit_cost / max(0.05, defender.kill_prob)
+        if cost_per_kill <= self._attacker_cost_ref:
+            return True
+        tti = threat.time_to_impact_s
+        return tti is not None and tti <= self._imminent_s
+
+    def _in_range(self, defender: Defender, position: Optional[Vec3]) -> bool:
+        """True when the threat is within the defender reach, or position unknown."""
+        if position is None:
+            return True
+        return _distance(defender.position, position) <= defender.range_m
+
+    def _area_engagement(
+        self, defender: Defender, aim: Vec3, covered: List[str], now: float,
+    ) -> Engagement:
+        """Build one PENDING area engagement over a covered threat set."""
+        return Engagement(
+            id=f"eng-{uuid.uuid4().hex[:12]}",
+            defender_id=defender.id,
+            target_threat_id=covered[0],
+            start_time=now,
+            status=EngagementStatus.PENDING,
+            cost=defender.unit_cost,
+            aim_point=aim,
+            neutralized_threat_ids=list(covered),
+        )
+
+    def _point_engagement(
+        self, defender: Defender, threat: Threat, now: float,
+    ) -> Engagement:
+        """Build one PENDING single-target engagement."""
+        return Engagement(
+            id=f"eng-{uuid.uuid4().hex[:12]}",
+            defender_id=defender.id,
+            target_threat_id=threat.id,
+            start_time=now,
+            status=EngagementStatus.PENDING,
+            cost=defender.unit_cost,
+            neutralized_threat_ids=[threat.id],
+        )
+
+
+def _dist_sq(a: Vec3, b: Vec3) -> float:
+    """Squared Euclidean distance between two ENU points."""
+    return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
+
+
+def _auction(
+    benefit: List[List[float]], n_slots: int, n_items: int, eps: float,
+) -> List[int]:
+    """Bertsekas auction for max-benefit assignment of slots to items.
+
+    Returns the item index assigned to each slot, or -1 when a slot wins nothing.
+    Items are exclusive, so two slots never share a threat. Ineligible pairs carry
+    a benefit of negative infinity and are never bid on. This solves the point
+    assignment near optimally in time bounded by the slot and item counts.
+    """
+    prices = [0.0] * n_items
+    owner = [-1] * n_items
+    slot_item = [-1] * n_slots
+    queue = list(range(n_slots))
+    guard = 0
+    limit = 50 * max(1, n_slots) * max(1, n_items)
+    while queue and guard < limit:
+        guard += 1
+        s = queue.pop()
+        best_j, best_v, second_v = _best_bid(benefit[s], prices)
+        if best_j < 0:
+            continue
+        prices[best_j] += (best_v - second_v) + eps
+        prev = owner[best_j]
+        if prev >= 0:
+            slot_item[prev] = -1
+            queue.append(prev)
+        owner[best_j] = s
+        slot_item[s] = best_j
+    return slot_item
+
+
+def _best_bid(row: List[float], prices: List[float]) -> tuple:
+    """Find the best and second-best net value item for one slot."""
+    best_j, best_v, second_v = -1, -math.inf, -math.inf
+    for j, b in enumerate(row):
+        if b == -math.inf:
+            continue
+        v = b - prices[j]
+        if v > best_v:
+            second_v = best_v
+            best_v, best_j = v, j
+        elif v > second_v:
+            second_v = v
+    if second_v == -math.inf:
+        second_v = best_v
+    return best_j, best_v, second_v
+
+
 def resolve(
     engagements: List[Engagement],
     defenders: List[Defender],
@@ -322,17 +619,28 @@ def _resolve_one(
     ledger: CostLedger,
     rng: random.Random,
 ) -> None:
-    """Resolve a single PENDING engagement and fold it into the ledger."""
+    """Resolve a PENDING engagement, crediting every drone it neutralizes.
+
+    The engagement cost is charged once. Each targeted threat is rolled against
+    the defender kill probability independently, so an area shot can neutralize
+    several drones for one cost. The engagement keeps only the threats it actually
+    killed, which is the lineage the runner uses to remove airframes.
+    """
     ledger.record_spend(engagement.cost)
     defender = defender_by_id.get(engagement.defender_id)
     if defender is None:
         engagement.status = EngagementStatus.LEAK
+        engagement.neutralized_threat_ids = []
         ledger.record_outcome(EngagementStatus.LEAK, 0.0)
         return
-    attacker_value = value_by_threat.get(engagement.target_threat_id, DEFAULT_THREAT_VALUE)
-    if rng.random() < defender.kill_prob:
+    targets = engagement.neutralized_threat_ids or [engagement.target_threat_id]
+    killed = [tid for tid in targets if rng.random() < defender.kill_prob]
+    engagement.neutralized_threat_ids = killed
+    if killed:
         engagement.status = EngagementStatus.HIT
-        ledger.record_outcome(EngagementStatus.HIT, attacker_value)
+        for tid in killed:
+            value = value_by_threat.get(tid, DEFAULT_THREAT_VALUE)
+            ledger.record_outcome(EngagementStatus.HIT, value)
     else:
         engagement.status = EngagementStatus.MISS
-        ledger.record_outcome(EngagementStatus.MISS, attacker_value)
+        ledger.record_outcome(EngagementStatus.MISS, 0.0)

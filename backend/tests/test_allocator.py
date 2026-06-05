@@ -23,6 +23,7 @@ from defense import (
     CostLedger,
     DEFAULT_THREAT_VALUE,
     GreedyAllocator,
+    LayeredAllocator,
     resolve,
 )
 
@@ -260,3 +261,67 @@ def test_saturation_leaves_predicted_leakers():
     leakers = [t for t in threats if t.id not in engaged_ids]
     assert len(out) == 3
     assert len(leakers) == 7
+
+
+# ---- Layered allocator: area effects and cost discipline ----
+
+def _area_threat(tid: str, pos: Vec3, rank: int) -> Threat:
+    """A closing, imminent threat at a position, used for layered tests."""
+    return Threat(
+        id=tid, score=0.9, time_to_impact_s=8.0, value_at_risk=50_000.0,
+        priority_rank=rank, track_id=f"trk-{tid}",
+    )
+
+
+def test_area_effector_covers_cluster_in_one_shot():
+    positions = {f"t{i}": (float(i * 30), 0.0, 80.0) for i in range(8)}
+    threats = [_area_threat(f"t{i}", positions[f"t{i}"], i) for i in range(8)]
+    hpm = _defender(
+        "hpm1", (0.0, 0.0, 0.0), capacity=1, range_m=3000.0,
+        unit_cost=8.0, kind=DefenderKind.HPM,
+    )
+    hpm.effect_radius_m = 400.0
+    hpm.max_simultaneous = 25
+    allocator = LayeredAllocator(resolve_position=lambda t: positions[t.id])
+    out = allocator.allocate(threats, [hpm], now=0.0)
+    assert len(out) == 1
+    assert len(out[0].neutralized_threat_ids) == 8
+    assert out[0].aim_point is not None
+
+
+def test_area_resolve_credits_every_kill():
+    positions = {f"t{i}": (float(i * 20), 0.0, 80.0) for i in range(5)}
+    threats = [_area_threat(f"t{i}", positions[f"t{i}"], i) for i in range(5)]
+    hpm = _defender(
+        "hpm1", (0.0, 0.0, 0.0), capacity=1, range_m=3000.0,
+        unit_cost=8.0, kill_prob=1.0, kind=DefenderKind.HPM,
+    )
+    hpm.effect_radius_m = 400.0
+    hpm.max_simultaneous = 25
+    allocator = LayeredAllocator(resolve_position=lambda t: positions[t.id])
+    out = allocator.allocate(threats, [hpm], now=0.0)
+    ledger = resolve(out, [hpm], threats, now=0.0, rng=random.Random(1))
+    assert ledger.hits == 5
+    assert ledger.attacker_destroyed == 5 * 50_000.0
+    assert ledger.defender_spent == 8.0
+
+
+def test_cost_discipline_reserves_interceptor_for_imminent():
+    positions = {"far": (1000.0, 0.0, 80.0), "near": (1000.0, 0.0, 80.0)}
+    interceptor = _defender(
+        "int1", (0.0, 0.0, 0.0), capacity=2, range_m=3000.0,
+        unit_cost=8_000.0, kill_prob=0.85, kind=DefenderKind.INTERCEPTOR,
+    )
+    allocator = LayeredAllocator(resolve_position=lambda t: positions[t.id])
+    distant = Threat(
+        id="far", score=0.9, time_to_impact_s=120.0, value_at_risk=50_000.0,
+        priority_rank=1, track_id="trk-far",
+    )
+    out_distant = allocator.allocate([distant], [interceptor], now=0.0)
+    assert out_distant == []  # too costly per kill, not imminent, so held back
+    imminent = Threat(
+        id="near", score=0.9, time_to_impact_s=5.0, value_at_risk=50_000.0,
+        priority_rank=1, track_id="trk-near",
+    )
+    out_imminent = allocator.allocate([imminent], [interceptor], now=0.0)
+    assert len(out_imminent) == 1  # last-resort terminal defense fires

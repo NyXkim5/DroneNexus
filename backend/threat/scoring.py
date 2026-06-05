@@ -34,6 +34,11 @@ TTI_CEILING_S = 300.0
 CLOSING_SPEED_FULL_MS = 40.0
 # A swarm endangers more value than a lone drone. Scale value by member count.
 SWARM_VALUE_PER_MEMBER = 1.0
+# Expected dollar damage if one drone reaches the site and detonates. This is the
+# value at risk per drone, used both for scoring and for the allocator cost
+# discipline. It is the harm one airframe does, not the whole site value, so an
+# effector worth less than this is worth spending and one worth more is not.
+EXPECTED_DAMAGE_PER_DRONE = 50_000.0
 
 
 def _range_to_site(pos: Vec3, site: Site) -> float:
@@ -75,10 +80,13 @@ def _speed_urgency(closing_ms: float) -> float:
 
 
 def _value_urgency(value_at_risk: float, site: Site) -> float:
-    """Map endangered value to a 0..1 share of total site value."""
-    if site.value <= 0.0:
-        return 0.0
-    return min(1.0, value_at_risk / site.value)
+    """Map endangered value to 0..1, saturating at a few drones of damage.
+
+    Normalized against a small multiple of one drone of expected damage so a lone
+    drone already carries meaningful urgency and a mass attack saturates the term.
+    """
+    ceiling = EXPECTED_DAMAGE_PER_DRONE * 5.0
+    return min(1.0, value_at_risk / ceiling)
 
 
 def _blend(tti_u: float, speed_u: float, value_u: float) -> float:
@@ -94,7 +102,7 @@ def _score_track(track: Track, site: Site) -> Threat:
     """Score one lone hostile track into a Threat (rank filled in later)."""
     tti = time_to_impact(track, site)
     closing = max(0.0, closing_speed_to_site(track, site))
-    value_at_risk = site.value
+    value_at_risk = min(site.value, EXPECTED_DAMAGE_PER_DRONE)
     score = _blend(
         _tti_urgency(tti),
         _speed_urgency(closing),
@@ -121,7 +129,9 @@ def _score_swarm(swarm: Swarm, members: List[Track], site: Site) -> Threat:
     lead_tti = min(ttis) if ttis else None
     max_closing = max((closing_speed_to_site(m, site) for m in members), default=0.0)
     max_closing = max(0.0, max_closing)
-    value_at_risk = site.value * len(members) * SWARM_VALUE_PER_MEMBER
+    value_at_risk = min(
+        site.value, EXPECTED_DAMAGE_PER_DRONE * len(members) * SWARM_VALUE_PER_MEMBER,
+    )
     score = _blend(
         _tti_urgency(lead_tti),
         _speed_urgency(max_closing),

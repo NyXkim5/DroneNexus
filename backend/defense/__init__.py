@@ -10,6 +10,7 @@ spent against attacker dollars destroyed for the cost-exchange ratio.
 from defense.allocator import (
     Allocator,
     GreedyAllocator,
+    LayeredAllocator,
     PositionResolver,
     resolve,
     CostLedger,
@@ -19,6 +20,7 @@ from defense.allocator import (
 __all__ = [
     "Allocator",
     "GreedyAllocator",
+    "LayeredAllocator",
     "PositionResolver",
     "resolve",
     "CostLedger",

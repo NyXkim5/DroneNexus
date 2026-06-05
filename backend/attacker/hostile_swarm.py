@@ -17,6 +17,15 @@ WAVES       drones split into staggered groups that launch on a delay.
 DECOY       a mix of cheap decoys and a smaller set of real, costly threats.
 PROBE       a small leading element advances while the rest hold and observe.
 
+Adversary realism
+-----------------
+Drones do not fly straight. Each one jinks with a deterministic serpentine
+lateral acceleration and varies altitude as it approaches, so the track layer
+sees a maneuvering target. When nearby drones are destroyed, survivors react.
+They sprint, spread their jink wider, and the wave timing presses forward while
+attrition stays low. All randomness comes from the injected RNG so a fixed seed
+reproduces every run.
+
 All positions and velocities are ENU meters and m/s about the site origin.
 """
 from __future__ import annotations
@@ -25,7 +34,7 @@ import logging
 import math
 import random
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import List, Optional, Set
 
 from csontology import SwarmIntent, Vec3, now
 
@@ -50,6 +59,34 @@ WAVE_INTERVAL_S = 8.0
 # Number of staggered groups in a WAVES attack.
 WAVE_GROUP_COUNT = 4
 
+# ---- evasion tuning ----
+# Peak sideways jink acceleration in m/s^2 under nominal approach.
+JINK_ACCEL_MPS2 = 9.0
+# Serpentine angular rate in radians per second. Higher means tighter weave.
+JINK_RATE_RPS = 0.9
+# Peak altitude bob amplitude in meters for terrain-following profiles.
+ALT_BOB_M = 35.0
+# Altitude bob angular rate in radians per second.
+ALT_BOB_RATE_RPS = 0.4
+# Fraction of the swarm that flies low terrain-following profiles.
+TERRAIN_FOLLOW_FRACTION = 0.5
+
+# ---- reactive tuning ----
+# Survivors within this radius of a fresh kill react, in meters.
+REACTION_RADIUS_M = 600.0
+# Speed multiplier a reacting survivor sprints at.
+SPRINT_MULTIPLIER = 1.5
+# Extra jink amplitude multiplier while reacting.
+REACT_JINK_MULTIPLIER = 1.8
+# Seconds a survivor keeps sprinting after a nearby kill.
+REACT_DECAY_S = 6.0
+
+# ---- pulsing tuning ----
+# Attrition fraction below which the swarm presses and pulls waves forward.
+PRESS_ATTRITION_THRESHOLD = 0.2
+# Seconds each press pulls an unlaunched wave forward by.
+PRESS_PULL_S = WAVE_INTERVAL_S * 0.5
+
 
 @dataclass
 class AttackerDrone:
@@ -58,6 +95,10 @@ class AttackerDrone:
     is_decoy marks cheap throwaway airframes used to draw fire. launch_time is
     the wall-clock second this drone starts moving. Before it launches the drone
     holds its spawn position with zero velocity.
+
+    The evasion fields drive deterministic maneuvering. jink_phase and jink_sign
+    set the serpentine weave, alt_phase and alt_amp set the altitude bob, and
+    react_until is the wall-clock second a sprint reaction expires.
     """
     id: str
     position: Vec3
@@ -67,6 +108,13 @@ class AttackerDrone:
     launch_time: float = 0.0
     arrived: bool = False
     speed_mps: float = CRUISE_SPEED_MPS
+    jink_phase: float = 0.0
+    jink_sign: float = 1.0
+    jink_rate: float = JINK_RATE_RPS
+    alt_phase: float = 0.0
+    alt_amp: float = 0.0
+    cruise_alt: float = 100.0
+    react_until: float = 0.0
 
 
 @dataclass
@@ -86,6 +134,11 @@ class HostileSwarm:
     Construct with a behavior intent, a member count, and the site position in
     ENU meters. Call advance(dt) each tick to fly the swarm toward the site.
     Call get_truth() to read ground-truth kinematics for the sensor layer.
+
+    The swarm maneuvers and reacts to attrition on its own. The runner may call
+    register_losses(positions) to signal kills explicitly, but it does not need
+    to. Kills are also inferred from drones flagged arrived away from the site,
+    so the existing runner keeps working unchanged.
     """
 
     intent: SwarmIntent
@@ -95,9 +148,13 @@ class HostileSwarm:
     seed: Optional[int] = None
     swarm_id: str = "RED-1"
     spawn_radius_m: float = SPAWN_RADIUS_M
+    evasive: bool = True
     drones: List[AttackerDrone] = field(default_factory=list)
     first_seen: float = field(default_factory=now)
     _rng: random.Random = field(init=False, repr=False)
+    _known_arrived: Set[str] = field(init=False, default_factory=set, repr=False)
+    _pressed: bool = field(init=False, default=False, repr=False)
+    _sim_time: float = field(init=False, default=0.0, repr=False)
 
     def __post_init__(self) -> None:
         if not 10 <= self.count <= 1000:
@@ -120,8 +177,8 @@ class HostileSwarm:
             raise ValueError(f"unsupported intent: {self.intent}")
         self.drones = builder()
         logger.info(
-            "Spawned %s hostile drones, intent=%s, id=%s",
-            len(self.drones), self.intent.value, self.swarm_id,
+            "Spawned %s hostile drones, intent=%s, id=%s, evasive=%s",
+            len(self.drones), self.intent.value, self.swarm_id, self.evasive,
         )
 
     def _ring_position(self, index: int) -> Vec3:
@@ -138,14 +195,26 @@ class HostileSwarm:
     def _make_drone(
         self, index: int, launch_time: float, is_decoy: bool, cost: float,
     ) -> AttackerDrone:
-        """Construct one attacker drone holding at its spawn ring position."""
+        """Construct one attacker drone holding at its spawn ring position.
+
+        Each drone gets a deterministic evasion profile drawn from the RNG so a
+        fixed seed reproduces every weave and altitude bob.
+        """
+        position = self._ring_position(index)
+        terrain_follow = self._rng.random() < TERRAIN_FOLLOW_FRACTION
         return AttackerDrone(
             id=f"{self.swarm_id}-{index:04d}",
-            position=self._ring_position(index),
+            position=position,
             velocity=(0.0, 0.0, 0.0),
             unit_cost=cost,
             is_decoy=is_decoy,
             launch_time=launch_time,
+            jink_phase=self._rng.uniform(0.0, 2.0 * math.pi),
+            jink_sign=self._rng.choice((-1.0, 1.0)),
+            jink_rate=JINK_RATE_RPS * self._rng.uniform(0.7, 1.3),
+            alt_phase=self._rng.uniform(0.0, 2.0 * math.pi),
+            alt_amp=ALT_BOB_M if terrain_follow else ALT_BOB_M * 0.25,
+            cruise_alt=position[2],
         )
 
     def _spawn_saturation(self) -> List[AttackerDrone]:
@@ -197,16 +266,97 @@ class HostileSwarm:
             )
         return drones
 
+    # ---- loss signaling and inference ----
+
+    def register_losses(self, positions: List[Vec3]) -> None:
+        """Tell the swarm where drones were just destroyed so survivors react.
+
+        This is an optional hook for a runner that knows its kills directly. The
+        runner is not required to call it. Survivors within REACTION_RADIUS_M of
+        any position start sprinting and widen their weave. Calling it with an
+        empty list is a no-op.
+        """
+        for kill_pos in positions:
+            self._trigger_reactions(kill_pos)
+
+    def _infer_losses(self) -> List[Vec3]:
+        """Find drones newly flagged arrived away from the site, return positions.
+
+        The runner kills a drone by flagging arrived while it is still in the
+        field, whereas a drone that reaches the site snaps to the site position.
+        We treat any new arrived drone that is not at the site as a fresh kill so
+        survivors react without the runner calling register_losses.
+        """
+        kills: List[Vec3] = []
+        for drone in self.drones:
+            if not drone.arrived or drone.id in self._known_arrived:
+                continue
+            self._known_arrived.add(drone.id)
+            if _magnitude(self._vector_to_site(drone.position)) > ARRIVAL_RADIUS_M:
+                kills.append(drone.position)
+        return kills
+
+    def _trigger_reactions(self, kill_pos: Vec3) -> None:
+        """Make live survivors near a kill sprint and widen their weave.
+
+        react_until is on the internal sim-clock so reactions stay deterministic
+        across runs regardless of wall-clock time.
+        """
+        for drone in self.drones:
+            if drone.arrived:
+                continue
+            offset = _subtract(drone.position, kill_pos)
+            if _magnitude(offset) <= REACTION_RADIUS_M:
+                drone.react_until = self._sim_time + REACT_DECAY_S
+
+    def _press_if_holding(self) -> None:
+        """Pull unlaunched waves forward while attrition stays low.
+
+        A confident attacker presses the attack when it is barely losing drones.
+        We pull every future launch time forward once, the first tick attrition
+        sits below the press threshold, so later waves arrive sooner.
+        """
+        if self._pressed:
+            return
+        attrition = self._attrition_fraction()
+        if attrition > PRESS_ATTRITION_THRESHOLD:
+            return
+        t = now()
+        for drone in self.drones:
+            if not drone.arrived and drone.launch_time > t:
+                drone.launch_time = max(t, drone.launch_time - PRESS_PULL_S)
+        self._pressed = True
+        logger.info("Red force presses, attrition=%.2f", attrition)
+
+    def _attrition_fraction(self) -> float:
+        """Return the fraction of the force that has been killed in the field."""
+        killed = sum(
+            1 for d in self.drones
+            if d.arrived
+            and _magnitude(self._vector_to_site(d.position)) > ARRIVAL_RADIUS_M
+        )
+        return killed / max(1, len(self.drones))
+
     # ---- per-tick advance ----
 
     def advance(self, dt: float) -> None:
-        """Fly every launched, unarrived drone toward the site for dt seconds."""
+        """Fly every launched, unarrived drone toward the site for dt seconds.
+
+        First infer fresh kills so survivors react, then maybe press the attack,
+        then move each drone with evasion. Evasion runs on an internal sim-clock
+        so trajectories stay deterministic under a fixed seed. The public
+        signature is unchanged.
+        """
+        for kill_pos in self._infer_losses():
+            self._trigger_reactions(kill_pos)
+        self._press_if_holding()
+        self._sim_time += dt
         t = now()
         for drone in self.drones:
             self._advance_one(drone, dt, t)
 
     def _advance_one(self, drone: AttackerDrone, dt: float, t: float) -> None:
-        """Move one drone toward the site, or hold it if not yet launched."""
+        """Move one drone toward the site with evasion, or hold it if not launched."""
         if drone.arrived or t < drone.launch_time:
             drone.velocity = (0.0, 0.0, 0.0)
             return
@@ -214,12 +364,63 @@ class HostileSwarm:
         dist = _magnitude(to_site)
         if dist <= ARRIVAL_RADIUS_M:
             drone.arrived = True
+            self._known_arrived.add(drone.id)
             drone.position = self.site_position
             drone.velocity = (0.0, 0.0, 0.0)
             return
-        drone.velocity = _scale(to_site, drone.speed_mps / dist)
-        step = min(dist, drone.speed_mps * dt)
-        drone.position = _add(drone.position, _scale(to_site, step / dist))
+        velocity = self._evasive_velocity(drone, to_site, dist)
+        drone.velocity = velocity
+        step = _scale(velocity, dt)
+        if _magnitude(step) > dist:
+            step = to_site
+        drone.position = _add(drone.position, step)
+
+    def _evasive_velocity(
+        self, drone: AttackerDrone, to_site: Vec3, dist: float,
+    ) -> Vec3:
+        """Steer a constant-speed velocity that weaves toward the site.
+
+        Pursuit, serpentine jink, and altitude bob combine into a steering
+        direction that is renormalized back to the drone speed. The drone keeps
+        cruise speed but deviates laterally from a straight line, so the track
+        layer sees a maneuvering target. Reacting survivors sprint and weave
+        harder. With evasion disabled this collapses to straight-line pursuit.
+        """
+        speed = drone.speed_mps
+        reacting = self._sim_time < drone.react_until
+        if reacting:
+            speed *= SPRINT_MULTIPLIER
+        if not self.evasive:
+            return _scale(to_site, speed / dist)
+        forward = (to_site[0] / dist, to_site[1] / dist, to_site[2] / dist)
+        lateral = self._lateral_jink(drone, to_site, dist, reacting)
+        vertical = self._altitude_bob(drone)
+        steer = _add(_add(forward, lateral), vertical)
+        mag = _magnitude(steer)
+        if mag <= 0.0:
+            return _scale(to_site, speed / dist)
+        return _scale(steer, speed / mag)
+
+    def _lateral_jink(
+        self, drone: AttackerDrone, to_site: Vec3, dist: float, reacting: bool,
+    ) -> Vec3:
+        """Return a unit-scaled sideways serpentine steering, perpendicular to approach."""
+        nx, ny = to_site[0] / dist, to_site[1] / dist
+        perp = (-ny, nx, 0.0)
+        amp = JINK_ACCEL_MPS2 / CRUISE_SPEED_MPS
+        if reacting:
+            amp *= REACT_JINK_MULTIPLIER
+        phase = drone.jink_phase + drone.jink_rate * self._sim_time
+        weave = drone.jink_sign * amp * math.sin(phase)
+        return _scale(perp, weave)
+
+    def _altitude_bob(self, drone: AttackerDrone) -> Vec3:
+        """Return a unit-scaled vertical steering toward a bobbing target altitude."""
+        target = drone.cruise_alt + drone.alt_amp * math.sin(
+            drone.alt_phase + ALT_BOB_RATE_RPS * self._sim_time
+        )
+        error = (target - drone.position[2]) / CRUISE_SPEED_MPS
+        return (0.0, 0.0, max(-0.4, min(0.4, error)))
 
     def _vector_to_site(self, position: Vec3) -> Vec3:
         """Return the ENU vector from a position to the site center."""

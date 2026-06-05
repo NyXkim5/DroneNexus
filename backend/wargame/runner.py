@@ -33,7 +33,7 @@ from csontology import (
     TrackClass,
     now,
 )
-from defense import GreedyAllocator, resolve
+from defense import LayeredAllocator, resolve
 from sensors.sim_source import SimSensorSource
 import threat as threat_module
 
@@ -56,7 +56,7 @@ class WargameRunner:
             rate_hz=scenario.tick_hz,
             rng=self._world.rng,
         )
-        self._allocator = GreedyAllocator(
+        self._allocator = LayeredAllocator(
             resolve_position=self._world.resolve_threat_position,
         )
         self._dt = 1.0 / scenario.tick_hz
@@ -160,22 +160,24 @@ class WargameRunner:
     def _mark_destroyed(
         self, engagements: List[Engagement], threats: List[Threat]
     ) -> None:
-        """Kill the attacker drone behind each HIT and tally its real dollar cost.
+        """Kill every attacker drone a HIT neutralized and tally its dollar cost.
 
-        Each HIT resolves the threat to an ENU position, then flags the nearest
-        live drone as destroyed so it leaves the truth feed next tick. We sum that
-        drone unit_cost into attacker_destroyed so the cost-exchange ratio uses
-        real airframe cost, not the asset value at risk that resolve() rolls.
+        Each HIT carries the threats it actually killed in neutralized_threat_ids,
+        so one area shot removes several airframes. We resolve each killed threat
+        to an ENU position and flag the nearest live drone as destroyed so it
+        leaves the truth feed next tick. We sum drone unit_cost into
+        attacker_destroyed so the cost-exchange ratio uses real airframe cost.
         """
         by_threat = {th.id: th for th in threats}
         for eng in engagements:
             if eng.status is not EngagementStatus.HIT:
                 continue
-            threat = by_threat.get(eng.target_threat_id)
-            if threat is None:
-                continue
-            position = self._world.resolve_threat_position(threat)
-            self._kill_nearest_drone(position)
+            for tid in eng.neutralized_threat_ids:
+                threat = by_threat.get(tid)
+                if threat is None:
+                    continue
+                position = self._world.resolve_threat_position(threat)
+                self._kill_nearest_drone(position)
 
     def _kill_nearest_drone(self, position) -> None:
         """Flag the live drone closest to an ENU position as destroyed.

@@ -64,9 +64,21 @@ Vec3 = Tuple[float, float, float]
 # ---- Enums ----
 
 class DefenderKind(str, Enum):
-    """Effector category. INTERCEPTOR is kinetic. JAMMER is non-kinetic RF."""
+    """Effector category, kinetic and non-kinetic.
+
+    INTERCEPTOR and NET are kinetic single-target effectors. JAMMER and EW are
+    soft-kill RF effectors that defeat control and navigation. HPM is a
+    high-power-microwave area effector that fries electronics across a cone.
+    LASER is directed energy, single-target with a near-zero marginal cost.
+    Non-kinetic area effectors are what flip the cost-exchange ratio: one cheap,
+    reusable shot neutralizes many drones at once.
+    """
     INTERCEPTOR = "INTERCEPTOR"
+    NET = "NET"
     JAMMER = "JAMMER"
+    EW = "EW"
+    HPM = "HPM"
+    LASER = "LASER"
 
 
 class EngagementStatus(str, Enum):
@@ -177,6 +189,13 @@ class Defender:
     simultaneous targets. reload_s is recovery time between engagements.
     kill_prob is single-shot kill probability 0..1. unit_cost is dollars per
     engagement, used for the cost-exchange metric.
+
+    effect_radius_m is the lethal radius around an aim point. Zero means a single
+    point target. A positive radius makes this an area effector, like HPM or wide
+    EW, that neutralizes every drone within the radius of its aim point in one
+    shot. max_simultaneous caps how many drones one area shot can neutralize, so
+    a cheap reusable effector kills many drones per engagement and drives the
+    cost per kill far below the attacker cost per drone.
     """
     id: str
     position: Vec3
@@ -187,17 +206,27 @@ class Defender:
     kill_prob: float
     unit_cost: float
     status: DefenderStatus = DefenderStatus.READY
+    effect_radius_m: float = 0.0
+    max_simultaneous: int = 1
 
 
 @dataclass
 class Engagement:
-    """One assignment of a defender against a threat and its outcome."""
+    """One assignment of a defender against a threat and its outcome.
+
+    target_threat_id is the primary threat. For an area effector, aim_point is the
+    ENU point the shot is centered on and neutralized_threat_ids lists every
+    threat the shot removed on a HIT, so one engagement can credit many kills.
+    The fields also carry the decision lineage for audit and replay.
+    """
     id: str
     defender_id: str
     target_threat_id: str
     start_time: float
     status: EngagementStatus = EngagementStatus.PENDING
     cost: float = 0.0
+    aim_point: Optional[Vec3] = None
+    neutralized_threat_ids: List[str] = field(default_factory=list)
 
 
 @dataclass

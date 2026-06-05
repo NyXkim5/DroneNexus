@@ -182,3 +182,129 @@ def test_deterministic_with_seed() -> None:
 def test_unknown_intent_rejected() -> None:
     with pytest.raises(ValueError):
         HostileSwarm(SwarmIntent.UNKNOWN, count=20, site_position=SITE)
+
+
+# ---- adversary realism ----
+
+
+def _track_lateral_deviation(swarm: HostileSwarm, drone_index: int, ticks: int) -> float:
+    """Sum the perpendicular distance of one drone from its straight start-to-site line."""
+    start = swarm.drones[drone_index].position
+    line = _subtract(SITE, start)
+    line_mag = _magnitude(line)
+    unit = tuple(c / line_mag for c in line)
+    total = 0.0
+    for _ in range(ticks):
+        swarm.advance(1.0)
+        pos = swarm.drones[drone_index].position
+        rel = _subtract(pos, start)
+        along = sum(r * u for r, u in zip(rel, unit))
+        proj = tuple(start[i] + along * unit[i] for i in range(3))
+        total += _magnitude(_subtract(pos, proj))
+    return total
+
+
+def test_drones_do_not_fly_straight_lines() -> None:
+    swarm = HostileSwarm(SwarmIntent.SATURATION, count=30, site_position=SITE, seed=21)
+    deviation = _track_lateral_deviation(swarm, drone_index=0, ticks=20)
+    # An evasive drone weaves off the straight start-to-site line.
+    assert deviation > 50.0
+
+
+def test_evasion_can_be_disabled() -> None:
+    swarm = HostileSwarm(
+        SwarmIntent.SATURATION, count=30, site_position=SITE, seed=21, evasive=False,
+    )
+    deviation = _track_lateral_deviation(swarm, drone_index=0, ticks=20)
+    # With evasion off the drone tracks the straight line within float noise.
+    assert deviation < 1.0
+
+
+def test_altitude_varies_during_approach() -> None:
+    swarm = HostileSwarm(SwarmIntent.SATURATION, count=40, site_position=SITE, seed=22)
+    heights = []
+    for _ in range(30):
+        swarm.advance(1.0)
+        heights.append(swarm.drones[0].position[2])
+    assert max(heights) - min(heights) > 5.0
+
+
+def test_velocity_magnitude_holds_under_evasion() -> None:
+    swarm = HostileSwarm(SwarmIntent.SATURATION, count=20, site_position=SITE, seed=23)
+    swarm.advance(0.1)
+    swarm.advance(0.1)
+    for d in swarm.get_truth():
+        if d.position == SITE:
+            continue
+        # Steering renormalizes back to cruise speed even while weaving.
+        assert _magnitude(d.velocity) == pytest.approx(18.0, rel=0.02)
+
+
+def _live_drone_far_from_site(swarm: HostileSwarm):
+    for d in swarm.drones:
+        if not d.arrived and _dist_to_site(d.position) > 100.0:
+            return d
+    raise AssertionError("no live drone found")
+
+
+def test_survivors_react_to_nearby_losses() -> None:
+    swarm = HostileSwarm(SwarmIntent.SATURATION, count=60, site_position=SITE, seed=24)
+    swarm.advance(1.0)
+    survivor = _live_drone_far_from_site(swarm)
+    baseline = _magnitude(survivor.velocity)
+    # Signal a kill right next to the survivor.
+    swarm.register_losses([survivor.position])
+    swarm.advance(1.0)
+    reacting = _magnitude(survivor.velocity)
+    # The survivor sprints faster than its un-reacted cruise speed.
+    assert reacting > baseline * 1.2
+
+
+def test_inferred_kill_triggers_reaction_without_hook() -> None:
+    swarm = HostileSwarm(SwarmIntent.SATURATION, count=60, site_position=SITE, seed=25)
+    swarm.advance(1.0)
+    victim = _live_drone_far_from_site(swarm)
+    # A neighbor within the reaction radius of the victim.
+    neighbor = min(
+        (d for d in swarm.drones if d is not victim and not d.arrived),
+        key=lambda d: _magnitude(_subtract(d.position, victim.position)),
+    )
+    # Runner-style kill: flag arrived in the field, no hook call.
+    victim.arrived = True
+    swarm.advance(1.0)
+    assert neighbor.react_until > 0.0
+
+
+def test_pulsing_presses_waves_when_attrition_low() -> None:
+    swarm = HostileSwarm(SwarmIntent.WAVES, count=80, site_position=SITE, seed=26)
+    before = sorted({d.launch_time for d in swarm.drones})
+    swarm.advance(1.0)  # zero attrition triggers the press
+    after = sorted({d.launch_time for d in swarm.drones})
+    # Future waves were pulled forward, so the spread of launch times shrinks.
+    assert (after[-1] - after[0]) < (before[-1] - before[0])
+
+
+def test_evasive_swarm_still_arrives() -> None:
+    swarm = HostileSwarm(SwarmIntent.SATURATION, count=15, site_position=SITE, seed=27)
+    for _ in range(600):
+        swarm.advance(1.0)
+    assert swarm.arrived_count() == 15
+
+
+def test_deterministic_trajectories_under_seed() -> None:
+    a = HostileSwarm(SwarmIntent.SATURATION, count=40, site_position=SITE, seed=77)
+    b = HostileSwarm(SwarmIntent.SATURATION, count=40, site_position=SITE, seed=77)
+    for _ in range(25):
+        a.advance(1.0)
+        b.advance(1.0)
+    pa = [d.position for d in a.get_truth()]
+    pb = [d.position for d in b.get_truth()]
+    assert pa == pb
+
+
+def test_register_losses_empty_is_noop() -> None:
+    swarm = HostileSwarm(SwarmIntent.SATURATION, count=20, site_position=SITE, seed=28)
+    swarm.advance(1.0)
+    snapshot = [d.react_until for d in swarm.drones]
+    swarm.register_losses([])
+    assert [d.react_until for d in swarm.drones] == snapshot

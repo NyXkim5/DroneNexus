@@ -84,13 +84,17 @@ def test_frame_serializes_to_json_shape() -> None:
 
 
 def test_metrics_are_coherent_after_engagements() -> None:
-    frames = _run_scenario("probe_120", max_ticks=30)
+    frames = _run_scenario("probe_120", max_ticks=160)
     last = frames[-1].metrics
-    # Engagements should have happened and intercepts cannot exceed them.
+    swarm_size = load_scenario("probe_120").swarm_count
+    # Engagements should have happened once drones reach defender range.
     assert last.engagements_made > 0
-    assert last.intercepts <= last.engagements_made
+    # Intercepts are real kills, capped by the swarm size. Area effectors can
+    # neutralize several drones per engagement, so intercepts may exceed the
+    # engagement count, which is the point of a cheap area effect.
+    assert 0 <= last.intercepts <= swarm_size
     # Killed drones reduce the live hostile count below the swarm size.
-    assert last.active_hostiles < load_scenario("probe_120").swarm_count
+    assert last.active_hostiles < swarm_size
     # Cost figures are non-negative and the ratio is real once anything dies.
     assert last.defender_spent >= 0.0
     assert last.attacker_destroyed >= 0.0

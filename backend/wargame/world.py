@@ -144,6 +144,8 @@ def _build_defenders(configs: List[DefenderConfig]) -> List[Defender]:
                     kill_prob=cfg.kill_prob,
                     unit_cost=cfg.unit_cost,
                     status=DefenderStatus.READY,
+                    effect_radius_m=cfg.effect_radius_m,
+                    max_simultaneous=cfg.max_simultaneous,
                 )
             )
     return defenders

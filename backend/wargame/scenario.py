@@ -60,6 +60,8 @@ class DefenderConfig:
     reload_s: float
     kill_prob: float
     unit_cost: float
+    effect_radius_m: float = 0.0
+    max_simultaneous: int = 1
 
 
 @dataclass
@@ -122,6 +124,51 @@ def _ring_sensors(count: int, range_m: float, radius_m: float) -> List[SensorCon
     return sensors
 
 
+def _hpm(count: int) -> DefenderConfig:
+    """A high-power-microwave area effector: cheap per shot, many kills per shot.
+
+    HPM fries drone electronics across a cone regardless of jam resistance, so it
+    is the workhorse against dense swarms. Each shot costs only power, yet
+    neutralizes every airframe inside its effect radius up to the cap. This is the
+    layer that drives the cost-exchange ratio below one.
+    """
+    return DefenderConfig(
+        id_prefix="HPM",
+        kind=DefenderKind.HPM,
+        count=count,
+        position=(0.0, 0.0, 0.0),
+        capacity=40,
+        range_m=2000.0,
+        reload_s=3.0,
+        kill_prob=0.8,
+        unit_cost=8.0,
+        effect_radius_m=350.0,
+        max_simultaneous=25,
+    )
+
+
+def _ew(count: int) -> DefenderConfig:
+    """A wide electronic-warfare effector: very cheap, broad, but jam-resistible.
+
+    EW defeats control and navigation across a wide footprint at almost no cost.
+    Modern autonomous drones resist it, so its kill probability is modest. It
+    thins the swarm cheaply and hands the survivors to HPM and interceptors.
+    """
+    return DefenderConfig(
+        id_prefix="EW",
+        kind=DefenderKind.EW,
+        count=count,
+        position=(0.0, 0.0, 0.0),
+        capacity=80,
+        range_m=2400.0,
+        reload_s=1.0,
+        kill_prob=0.5,
+        unit_cost=3.0,
+        effect_radius_m=500.0,
+        max_simultaneous=40,
+    )
+
+
 def _saturation_1000() -> Scenario:
     """A 1000-drone all-axis saturation attack against a hardened site."""
     return Scenario(
@@ -131,27 +178,18 @@ def _saturation_1000() -> Scenario:
         unit_cost=500.0,
         sensors=_ring_sensors(count=4, range_m=3500.0, radius_m=600.0),
         defenders=[
+            _hpm(count=5),
+            _ew(count=5),
             DefenderConfig(
                 id_prefix="INT",
                 kind=DefenderKind.INTERCEPTOR,
-                count=40,
+                count=20,
                 position=(0.0, 0.0, 0.0),
                 capacity=6,
                 range_m=2500.0,
                 reload_s=2.0,
-                kill_prob=0.75,
+                kill_prob=0.85,
                 unit_cost=8_000.0,
-            ),
-            DefenderConfig(
-                id_prefix="JAM",
-                kind=DefenderKind.JAMMER,
-                count=6,
-                position=(0.0, 0.0, 0.0),
-                capacity=50,
-                range_m=1800.0,
-                reload_s=0.5,
-                kill_prob=0.35,
-                unit_cost=200.0,
             ),
         ],
         site=SiteConfig(),
@@ -170,27 +208,18 @@ def _probe_120() -> Scenario:
         unit_cost=500.0,
         sensors=_ring_sensors(count=3, range_m=3200.0, radius_m=400.0),
         defenders=[
+            _hpm(count=2),
+            _ew(count=2),
             DefenderConfig(
                 id_prefix="INT",
                 kind=DefenderKind.INTERCEPTOR,
-                count=8,
+                count=6,
                 position=(0.0, 0.0, 0.0),
                 capacity=4,
                 range_m=2200.0,
                 reload_s=2.0,
-                kill_prob=0.8,
+                kill_prob=0.85,
                 unit_cost=8_000.0,
-            ),
-            DefenderConfig(
-                id_prefix="JAM",
-                kind=DefenderKind.JAMMER,
-                count=2,
-                position=(0.0, 0.0, 0.0),
-                capacity=30,
-                range_m=1600.0,
-                reload_s=0.5,
-                kill_prob=0.4,
-                unit_cost=200.0,
             ),
         ],
         site=SiteConfig(),
@@ -209,27 +238,18 @@ def _decoy_300() -> Scenario:
         unit_cost=500.0,
         sensors=_ring_sensors(count=4, range_m=3400.0, radius_m=500.0),
         defenders=[
+            _hpm(count=3),
+            _ew(count=3),
             DefenderConfig(
                 id_prefix="INT",
                 kind=DefenderKind.INTERCEPTOR,
-                count=16,
+                count=10,
                 position=(0.0, 0.0, 0.0),
                 capacity=5,
                 range_m=2400.0,
                 reload_s=2.0,
-                kill_prob=0.78,
+                kill_prob=0.82,
                 unit_cost=8_000.0,
-            ),
-            DefenderConfig(
-                id_prefix="JAM",
-                kind=DefenderKind.JAMMER,
-                count=4,
-                position=(0.0, 0.0, 0.0),
-                capacity=40,
-                range_m=1700.0,
-                reload_s=0.5,
-                kill_prob=0.38,
-                unit_cost=200.0,
             ),
         ],
         site=SiteConfig(),
