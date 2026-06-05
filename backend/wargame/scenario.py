@@ -1,0 +1,293 @@
+"""
+Scenario configuration for the BULWARK counter-swarm wargame.
+
+A scenario fully describes one wargame run. It names the attacking swarm size and
+behavior, the sensor layout that watches the airspace, the defender loadout that
+answers the threat, and the site under attack. Scenarios are plain dataclasses so
+they validate at construction and serialize cleanly to JSON for the HUD.
+
+Presets ship inline and as YAML under wargame/scenarios. load_scenario(name)
+returns a preset by name. load_scenario_file(path) reads a YAML scenario. Both
+raise on an unknown name or malformed file. No silent fallbacks.
+
+All positions are ENU meters about the site origin, the shared world-model frame.
+"""
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List
+
+import yaml
+
+from csontology import DefenderKind, SwarmIntent, Vec3
+
+logger = logging.getLogger("overwatch.wargame")
+
+# Directory holding YAML scenario presets shipped with the module.
+SCENARIOS_DIR = Path(__file__).parent / "scenarios"
+
+
+@dataclass
+class SensorConfig:
+    """One sensor in the layout, mapped onto a SimSensorSpec at build time."""
+
+    sensor_id: str
+    position: Vec3 = (0.0, 0.0, 0.0)
+    range_m: float = 5000.0
+    fov_deg: float = 360.0
+    bearing_deg: float = 0.0
+    detection_prob: float = 0.9
+    pos_noise_m: float = 8.0
+    vel_noise_ms: float = 1.5
+
+
+@dataclass
+class DefenderConfig:
+    """One defender effector loadout entry, mapped onto a Defender at build time.
+
+    count expands into count identical defenders, each suffixed by index. This
+    keeps a loadout of twenty interceptors to a single readable line.
+    """
+
+    id_prefix: str
+    kind: DefenderKind
+    count: int
+    position: Vec3
+    capacity: int
+    range_m: float
+    reload_s: float
+    kill_prob: float
+    unit_cost: float
+
+
+@dataclass
+class SiteConfig:
+    """The defended site and the value it protects."""
+
+    id: str = "SITE-1"
+    position: Vec3 = (0.0, 0.0, 0.0)
+    protected_assets: List[str] = field(default_factory=lambda: ["C2", "RADAR"])
+    value: float = 1_000_000.0
+
+
+@dataclass
+class Scenario:
+    """A full wargame configuration: attacker, sensors, defenders, and site.
+
+    swarm_intent and swarm_count drive the red force. unit_cost is the per-drone
+    attacker dollar cost. tick_hz is the sim loop rate. max_ticks bounds a CLI
+    run so it always terminates. seed pins randomness for repeatable runs.
+    """
+
+    name: str
+    swarm_intent: SwarmIntent
+    swarm_count: int
+    unit_cost: float = 500.0
+    sensors: List[SensorConfig] = field(default_factory=list)
+    defenders: List[DefenderConfig] = field(default_factory=list)
+    site: SiteConfig = field(default_factory=SiteConfig)
+    tick_hz: float = 5.0
+    max_ticks: int = 600
+    seed: int = 7
+
+    def __post_init__(self) -> None:
+        if not 10 <= self.swarm_count <= 1000:
+            raise ValueError(f"swarm_count must be in 10..1000, got {self.swarm_count}")
+        if self.tick_hz <= 0:
+            raise ValueError("tick_hz must be positive")
+        if not self.sensors:
+            raise ValueError("scenario needs at least one sensor")
+        if not self.defenders:
+            raise ValueError("scenario needs at least one defender")
+
+
+def _ring_sensors(count: int, range_m: float, radius_m: float) -> List[SensorConfig]:
+    """Build a ring of omnidirectional sensors evenly spaced around the site."""
+    import math
+
+    sensors: List[SensorConfig] = []
+    for i in range(count):
+        bearing = (i / count) * 2.0 * math.pi
+        x = radius_m * math.cos(bearing)
+        y = radius_m * math.sin(bearing)
+        sensors.append(
+            SensorConfig(
+                sensor_id=f"radar-{i + 1}",
+                position=(x, y, 0.0),
+                range_m=range_m,
+            )
+        )
+    return sensors
+
+
+def _saturation_1000() -> Scenario:
+    """A 1000-drone all-axis saturation attack against a hardened site."""
+    return Scenario(
+        name="saturation_1000",
+        swarm_intent=SwarmIntent.SATURATION,
+        swarm_count=1000,
+        unit_cost=500.0,
+        sensors=_ring_sensors(count=4, range_m=3500.0, radius_m=600.0),
+        defenders=[
+            DefenderConfig(
+                id_prefix="INT",
+                kind=DefenderKind.INTERCEPTOR,
+                count=40,
+                position=(0.0, 0.0, 0.0),
+                capacity=6,
+                range_m=2500.0,
+                reload_s=2.0,
+                kill_prob=0.75,
+                unit_cost=8_000.0,
+            ),
+            DefenderConfig(
+                id_prefix="JAM",
+                kind=DefenderKind.JAMMER,
+                count=6,
+                position=(0.0, 0.0, 0.0),
+                capacity=50,
+                range_m=1800.0,
+                reload_s=0.5,
+                kill_prob=0.35,
+                unit_cost=200.0,
+            ),
+        ],
+        site=SiteConfig(),
+        tick_hz=5.0,
+        max_ticks=600,
+        seed=11,
+    )
+
+
+def _probe_120() -> Scenario:
+    """A small probing attack to test sensors and defender reaction."""
+    return Scenario(
+        name="probe_120",
+        swarm_intent=SwarmIntent.PROBE,
+        swarm_count=120,
+        unit_cost=500.0,
+        sensors=_ring_sensors(count=3, range_m=3200.0, radius_m=400.0),
+        defenders=[
+            DefenderConfig(
+                id_prefix="INT",
+                kind=DefenderKind.INTERCEPTOR,
+                count=8,
+                position=(0.0, 0.0, 0.0),
+                capacity=4,
+                range_m=2200.0,
+                reload_s=2.0,
+                kill_prob=0.8,
+                unit_cost=8_000.0,
+            ),
+            DefenderConfig(
+                id_prefix="JAM",
+                kind=DefenderKind.JAMMER,
+                count=2,
+                position=(0.0, 0.0, 0.0),
+                capacity=30,
+                range_m=1600.0,
+                reload_s=0.5,
+                kill_prob=0.4,
+                unit_cost=200.0,
+            ),
+        ],
+        site=SiteConfig(),
+        tick_hz=5.0,
+        max_ticks=400,
+        seed=7,
+    )
+
+
+def _decoy_300() -> Scenario:
+    """A mixed decoy raid where most airframes are cheap throwaways."""
+    return Scenario(
+        name="decoy_300",
+        swarm_intent=SwarmIntent.DECOY,
+        swarm_count=300,
+        unit_cost=500.0,
+        sensors=_ring_sensors(count=4, range_m=3400.0, radius_m=500.0),
+        defenders=[
+            DefenderConfig(
+                id_prefix="INT",
+                kind=DefenderKind.INTERCEPTOR,
+                count=16,
+                position=(0.0, 0.0, 0.0),
+                capacity=5,
+                range_m=2400.0,
+                reload_s=2.0,
+                kill_prob=0.78,
+                unit_cost=8_000.0,
+            ),
+            DefenderConfig(
+                id_prefix="JAM",
+                kind=DefenderKind.JAMMER,
+                count=4,
+                position=(0.0, 0.0, 0.0),
+                capacity=40,
+                range_m=1700.0,
+                reload_s=0.5,
+                kill_prob=0.38,
+                unit_cost=200.0,
+            ),
+        ],
+        site=SiteConfig(),
+        tick_hz=5.0,
+        max_ticks=500,
+        seed=23,
+    )
+
+
+# Built-in presets keyed by name. At least two ship, including the 1000-drone
+# saturation attack required by the design.
+PRESETS: Dict[str, "callable"] = {
+    "saturation_1000": _saturation_1000,
+    "probe_120": _probe_120,
+    "decoy_300": _decoy_300,
+}
+
+
+def list_scenarios() -> List[str]:
+    """Return the names of all built-in presets."""
+    return sorted(PRESETS.keys())
+
+
+def load_scenario(name: str) -> Scenario:
+    """Return a built-in preset by name. Raises KeyError if unknown."""
+    builder = PRESETS.get(name)
+    if builder is None:
+        raise KeyError(f"unknown scenario '{name}', have {list_scenarios()}")
+    return builder()
+
+
+def load_scenario_file(path: Path) -> Scenario:
+    """Load a Scenario from a YAML file. Raises on a missing or malformed file."""
+    if not path.exists():
+        raise FileNotFoundError(f"scenario file not found: {path}")
+    raw = yaml.safe_load(path.read_text())
+    if not isinstance(raw, dict):
+        raise ValueError(f"scenario file must be a mapping: {path}")
+    return _scenario_from_dict(raw)
+
+
+def _scenario_from_dict(raw: Dict[str, object]) -> Scenario:
+    """Build a Scenario from a parsed YAML mapping with explicit field mapping."""
+    sensors = [SensorConfig(**s) for s in raw.get("sensors", [])]  # type: ignore[arg-type]
+    defenders = [
+        DefenderConfig(kind=DefenderKind(d.pop("kind")), **d)  # type: ignore[arg-type]
+        for d in raw.get("defenders", [])  # type: ignore[union-attr]
+    ]
+    site = SiteConfig(**raw["site"]) if "site" in raw else SiteConfig()
+    return Scenario(
+        name=str(raw["name"]),
+        swarm_intent=SwarmIntent(raw["swarm_intent"]),
+        swarm_count=int(raw["swarm_count"]),  # type: ignore[arg-type]
+        unit_cost=float(raw.get("unit_cost", 500.0)),  # type: ignore[arg-type]
+        sensors=sensors,
+        defenders=defenders,
+        site=site,
+        tick_hz=float(raw.get("tick_hz", 5.0)),  # type: ignore[arg-type]
+        max_ticks=int(raw.get("max_ticks", 600)),  # type: ignore[arg-type]
+        seed=int(raw.get("seed", 7)),  # type: ignore[arg-type]
+    )

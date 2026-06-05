@@ -347,6 +347,15 @@ async def get_connected_devices():
     return {"devices": devices}
 
 
+# ---- Wargame (counter-swarm) endpoints ----
+
+@router.get("/wargame/scenarios")
+async def list_wargame_scenarios():
+    """List available BULWARK counter-swarm wargame scenarios."""
+    from wargame import list_scenarios
+    return {"scenarios": list_scenarios()}
+
+
 # ---- ISR Feed (video) endpoints ----
 
 @router.get("/isr/feeds/sources")

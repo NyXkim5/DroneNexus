@@ -392,6 +392,12 @@ async def ws_compat(websocket: WebSocket):
     await overwatch_app.ws_handler.handle(websocket)
 
 
+@app.websocket("/ws/v1/wargame/{scenario}")
+async def wargame_websocket(websocket: WebSocket, scenario: str):
+    """Stream BULWARK counter-swarm wargame frames for the named scenario."""
+    await overwatch_app.ws_handler.handle_wargame(websocket, scenario)
+
+
 # ---- Entry point ----
 if __name__ == "__main__":
     settings = OverwatchSettings()

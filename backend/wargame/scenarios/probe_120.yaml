@@ -1,0 +1,46 @@
+# Small probing attack to test sensors and defender reaction.
+# Mirrors the probe_120 preset in wargame/scenario.py.
+name: probe_120
+swarm_intent: PROBE
+swarm_count: 120
+unit_cost: 500.0
+tick_hz: 5.0
+max_ticks: 400
+seed: 7
+
+site:
+  id: SITE-1
+  position: [0.0, 0.0, 0.0]
+  protected_assets: [C2, RADAR]
+  value: 1000000.0
+
+sensors:
+  - sensor_id: radar-1
+    position: [400.0, 0.0, 0.0]
+    range_m: 3200.0
+  - sensor_id: radar-2
+    position: [-200.0, 346.0, 0.0]
+    range_m: 3200.0
+  - sensor_id: radar-3
+    position: [-200.0, -346.0, 0.0]
+    range_m: 3200.0
+
+defenders:
+  - id_prefix: INT
+    kind: INTERCEPTOR
+    count: 8
+    position: [0.0, 0.0, 0.0]
+    capacity: 4
+    range_m: 2200.0
+    reload_s: 2.0
+    kill_prob: 0.8
+    unit_cost: 8000.0
+  - id_prefix: JAM
+    kind: JAMMER
+    count: 2
+    position: [0.0, 0.0, 0.0]
+    capacity: 30
+    range_m: 1600.0
+    reload_s: 0.5
+    kill_prob: 0.4
+    unit_cost: 200.0

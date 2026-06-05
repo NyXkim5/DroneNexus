@@ -1,0 +1,49 @@
+# 1000-drone all-axis saturation attack against a hardened site.
+# Mirrors the saturation_1000 preset in wargame/scenario.py.
+name: saturation_1000
+swarm_intent: SATURATION
+swarm_count: 1000
+unit_cost: 500.0
+tick_hz: 5.0
+max_ticks: 600
+seed: 11
+
+site:
+  id: SITE-1
+  position: [0.0, 0.0, 0.0]
+  protected_assets: [C2, RADAR]
+  value: 1000000.0
+
+sensors:
+  - sensor_id: radar-1
+    position: [600.0, 0.0, 0.0]
+    range_m: 3500.0
+  - sensor_id: radar-2
+    position: [0.0, 600.0, 0.0]
+    range_m: 3500.0
+  - sensor_id: radar-3
+    position: [-600.0, 0.0, 0.0]
+    range_m: 3500.0
+  - sensor_id: radar-4
+    position: [0.0, -600.0, 0.0]
+    range_m: 3500.0
+
+defenders:
+  - id_prefix: INT
+    kind: INTERCEPTOR
+    count: 40
+    position: [0.0, 0.0, 0.0]
+    capacity: 6
+    range_m: 2500.0
+    reload_s: 2.0
+    kill_prob: 0.75
+    unit_cost: 8000.0
+  - id_prefix: JAM
+    kind: JAMMER
+    count: 6
+    position: [0.0, 0.0, 0.0]
+    capacity: 50
+    range_m: 1800.0
+    reload_s: 0.5
+    kill_prob: 0.35
+    unit_cost: 200.0

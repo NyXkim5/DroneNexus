@@ -117,6 +117,37 @@ class WebSocketHandler:
         }
         await ws.send_text(json.dumps(sync_msg))
 
+    async def handle_wargame(self, websocket: WebSocket, scenario_name: str) -> None:
+        """Stream BULWARK wargame Frame snapshots as JSON over a websocket.
+
+        Each connection runs one independent wargame for the named scenario and
+        pushes a WARGAME_FRAME message per tick. The run ends when the scenario
+        terminates or the client disconnects. Unknown scenarios get an error frame
+        then a clean close. This endpoint is isolated from the telemetry stream.
+        """
+        await websocket.accept()
+        client_id = str(uuid.uuid4())[:8]
+        logger.info(f"Wargame WS {client_id} connected, scenario={scenario_name}")
+        try:
+            from wargame import WargameRunner, load_scenario
+
+            scenario = load_scenario(scenario_name)
+            runner = WargameRunner(scenario)
+            async for frame in runner.run():
+                await websocket.send_text(json.dumps(frame.to_dict()))
+        except KeyError as e:
+            await websocket.send_text(json.dumps({"type": "ERROR", "error": str(e)}))
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            logger.error(f"Wargame WS error: {e}")
+            try:
+                await websocket.send_text(json.dumps({"type": "ERROR", "error": str(e)}))
+            except Exception:
+                logger.debug("Wargame WS already closed")
+        finally:
+            logger.info(f"Wargame WS {client_id} disconnected")
+
     async def _dispatch_command(self, data: dict, ws: WebSocket) -> None:
         command = data.get("command", "")
         params = data.get("params", {})

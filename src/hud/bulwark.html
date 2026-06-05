@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BULWARK Counter-Swarm</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+/* Reuse the Gotham palette from styles.css :root. Scope to this page only. */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg, #0B0E11);
+  color: var(--text, #D4DAE0);
+  font-family: var(--font-ui, 'Inter', system-ui, sans-serif);
+  overflow: hidden;
+}
+#map { position: fixed; inset: 0; background: var(--bg-deep, #060809); z-index: 0; }
+#overlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 400;
+}
+canvas#tactical { position: fixed; inset: 0; z-index: 410; pointer-events: none; }
+
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 46px; z-index: 500;
+  display: flex; align-items: center; gap: 18px; padding: 0 18px;
+  background: var(--panel, #141820); border-bottom: 1px solid var(--border, #252B35);
+}
+.brand {
+  font-family: var(--font-data, monospace); font-weight: 700; font-size: 15px;
+  letter-spacing: 2px; color: var(--text-bright, #E8ECF0);
+}
+.brand .sub { color: var(--red, #C23A3E); margin-left: 8px; font-size: 11px; letter-spacing: 1px; }
+.conn { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.conn input {
+  background: var(--panel-elevated, #1A1F28); border: 1px solid var(--border, #252B35);
+  color: var(--text, #D4DAE0); font-family: var(--font-data, monospace); font-size: 11px;
+  padding: 6px 8px; width: 360px; border-radius: 3px;
+}
+.conn select {
+  background: var(--panel-elevated, #1A1F28); border: 1px solid var(--border, #252B35);
+  color: var(--text, #D4DAE0); font-family: var(--font-data, monospace); font-size: 11px;
+  padding: 6px 8px; border-radius: 3px;
+}
+.conn button {
+  background: var(--accent, #3B82C4); border: 1px solid var(--accent, #3B82C4);
+  color: #fff; font-family: var(--font-label, sans-serif); font-size: 11px;
+  letter-spacing: 1px; padding: 6px 14px; border-radius: 3px; cursor: pointer;
+}
+.conn button.stop { background: var(--red, #C23A3E); border-color: var(--red, #C23A3E); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-tertiary, #6B7785); }
+.dot.live { background: var(--green, #1E7A4A); box-shadow: 0 0 8px var(--green, #1E7A4A); }
+.dot.err { background: var(--red, #C23A3E); }
+
+/* Cost-exchange headline card */
+.cer-card {
+  position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 500;
+  display: flex; gap: 0; pointer-events: none;
+  background: var(--panel, #141820); border: 1px solid var(--border-light, #2E3642);
+  border-radius: 6px; overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+}
+.cer-col { padding: 10px 22px; text-align: center; border-right: 1px solid var(--border, #252B35); }
+.cer-col:last-child { border-right: none; }
+.cer-label { font-family: var(--font-label, sans-serif); font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim, #7A8899); text-transform: uppercase; }
+.cer-val { font-family: var(--font-data, monospace); font-size: 22px; font-weight: 700; margin-top: 3px; }
+.cer-attacker .cer-val { color: var(--red, #C23A3E); }
+.cer-defender .cer-val { color: var(--cyan, #4888D8); }
+.cer-ratio { background: var(--panel-elevated, #1A1F28); }
+.cer-ratio .cer-val { font-size: 30px; color: var(--amber, #B86E17); }
+.cer-ratio.win .cer-val { color: var(--green, #1E7A4A); }
+
+/* Metrics strip */
+.metrics {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 54px; z-index: 500;
+  display: flex; align-items: center; gap: 0;
+  background: var(--panel, #141820); border-top: 1px solid var(--border, #252B35);
+}
+.metric { padding: 0 20px; border-right: 1px solid var(--border, #252B35); }
+.metric .k { font-family: var(--font-label, sans-serif); font-size: 8px; letter-spacing: 1px; color: var(--text-dim, #7A8899); text-transform: uppercase; }
+.metric .v { font-family: var(--font-data, monospace); font-size: 16px; font-weight: 700; color: var(--text-bright, #E8ECF0); margin-top: 2px; }
+.metric .v.red { color: var(--red, #C23A3E); }
+.metric .v.green { color: var(--green, #1E7A4A); }
+.metric .v.amber { color: var(--amber, #B86E17); }
+
+.legend {
+  position: fixed; bottom: 64px; right: 12px; z-index: 500;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px; padding: 8px 12px; font-size: 10px; color: var(--text-secondary, #8A96A3);
+}
+.legend .row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.legend .swatch { width: 12px; height: 12px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<canvas id="tactical"></canvas>
+
+<div class="topbar">
+  <div class="brand">BULWARK<span class="sub">COUNTER-SWARM</span></div>
+  <div class="conn">
+    <span class="dot" id="dot"></span>
+    <select id="scenario">
+      <option value="probe_120">probe_120</option>
+      <option value="decoy_300">decoy_300</option>
+      <option value="saturation_1000">saturation_1000</option>
+    </select>
+    <input id="wsurl" value="ws://localhost:8765/ws/v1/wargame" />
+    <button id="start">ENGAGE</button>
+  </div>
+</div>
+
+<div class="cer-card">
+  <div class="cer-col cer-attacker"><div class="cer-label">Attacker $ Killed</div><div class="cer-val" id="cer-att">$0</div></div>
+  <div class="cer-col cer-ratio" id="cer-ratio-col"><div class="cer-label">Cost Exchange</div><div class="cer-val" id="cer-ratio">n/a</div></div>
+  <div class="cer-col cer-defender"><div class="cer-label">Defender $ Spent</div><div class="cer-val" id="cer-def">$0</div></div>
+</div>
+
+<div class="metrics">
+  <div class="metric"><div class="k">Tick</div><div class="v" id="m-tick">0</div></div>
+  <div class="metric"><div class="k">Active Hostiles</div><div class="v red" id="m-host">0</div></div>
+  <div class="metric"><div class="k">Tracks Held</div><div class="v" id="m-trk">0</div></div>
+  <div class="metric"><div class="k">Leakers</div><div class="v amber" id="m-leak">0</div></div>
+  <div class="metric"><div class="k">Intercepts</div><div class="v green" id="m-hit">0</div></div>
+  <div class="metric"><div class="k">Intercept Rate</div><div class="v" id="m-rate">0%</div></div>
+  <div class="metric"><div class="k">Engagements</div><div class="v" id="m-eng">0</div></div>
+</div>
+
+<div class="legend">
+  <div class="row"><span class="swatch" style="background:#C23A3E"></span>Hostile track</div>
+  <div class="row"><span class="swatch" style="background:#4888D8"></span>Defender</div>
+  <div class="row"><span class="swatch" style="background:#B86E17"></span>Assignment line</div>
+  <div class="row"><span class="swatch" style="background:#E8ECF0"></span>Defended site</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+
+// Site origin matches csontology ORIGIN_LAT / ORIGIN_LON.
+const ORIGIN = { lat: 33.6405, lon: -117.8443 };
+
+const map = L.map("map", { zoomControl: true, attributionControl: false })
+  .setView([ORIGIN.lat, ORIGIN.lon], 14);
+L.tileLayer(
+  "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  { maxZoom: 19 }
+).addTo(map);
+
+const canvas = document.getElementById("tactical");
+const ctx = canvas.getContext("2d");
+function sizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", () => { sizeCanvas(); draw(); });
+sizeCanvas();
+
+let frame = null;
+let ws = null;
+
+function project(lat, lon) {
+  const p = map.latLngToContainerPoint([lat, lon]);
+  return { x: p.x, y: p.y };
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!frame) return;
+
+  const trackById = {};
+  frame.tracks.forEach((t) => { trackById[t.id] = t; });
+  const defById = {};
+  frame.defenders.forEach((d) => { defById[d.id] = d; });
+
+  // Assignment lines first so markers sit on top.
+  ctx.lineWidth = 1;
+  frame.assignments.forEach((a) => {
+    const d = defById[a.defender_id];
+    const t = trackById[a.track_id];
+    if (!d || !t) return;
+    const pd = project(d.lat, d.lon);
+    const pt = project(t.lat, t.lon);
+    ctx.strokeStyle = a.status === "HIT"
+      ? "rgba(30,122,74,0.7)"
+      : "rgba(184,110,23,0.5)";
+    ctx.beginPath();
+    ctx.moveTo(pd.x, pd.y);
+    ctx.lineTo(pt.x, pt.y);
+    ctx.stroke();
+  });
+
+  // Hostile tracks in red.
+  frame.tracks.forEach((t) => {
+    const p = project(t.lat, t.lon);
+    ctx.fillStyle = "rgba(194,58,62,0.85)";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Defenders in blue squares.
+  frame.defenders.forEach((d) => {
+    const p = project(d.lat, d.lon);
+    ctx.fillStyle = d.status === "DEPLETED"
+      ? "rgba(107,119,133,0.7)"
+      : "rgba(72,136,216,0.95)";
+    ctx.fillRect(p.x - 4, p.y - 4, 8, 8);
+  });
+
+  // Defended site marker.
+  const s = project(frame.site.lat, frame.site.lon);
+  ctx.strokeStyle = "#E8ECF0";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 9, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+map.on("move zoom", draw);
+
+function fmtMoney(v) {
+  return "$" + Math.round(v).toLocaleString();
+}
+
+function renderMetrics(m) {
+  document.getElementById("m-tick").textContent = m.tick;
+  document.getElementById("m-host").textContent = m.active_hostiles;
+  document.getElementById("m-trk").textContent = m.tracks_held;
+  document.getElementById("m-leak").textContent = m.leakers;
+  document.getElementById("m-hit").textContent = m.intercepts;
+  document.getElementById("m-rate").textContent =
+    (m.intercept_rate * 100).toFixed(0) + "%";
+  document.getElementById("m-eng").textContent = m.engagements_made;
+
+  document.getElementById("cer-att").textContent = fmtMoney(m.attacker_destroyed);
+  document.getElementById("cer-def").textContent = fmtMoney(m.defender_spent);
+  const ratioEl = document.getElementById("cer-ratio");
+  const ratioCol = document.getElementById("cer-ratio-col");
+  if (m.cost_exchange_ratio === null) {
+    ratioEl.textContent = "n/a";
+    ratioCol.classList.remove("win");
+  } else {
+    ratioEl.textContent = m.cost_exchange_ratio.toFixed(2);
+    ratioCol.classList.toggle("win", m.cost_exchange_ratio < 1.0);
+  }
+}
+
+function setDot(state) {
+  const dot = document.getElementById("dot");
+  dot.className = "dot" + (state ? " " + state : "");
+}
+
+function connect() {
+  if (ws) { ws.close(); ws = null; }
+  const base = document.getElementById("wsurl").value.replace(/\/$/, "");
+  const scenario = document.getElementById("scenario").value;
+  const url = base + "/" + scenario;
+  ws = new WebSocket(url);
+  setDot("");
+
+  ws.onopen = () => setDot("live");
+  ws.onerror = () => setDot("err");
+  ws.onclose = () => setDot("");
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch (e) { return; }
+    if (msg.type === "ERROR") { setDot("err"); return; }
+    if (msg.type !== "WARGAME_FRAME") return;
+    frame = msg;
+    renderMetrics(msg.metrics);
+    if (frame.tracks.length || frame.defenders.length) {
+      const lats = frame.defenders.map((d) => d.lat).concat([frame.site.lat]);
+      const lons = frame.defenders.map((d) => d.lon).concat([frame.site.lon]);
+      void lats; void lons;
+    }
+    draw();
+  };
+}
+
+document.getElementById("start").addEventListener("click", connect);
+</script>
+</body>
+</html>
