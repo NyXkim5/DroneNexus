@@ -168,9 +168,11 @@ class Swarm:
 class Threat:
     """A scored, prioritized danger derived from a track or a swarm.
 
-    Exactly one of track_id or swarm_id is set. score is 0..1. time_to_impact_s
-    is seconds until the threat reaches a protected asset, or None if it is not
-    closing. value_at_risk is the asset value the threat endangers.
+    track_id is the airframe this threat represents and is always set in the live
+    pipeline. swarm_id is optional situational-awareness context naming the swarm
+    the track belongs to. score is 0..1. time_to_impact_s is seconds until the
+    threat reaches a protected asset, or None if it is not closing. value_at_risk
+    is the expected dollar damage the threat would do if it leaks.
     """
     id: str
     score: float

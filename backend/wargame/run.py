@@ -17,6 +17,7 @@ import asyncio
 import logging
 from pathlib import Path
 
+from wargame.audit import AuditLog
 from wargame.frame import Frame
 from wargame.runner import WargameRunner
 from wargame.scenario import (
@@ -37,6 +38,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--list", action="store_true", help="list preset scenarios")
     parser.add_argument("--max-ticks", type=int, help="override scenario max_ticks")
     parser.add_argument("--quiet", action="store_true", help="only print the summary")
+    parser.add_argument(
+        "--fast", action="store_true",
+        help="run with no real-time pacing, for fast batch runs",
+    )
+    parser.add_argument(
+        "--audit", help="write a decision audit log to this SQLite path",
+    )
     return parser.parse_args()
 
 
@@ -87,16 +95,21 @@ def _print_summary(frame: Frame, scenario: Scenario) -> None:
     print("=" * 64)
 
 
-async def _run(scenario: Scenario, quiet: bool) -> None:
+async def _run(
+    scenario: Scenario, quiet: bool, pace: bool, audit_path: str | None,
+) -> None:
     """Drive the runner to completion, printing metrics along the way."""
-    runner = WargameRunner(scenario)
+    audit = AuditLog(audit_path) if audit_path else None
+    runner = WargameRunner(scenario, audit=audit)
     last: Frame | None = None
-    async for frame in runner.run():
+    async for frame in runner.run(pace=pace):
         last = frame
         if not quiet:
             print(_format_tick(frame))
     if last is not None:
         _print_summary(last, scenario)
+    if audit_path:
+        print(f"  audit log written     {audit_path}")
 
 
 def main() -> None:
@@ -107,7 +120,7 @@ def main() -> None:
         print("scenarios:", ", ".join(list_scenarios()))
         return
     scenario = _resolve_scenario(args)
-    asyncio.run(_run(scenario, args.quiet))
+    asyncio.run(_run(scenario, args.quiet, not args.fast, args.audit))
 
 
 if __name__ == "__main__":

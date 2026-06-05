@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import AsyncIterator, List
+from typing import AsyncIterator, List, Optional
 
 from csontology import (
     Defender,
@@ -37,6 +37,9 @@ from defense import LayeredAllocator, resolve
 from sensors.sim_source import SimSensorSource
 import threat as threat_module
 
+from wargame.audit import AuditLog
+from wargame.degradation import DegradationModel
+
 from wargame.frame import Frame, Metrics, assignment_lines
 from wargame.scenario import Scenario
 from wargame.world import WorldModel, build_sensor_specs, build_world
@@ -47,7 +50,9 @@ logger = logging.getLogger("overwatch.wargame")
 class WargameRunner:
     """Drives one counter-swarm wargame from a Scenario to completion."""
 
-    def __init__(self, scenario: Scenario) -> None:
+    def __init__(
+        self, scenario: Scenario, audit: Optional[AuditLog] = None,
+    ) -> None:
         self._scenario = scenario
         self._world: WorldModel = build_world(scenario)
         self._source = SimSensorSource(
@@ -58,6 +63,12 @@ class WargameRunner:
         )
         self._allocator = LayeredAllocator(
             resolve_position=self._world.resolve_threat_position,
+            attacker_cost_ref=scenario.unit_cost,
+        )
+        self._audit = audit
+        self._degradation = DegradationModel(
+            jam_fraction=scenario.jam_fraction,
+            blackout_windows=list(scenario.blackout_windows),
         )
         self._dt = 1.0 / scenario.tick_hz
         self._tick = 0
@@ -68,12 +79,13 @@ class WargameRunner:
         """The live world model, exposed for inspection and tests."""
         return self._world
 
-    async def run(self) -> AsyncIterator[Frame]:
+    async def run(self, pace: bool = True) -> AsyncIterator[Frame]:
         """Yield one Frame per tick until the scenario terminates.
 
         The runner owns the clock. Each tick advances the red force, samples the
-        sensor source once, runs the pipeline, and yields a Frame. It awaits the
-        tick interval so a live consumer like the websocket sees real-time pacing.
+        sensor source once, runs the pipeline, and yields a Frame. When pace is
+        true it awaits the tick interval so a live consumer like the websocket
+        sees real-time pacing. Set pace false for a fast batch run with no sleep.
         """
         await self._source.start()
         try:
@@ -83,9 +95,12 @@ class WargameRunner:
                 yield frame
                 if frame.done:
                     break
-                await asyncio.sleep(self._dt)
+                if pace:
+                    await asyncio.sleep(self._dt)
         finally:
             await self._source.stop()
+            if self._audit is not None:
+                self._audit.close()
 
     def _collect_tick(self) -> List[Detection]:
         """Advance the attacker, then sample one tick of detections.
@@ -95,7 +110,8 @@ class WargameRunner:
         runner does, so detections and the pipeline stay in lockstep per tick.
         """
         self._world.swarm.advance(self._dt)
-        return self._source.sample_once()
+        detections = self._source.sample_once()
+        return self._degradation.apply(detections, self._tick, self._world.rng)
 
     def _step(self, detections: List[Detection]) -> Frame:
         """Run fusion, threat, defense for one tick and snapshot a Frame."""
@@ -106,8 +122,27 @@ class WargameRunner:
         self._classify_hostiles()
         threats = threat_module.assess(tracks, self._world.site, t)
         engagements = self._engage(threats, t)
+        self._audit_tick(t, engagements, threats, tracks)
         self._cool_down()
         return self._build_frame(tracks, threats, engagements)
+
+    def _audit_tick(
+        self,
+        t: float,
+        engagements: List[Engagement],
+        threats: List[Threat],
+        tracks: List[Track],
+    ) -> None:
+        """Record this tick's fire decisions with lineage when auditing is on."""
+        if self._audit is None or not engagements:
+            return
+        self._audit.record_tick(
+            self._tick,
+            t,
+            engagements,
+            {th.id: th for th in threats},
+            {tr.id: tr for tr in tracks},
+        )
 
     def _classify_hostiles(self) -> None:
         """Mark every confirmed track hostile so the threat layer scores it.

@@ -192,16 +192,19 @@ def test_ranks_are_dense_and_one_based():
     assert ranks == [1, 2, 3]
 
 
-def test_swarm_threat_sets_swarm_id_not_track_id():
+def test_clustered_threats_keep_track_id_and_carry_swarm_context():
     tracks = [
         make_track("a", (0.0, -300.0, 50.0), (0.0, 20.0, 0.0)),
         make_track("b", (20.0, -310.0, 50.0), (0.0, 20.0, 0.0)),
         make_track("c", (-15.0, -305.0, 50.0), (0.0, 20.0, 0.0)),
     ]
     threats = assess(tracks, SITE, timestamp=100.0)
-    assert len(threats) == 1
-    assert threats[0].swarm_id is not None
-    assert threats[0].track_id is None
+    # Each airframe is its own threat so an effector can target it directly.
+    assert len(threats) == 3
+    # Every threat keeps its track_id and carries the swarm as context.
+    assert all(t.track_id is not None for t in threats)
+    assert all(t.swarm_id is not None for t in threats)
+    assert len({t.swarm_id for t in threats}) == 1
 
 
 def test_swarm_outranks_a_distant_lone_track():

@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import yaml
 
@@ -93,6 +93,8 @@ class Scenario:
     tick_hz: float = 5.0
     max_ticks: int = 600
     seed: int = 7
+    jam_fraction: float = 0.0
+    blackout_windows: List[Tuple[int, int]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not 10 <= self.swarm_count <= 1000:
@@ -259,12 +261,38 @@ def _decoy_300() -> Scenario:
     )
 
 
+def _contested_500() -> Scenario:
+    """A 500-drone saturation fought under heavy jamming and a sensor blackout.
+
+    Forty percent of detections are jammed every tick and the picture goes fully
+    dark for a window mid-fight. The autonomy must keep tracking and engaging on
+    coasted, predicted state with no operator input. This is the comms-denied
+    test the design calls for.
+    """
+    base = _saturation_1000()
+    return Scenario(
+        name="contested_500",
+        swarm_intent=SwarmIntent.SATURATION,
+        swarm_count=500,
+        unit_cost=500.0,
+        sensors=_ring_sensors(count=4, range_m=3500.0, radius_m=600.0),
+        defenders=base.defenders,
+        site=SiteConfig(),
+        tick_hz=5.0,
+        max_ticks=600,
+        seed=29,
+        jam_fraction=0.4,
+        blackout_windows=[(60, 80)],
+    )
+
+
 # Built-in presets keyed by name. At least two ship, including the 1000-drone
 # saturation attack required by the design.
 PRESETS: Dict[str, "callable"] = {
     "saturation_1000": _saturation_1000,
     "probe_120": _probe_120,
     "decoy_300": _decoy_300,
+    "contested_500": _contested_500,
 }
 
 

@@ -16,7 +16,7 @@ Pipeline:
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Set
+from typing import Dict, List
 
 from csontology import Site, Swarm, Threat, Track, TrackClass
 
@@ -26,7 +26,7 @@ from threat.clustering import (
     cluster_tracks,
 )
 from threat.intent import infer_intent
-from threat.scoring import _rank, _score_swarm, _score_track
+from threat.scoring import _rank, _score_track
 
 logger = logging.getLogger("overwatch.threat")
 
@@ -66,32 +66,32 @@ def assess(
 ) -> List[Threat]:
     """Classify and prioritize hostile tracks into ranked Threat objects.
 
-    timestamp is the shared wall-clock from csontology.now(). The returned list
-    is ordered most urgent first, and each Threat carries its 1-based
-    priority_rank. Exactly one of track_id or swarm_id is set per Threat.
+    Each hostile track becomes one Threat so effectors can be assigned to
+    individual airframes, which is what an area effect needs and what keeps the
+    detection-to-engagement lineage intact. Swarms and their intent are still
+    inferred for situational awareness and stamped onto each member threat as
+    swarm_id context. The returned list is ordered most urgent first, with a
+    1-based priority_rank. track_id is always set, swarm_id is optional context.
     """
     hostiles = _hostile_tracks(tracks)
     if not hostiles:
         return []
 
     swarms = detect_swarms(tracks, site, timestamp, radius_m=radius_m, min_size=min_size)
-    by_id: Dict[str, Track] = {t.id: t for t in hostiles}
-    clustered_ids: Set[str] = set()
+    swarm_of: Dict[str, str] = {}
+    for swarm in swarms:
+        for mid in swarm.member_track_ids:
+            swarm_of[mid] = swarm.id
 
     threats: List[Threat] = []
-    for swarm in swarms:
-        members = [by_id[mid] for mid in swarm.member_track_ids if mid in by_id]
-        clustered_ids.update(m.id for m in members)
-        threats.append(_score_swarm(swarm, members, site))
-
     for track in hostiles:
-        if track.id in clustered_ids:
-            continue
-        threats.append(_score_track(track, site))
+        threat = _score_track(track, site)
+        threat.swarm_id = swarm_of.get(track.id)
+        threats.append(threat)
 
     ranked = _rank(threats)
     logger.info(
-        "assessed %d hostile tracks into %d threats (%d swarms)",
+        "assessed %d hostile tracks into %d threats (%d swarms for SA)",
         len(hostiles),
         len(ranked),
         len(swarms),
