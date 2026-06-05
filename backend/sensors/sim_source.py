@@ -119,8 +119,8 @@ class _KindProfile:
 # spurious contacts per tick.
 _KIND_PROFILES: dict[SensorKind, _KindProfile] = {
     SensorKind.RADAR: _KindProfile(
-        range_m=4000.0, pos_noise_m=8.0, vel_noise_ms=1.0,
-        cross_range_factor=2.5, radial_vel_factor=0.6, condition_factor=1.0,
+        range_m=4000.0, pos_noise_m=6.0, vel_noise_ms=1.0,
+        cross_range_factor=1.5, radial_vel_factor=0.6, condition_factor=1.0,
         false_alarm_rate=0.25, base_confidence=0.85,
     ),
     SensorKind.EOIR: _KindProfile(
@@ -341,7 +341,11 @@ class SimSensorSource(SensorSource):
         """
         rcs = _effective_rcs(target)
         ref = max(dist, 1.0) ** 4
-        norm = (rcs / sensor.ref_rcs) * (_REF_RANGE_M ** 4 / ref)
+        # Anchor SNR to the sensor's own rated range so a reference-RCS target
+        # detects well inside that range and falls off near and beyond it. A
+        # fixed anchor would blind a long-range sensor across most of its reach.
+        anchor = sensor.range_m ** 4
+        norm = (rcs / sensor.ref_rcs) * (anchor / ref)
         return norm
 
     def _build_detection(
@@ -367,8 +371,8 @@ class SimSensorSource(SensorSource):
         )
 
     def _range_noise_scale(self, sensor: SimSensorSpec, dist: float) -> float:
-        """Noise growth factor, 1 at the reference range and rising with range."""
-        return max(0.25, dist / _REF_RANGE_M)
+        """Noise growth factor, nominal at mid range, capped so it stays bounded."""
+        return min(1.25, max(0.3, dist / (sensor.range_m * 0.7)))
 
     def _false_alarms(
         self, sensor: SimSensorSpec, timestamp: float,

@@ -118,10 +118,10 @@ class FusionConfig:
     gate_radius_m: float = 150.0
     confidence_gain: float = 0.4
     confidence_decay: float = 0.3
-    cluster_radius_m: float = 40.0
-    dup_radius_m: float = 45.0
-    merge_radius_m: float = 30.0
-    merge_vel_ms: float = 12.0
+    cluster_radius_m: float = 60.0
+    dup_radius_m: float = 50.0
+    merge_radius_m: float = 25.0
+    merge_vel_ms: float = 10.0
 
 
 @dataclass
