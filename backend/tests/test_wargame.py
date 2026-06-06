@@ -13,6 +13,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
+# Full end-to-end wargame runs. Deselect for a fast loop with -m "not slow".
+pytestmark = pytest.mark.slow
+
+import pytest
+
 from csontology import SwarmIntent
 from wargame.frame import Frame
 from wargame.runner import WargameRunner

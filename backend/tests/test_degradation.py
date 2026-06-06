@@ -6,6 +6,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
+
+# Comms-denied runs drive full scenarios. Deselect with -m "not slow".
+pytestmark = pytest.mark.slow
+
 from csontology import Detection
 from wargame import load_scenario
 from wargame.degradation import DegradationModel

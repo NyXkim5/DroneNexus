@@ -11,6 +11,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
+
+# Honest-fight integration runs drive full scenarios. Deselect with -m "not slow".
+pytestmark = pytest.mark.slow
+
 from csontology import DefenderKind
 from wargame.runner import WargameRunner, _resistance
 from wargame.scenario import (

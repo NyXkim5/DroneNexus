@@ -21,10 +21,8 @@ from csontology import (
 )
 from defense import (
     CostLedger,
-    DEFAULT_THREAT_VALUE,
     GreedyAllocator,
     LayeredAllocator,
-    resolve,
 )
 
 
@@ -155,63 +153,46 @@ def test_highest_priority_threat_served_first_under_scarcity():
     assert out[0].target_threat_id == "t-high"
 
 
-# ---- Resolution and cost ledger ----
+# ---- Cost ledger (the shipped accounting the runner updates) ----
+# Engagement outcomes are resolved by WargameRunner._resolve_engagements, which is
+# covered end to end in test_honest_fight. These tests pin the CostLedger that the
+# runner feeds, so the shipped accounting is verified directly.
 
-def test_resolve_hit_credits_attacker_value():
-    allocator = GreedyAllocator()
-    defender = _defender("d1", (0.0, 0.0, 0.0), kill_prob=1.0, unit_cost=50.0)
-    threat = _threat("t1", 0.9, 1, value=1000.0)
-    engagements = allocator.allocate([threat], [defender], now=0.0)
-    ledger = resolve(engagements, [defender], [threat], now=1.0, rng=random.Random(1))
-    assert engagements[0].status is EngagementStatus.HIT
+def test_ledger_hit_credits_spend_and_value():
+    ledger = CostLedger()
+    ledger.record_spend(50.0)
+    ledger.record_outcome(EngagementStatus.HIT, 1000.0)
     assert ledger.defender_spent == 50.0
     assert ledger.attacker_destroyed == 1000.0
+    assert ledger.hits == 1
     assert ledger.cost_exchange_ratio == 50.0 / 1000.0
 
 
-def test_resolve_miss_spends_but_destroys_nothing():
-    allocator = GreedyAllocator()
-    defender = _defender("d1", (0.0, 0.0, 0.0), kill_prob=0.0, unit_cost=50.0)
-    threat = _threat("t1", 0.9, 1, value=1000.0)
-    engagements = allocator.allocate([threat], [defender], now=0.0)
-    ledger = resolve(engagements, [defender], [threat], now=1.0, rng=random.Random(1))
-    assert engagements[0].status is EngagementStatus.MISS
+def test_ledger_miss_spends_but_destroys_nothing():
+    ledger = CostLedger()
+    ledger.record_spend(50.0)
+    ledger.record_outcome(EngagementStatus.MISS, 0.0)
     assert ledger.defender_spent == 50.0
     assert ledger.attacker_destroyed == 0.0
+    assert ledger.misses == 1
     assert ledger.cost_exchange_ratio is None
 
 
-def test_resolve_marks_leak_when_defender_missing():
-    threat = _threat("t1", 0.9, 1)
-    from csontology import Engagement
-    orphan = Engagement(
-        id="e1", defender_id="ghost", target_threat_id="t1", start_time=0.0,
-    )
-    ledger = resolve([orphan], [], [threat], now=1.0, rng=random.Random(1))
-    assert orphan.status is EngagementStatus.LEAK
+def test_ledger_counts_leaks():
+    ledger = CostLedger()
+    ledger.record_outcome(EngagementStatus.LEAK, 0.0)
     assert ledger.leaks == 1
 
 
-def test_resolve_skips_already_resolved_engagements():
-    threat = _threat("t1", 0.9, 1)
-    defender = _defender("d1", (0.0, 0.0, 0.0), kill_prob=1.0)
-    from csontology import Engagement
-    done = Engagement(
-        id="e1", defender_id="d1", target_threat_id="t1", start_time=0.0,
-        status=EngagementStatus.HIT, cost=50.0,
-    )
-    ledger = resolve([done], [defender], [threat], now=1.0)
-    assert ledger.defender_spent == 0.0
-    assert ledger.hits == 0
-
-
-def test_threat_without_value_uses_default():
-    allocator = GreedyAllocator()
-    defender = _defender("d1", (0.0, 0.0, 0.0), kill_prob=1.0, unit_cost=10.0)
-    threat = _threat("t1", 0.9, 1, value=0.0)
-    engagements = allocator.allocate([threat], [defender], now=0.0)
-    ledger = resolve(engagements, [defender], [threat], now=1.0, rng=random.Random(1))
-    assert ledger.attacker_destroyed == DEFAULT_THREAT_VALUE
+def test_ledger_accumulates_multiple_hits():
+    ledger = CostLedger()
+    for _ in range(3):
+        ledger.record_spend(8.0)
+        ledger.record_outcome(EngagementStatus.HIT, 500.0)
+    assert ledger.hits == 3
+    assert ledger.defender_spent == 24.0
+    assert ledger.attacker_destroyed == 1500.0
+    assert ledger.cost_exchange_ratio == 24.0 / 1500.0
 
 
 def test_cost_exchange_ratio_below_one_when_defense_wins():
@@ -289,18 +270,15 @@ def test_area_effector_covers_cluster_in_one_shot():
     assert out[0].aim_point is not None
 
 
-def test_area_resolve_credits_every_kill():
-    positions = {f"t{i}": (float(i * 20), 0.0, 80.0) for i in range(5)}
-    threats = [_area_threat(f"t{i}", positions[f"t{i}"], i) for i in range(5)]
-    hpm = _defender(
-        "hpm1", (0.0, 0.0, 0.0), capacity=1, range_m=3000.0,
-        unit_cost=8.0, kill_prob=1.0, kind=DefenderKind.HPM,
-    )
-    hpm.effect_radius_m = 400.0
-    hpm.max_simultaneous = 25
-    allocator = LayeredAllocator(resolve_position=lambda t: positions[t.id])
-    out = allocator.allocate(threats, [hpm], now=0.0)
-    ledger = resolve(out, [hpm], threats, now=0.0, rng=random.Random(1))
+def test_area_shot_credits_every_kill_in_ledger():
+    # An area shot charges its cost once but credits a kill per drone it removes,
+    # the accounting the runner performs for an HPM cone. The ledger must show one
+    # spend and many destroyed. The runner-side physics is covered in
+    # test_honest_fight and test_area_effector_covers_cluster_in_one_shot.
+    ledger = CostLedger()
+    ledger.record_spend(8.0)
+    for _ in range(5):
+        ledger.record_outcome(EngagementStatus.HIT, 50_000.0)
     assert ledger.hits == 5
     assert ledger.attacker_destroyed == 5 * 50_000.0
     assert ledger.defender_spent == 8.0

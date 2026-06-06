@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import logging
 import math
-import random
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -571,84 +570,8 @@ def _best_bid(row: List[float], prices: List[float]) -> tuple:
     return best_j, best_v, second_v
 
 
-def resolve(
-    engagements: List[Engagement],
-    defenders: List[Defender],
-    threats: List[Threat],
-    now: float,
-    ledger: Optional[CostLedger] = None,
-    rng: Optional[random.Random] = None,
-) -> CostLedger:
-    """Roll each PENDING engagement to an outcome and update the cost ledger.
-
-    For every PENDING engagement we draw against the defender single-shot kill
-    probability. A draw under kill_prob is a HIT and removes the attacker value.
-    Otherwise it is a MISS. An engagement whose defender is unknown is marked
-    LEAK, since the shot could not be taken. Already-resolved engagements are
-    left untouched. The engagement objects are mutated in place. The returned
-    ledger holds defender spend, attacker value destroyed, and the ratio.
-
-    rng is injectable so tests can pin outcomes. now is the shared timestamp.
-    """
-    ledger = ledger if ledger is not None else CostLedger()
-    rng = rng if rng is not None else random.Random()
-    defender_by_id: Dict[str, Defender] = {d.id: d for d in defenders}
-    value_by_threat = _attacker_values(threats)
-    for engagement in engagements:
-        if engagement.status is not EngagementStatus.PENDING:
-            continue
-        _resolve_one(engagement, defender_by_id, value_by_threat, ledger, rng)
-    logger.info(
-        "Resolved %d engagements at t=%.3f ratio=%s",
-        len(engagements),
-        now,
-        ledger.cost_exchange_ratio,
-    )
-    return ledger
-
-
-def _attacker_values(threats: List[Threat]) -> Dict[str, float]:
-    """Map each threat id to the attacker dollar value it represents.
-
-    Uses value_at_risk when positive, else a default per-drone value so a hit
-    still credits the cost-exchange metric.
-    """
-    values: Dict[str, float] = {}
-    for threat in threats:
-        value = threat.value_at_risk if threat.value_at_risk > 0 else DEFAULT_THREAT_VALUE
-        values[threat.id] = value
-    return values
-
-
-def _resolve_one(
-    engagement: Engagement,
-    defender_by_id: Dict[str, Defender],
-    value_by_threat: Dict[str, float],
-    ledger: CostLedger,
-    rng: random.Random,
-) -> None:
-    """Resolve a PENDING engagement, crediting every drone it neutralizes.
-
-    The engagement cost is charged once. Each targeted threat is rolled against
-    the defender kill probability independently, so an area shot can neutralize
-    several drones for one cost. The engagement keeps only the threats it actually
-    killed, which is the lineage the runner uses to remove airframes.
-    """
-    ledger.record_spend(engagement.cost)
-    defender = defender_by_id.get(engagement.defender_id)
-    if defender is None:
-        engagement.status = EngagementStatus.LEAK
-        engagement.neutralized_threat_ids = []
-        ledger.record_outcome(EngagementStatus.LEAK, 0.0)
-        return
-    targets = engagement.neutralized_threat_ids or [engagement.target_threat_id]
-    killed = [tid for tid in targets if rng.random() < defender.kill_prob]
-    engagement.neutralized_threat_ids = killed
-    if killed:
-        engagement.status = EngagementStatus.HIT
-        for tid in killed:
-            value = value_by_threat.get(tid, DEFAULT_THREAT_VALUE)
-            ledger.record_outcome(EngagementStatus.HIT, value)
-    else:
-        engagement.status = EngagementStatus.MISS
-        ledger.record_outcome(EngagementStatus.MISS, 0.0)
+# Engagement outcomes are resolved by the WargameRunner, which owns the physical
+# truth needed to decide kills: the effector lethal radius and each drone's
+# resistance to that effector kind. See wargame.runner._resolve_engagements. The
+# CostLedger above is the shared accounting the runner updates, kept here next to
+# the allocator that produces the engagements it scores.

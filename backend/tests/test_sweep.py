@@ -11,6 +11,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
+
+# Each sweep runs many wargames. Deselect for a fast loop with -m "not slow".
+pytestmark = pytest.mark.slow
+
 from csontology import DefenderKind
 from wargame.sweep import (
     SweepResult,

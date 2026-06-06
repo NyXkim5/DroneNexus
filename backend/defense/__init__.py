@@ -12,7 +12,6 @@ from defense.allocator import (
     GreedyAllocator,
     LayeredAllocator,
     PositionResolver,
-    resolve,
     CostLedger,
     DEFAULT_THREAT_VALUE,
 )
@@ -22,7 +21,6 @@ __all__ = [
     "GreedyAllocator",
     "LayeredAllocator",
     "PositionResolver",
-    "resolve",
     "CostLedger",
     "DEFAULT_THREAT_VALUE",
 ]
