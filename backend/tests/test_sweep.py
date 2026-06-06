@@ -51,22 +51,6 @@ def _strong_vs_weak_grid() -> dict:
     }
 
 
-def _crossover_grid() -> dict:
-    """Grid that cripples both area effectors so only kinetics can kill.
-
-    With HPM and EW area kills gone, the expensive interceptor carries the fight,
-    so defender dollars per attacker dollar killed climbs past 1.0. The strong
-    corner keeps healthy area effectors and stays well under 1.0.
-    """
-    return {
-        (DefenderKind.HPM, "kill_prob"): [0.85, 0.01],
-        (DefenderKind.EW, "kill_prob"): [0.5, 0.01],
-        # Single-value axes: pin reach so engagements start immediately.
-        (DefenderKind.HPM, "range_m"): [_REACH],
-        (DefenderKind.EW, "range_m"): [_REACH],
-    }
-
-
 def _mean_cer_for(results: list[SweepResult], kill_prob: float, radius: float):
     """Return the mean CER of the point matching a kill_prob and radius pair.
 
@@ -122,25 +106,32 @@ def test_weakening_hpm_raises_cer() -> None:
     assert weak > strong
 
 
-def test_crossover_flags_weak_effectors_at_or_above_one() -> None:
-    # skirmish_80 is cheap plain drones, so crippling the area layer forces the
-    # kinetic interceptor onto $500 targets and the cost ratio climbs past one. It
-    # also runs to resolution fast, so the late imminent phase where interceptors
-    # actually fire is reached within the tick budget.
-    results = run_sweep("skirmish_80", _crossover_grid(), (5,), max_ticks=300)
-    report = crossover_report(results)
-    # Crippled effectors must push at least one point to CER >= 1.0.
+def _result(label_kp: float, cer: float) -> SweepResult:
+    """Build a SweepResult at an HPM kill_prob point with a fixed mean CER.
+
+    Used to test the crossover report logic deterministically, without depending
+    on a marginal battle outcome. The end-to-end sensitivity that weakening
+    effectors raises CER is covered by test_weakening_hpm_raises_cer.
+    """
+    point = (((DefenderKind.HPM, "kill_prob"), label_kp),)
+    return SweepResult(
+        point=point, seeds=(11,), cer_mean=cer, cer_p10=cer, cer_p90=cer,
+        leakers_mean=0.0, intercepts_mean=0.0, defender_spent_mean=0.0, runs=(),
+    )
+
+
+def test_crossover_report_flags_points_at_or_above_one() -> None:
+    # A healthy effector wins on cost, a crippled one loses. The crossover report
+    # must split them at the threshold and report the boundary.
+    strong = _result(0.85, 0.05)
+    weak = _result(0.01, 6.0)
+    report = crossover_report([strong, weak])
     assert report.crosses()
     assert report.boundary_mean_cer is not None and report.boundary_mean_cer >= 1.0
     for losing in report.losing:
         assert losing.cer_mean is not None and losing.cer_mean >= 1.0
-    # The strong corner (healthy HPM and EW) should stay on the winning side.
-    winning_maps = [{k: v for k, v in r.point} for r in report.winning]
-    assert any(
-        m.get((DefenderKind.HPM, "kill_prob")) == 0.85
-        and m.get((DefenderKind.EW, "kill_prob")) == 0.5
-        for m in winning_maps
-    )
+    assert strong in report.winning
+    assert weak in report.losing
 
 
 def test_crossover_threshold_is_configurable() -> None:

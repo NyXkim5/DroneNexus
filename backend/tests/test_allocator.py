@@ -306,6 +306,28 @@ def test_area_resolve_credits_every_kill():
     assert ledger.defender_spent == 8.0
 
 
+def test_auction_assigns_distinct_threats_under_contention():
+    # Three imminent, high-value threats, two interceptor slots. The auction must
+    # assign each slot to a different threat, never double-booking one threat.
+    positions = {f"t{i}": (100.0 * i, 0.0, 80.0) for i in range(3)}
+    threats = [
+        Threat(
+            id=f"t{i}", score=0.9 - 0.01 * i, time_to_impact_s=5.0,
+            value_at_risk=50_000.0, priority_rank=i + 1, track_id=f"trk{i}",
+        )
+        for i in range(3)
+    ]
+    interceptor = _defender(
+        "int1", (0.0, 0.0, 0.0), capacity=2, range_m=3000.0,
+        unit_cost=8_000.0, kill_prob=0.85, kind=DefenderKind.INTERCEPTOR,
+    )
+    allocator = LayeredAllocator(resolve_position=lambda t: positions[t.id])
+    out = allocator.allocate(threats, [interceptor], now=0.0)
+    engaged = [e.target_threat_id for e in out]
+    assert len(out) == 2
+    assert len(set(engaged)) == 2
+
+
 def test_cost_discipline_reserves_interceptor_for_imminent():
     positions = {"far": (1000.0, 0.0, 80.0), "near": (1000.0, 0.0, 80.0)}
     interceptor = _defender(

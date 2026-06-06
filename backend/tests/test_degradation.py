@@ -59,12 +59,15 @@ def test_autonomy_keeps_defending_under_contested_conditions() -> None:
 
 
 def test_tracks_survive_a_blackout_by_coasting() -> None:
-    # During the blackout window the fusion engine must hold tracks by coasting,
-    # so the picture does not collapse to zero with no operator input.
+    # During a blackout shorter than the coast timeout the fusion engine must hold
+    # tracks by coasting, so the picture does not collapse with no operator input.
+    # The run ends inside the blackout, before the coast timeout, so any held
+    # track is being coasted on prediction alone. A blackout longer than the coast
+    # timeout would correctly drop tracks, which is a different, expected behavior.
     async def go() -> int:
         sc = load_scenario("contested_500")
-        sc.max_ticks = 80
-        sc.blackout_windows = [(50, 79)]
+        sc.max_ticks = 55
+        sc.blackout_windows = [(50, 120)]
         runner = WargameRunner(sc)
         async for _frame in runner.run(pace=False):
             pass

@@ -32,7 +32,7 @@ from csontology import (
     Threat,
     Track,
     TrackClass,
-    now,
+    Vec3,
 )
 from defense import LayeredAllocator
 from sensors.sim_source import SimSensorSource
@@ -137,7 +137,11 @@ class WargameRunner:
     def _step(self, detections: List[Detection]) -> Frame:
         """Run fusion, threat, defense for one tick and snapshot a Frame."""
         self._tick += 1
-        t = now()
+        # Use a deterministic simulation clock, not wall-clock. Fusion coasting
+        # and time-to-impact depend on the time delta between ticks, so a
+        # wall-clock base would make outcomes vary with CPU load and break
+        # reproducibility. Sim time is exactly tick count times the tick interval.
+        t = self._tick * self._dt
         if self._audit is not None:
             self._audit.record_detections(self._tick, t, detections)
         tracks = self._world.tracks.update(detections, t)
@@ -224,6 +228,7 @@ class WargameRunner:
         by_def = {d.id: d for d in self._world.defenders}
         by_threat = {th.id: th for th in threats}
         ledger = self._world.ledger
+        kill_positions: List[Vec3] = []
         for eng in engagements:
             ledger.record_spend(eng.cost)
             defender = by_def.get(eng.defender_id)
@@ -231,14 +236,24 @@ class WargameRunner:
                 eng.status = EngagementStatus.LEAK
                 eng.neutralized_threat_ids = []
                 continue
-            killed = self._apply_effect(defender, eng, by_threat)
+            killed = self._apply_effect(defender, eng, by_threat, kill_positions)
             eng.neutralized_threat_ids = killed
             eng.status = EngagementStatus.HIT if killed else EngagementStatus.MISS
+        if kill_positions:
+            self._world.swarm.register_losses(kill_positions)
 
     def _apply_effect(
-        self, defender: Defender, eng: Engagement, by_threat: dict,
+        self,
+        defender: Defender,
+        eng: Engagement,
+        by_threat: dict,
+        kill_positions: List[Vec3],
     ) -> List[str]:
-        """Apply one effector to its targets and return the threats it killed."""
+        """Apply one effector to its targets and return the threats it killed.
+
+        Killed drone positions are appended to kill_positions so the runner can
+        tell the swarm where it took losses, which makes nearby survivors react.
+        """
         area = defender.effect_radius_m > 0.0
         radius = defender.effect_radius_m if area else _POINT_KILL_RADIUS_M
         targets = eng.neutralized_threat_ids or [eng.target_threat_id]
@@ -253,6 +268,7 @@ class WargameRunner:
                 continue
             kill_prob = defender.kill_prob * _resistance(defender.kind, drone)
             if self._world.rng.random() < kill_prob:
+                kill_positions.append(drone.position)
                 self._destroy(drone)
                 self._world.ledger.record_outcome(
                     EngagementStatus.HIT, drone.unit_cost,
