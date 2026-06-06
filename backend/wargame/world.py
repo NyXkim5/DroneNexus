@@ -107,6 +107,8 @@ def build_world(scenario: Scenario) -> WorldModel:
         site_position=scenario.site.position,
         unit_cost=scenario.unit_cost,
         seed=scenario.seed,
+        jam_resistant_fraction=scenario.jam_resistant_fraction,
+        hardened_fraction=scenario.hardened_fraction,
     )
     tracks = TrackManager(FusionConfig())
     defenders = _build_defenders(scenario.defenders)

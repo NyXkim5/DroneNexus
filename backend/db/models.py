@@ -133,6 +133,26 @@ class OverwatchDB:
             for r in rows
         ]
 
+    async def get_events_by_engagement(self, engagement_id: str,
+                                       limit: int = 100) -> List[dict]:
+        """Return logged events whose data carries a matching engagement_id.
+
+        Filters on the JSON data column so engagement events emitted through the
+        ontology bridge are retrievable for after-action review and replay.
+        """
+        cursor = await self._db.execute(
+            "SELECT id, drone_id, severity, message, data, timestamp "
+            "FROM events WHERE json_extract(data, '$.engagement_id') = ? "
+            "ORDER BY id DESC LIMIT ?",
+            (engagement_id, limit),
+        )
+        rows = await cursor.fetchall()
+        return [
+            {"id": r[0], "drone_id": r[1], "severity": r[2], "message": r[3],
+             "data": json.loads(r[4]) if r[4] else None, "timestamp": r[5]}
+            for r in rows
+        ]
+
     async def get_telemetry_replay(self, drone_id: str,
                                     start_time: str, end_time: str) -> List[dict]:
         cursor = await self._db.execute(

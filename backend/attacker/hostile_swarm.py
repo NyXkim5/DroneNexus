@@ -44,10 +44,18 @@ logger = logging.getLogger("overwatch.attacker")
 DEFAULT_UNIT_COST = 500.0
 # A decoy is an order of magnitude cheaper than a real threat.
 DECOY_UNIT_COST = 50.0
+# Hardened and jam-resistant airframes are not cheap FPV drones. They carry
+# shielding, autonomy, or fiber-optic control, so they cost far more. This is the
+# real raid economy: the cheap mass is killed cheaply by area effects, and the
+# few drones that force an expensive kinetic interceptor are themselves expensive,
+# so the cost exchange stays defensible instead of a free win or a free loss.
+EW_RESISTANT_UNIT_COST = 6000.0
+HARDENED_UNIT_COST = 9000.0
+DUAL_RESISTANT_UNIT_COST = 14000.0
 # Nominal cruise speed of an attacker drone in m/s.
-CRUISE_SPEED_MPS = 18.0
+CRUISE_SPEED_MPS = 26.0
 # Ring radius the swarm spawns on, in meters from the site.
-SPAWN_RADIUS_M = 3000.0
+SPAWN_RADIUS_M = 2200.0
 # Distance from the site at which a drone is considered to have arrived.
 ARRIVAL_RADIUS_M = 25.0
 # Fraction of a DECOY swarm that are real threats. The rest are decoys.
@@ -107,6 +115,7 @@ class AttackerDrone:
     is_decoy: bool = False
     launch_time: float = 0.0
     arrived: bool = False
+    killed: bool = False
     speed_mps: float = CRUISE_SPEED_MPS
     jink_phase: float = 0.0
     jink_sign: float = 1.0
@@ -115,6 +124,12 @@ class AttackerDrone:
     alt_amp: float = 0.0
     cruise_alt: float = 100.0
     react_until: float = 0.0
+    # ew_resistant drones fly autonomous or fiber-optic links that defeat jamming,
+    # so EW and soft-kill effectors do nothing to them. hardened drones shrug off
+    # high-power microwave. Both force the defense onto kinetic interceptors, which
+    # is where the attacker tries to win the cost war.
+    ew_resistant: bool = False
+    hardened: bool = False
 
 
 @dataclass
@@ -125,6 +140,8 @@ class TruthDrone:
     velocity: Vec3
     is_decoy: bool
     unit_cost: float
+    ew_resistant: bool = False
+    hardened: bool = False
 
 
 @dataclass
@@ -149,6 +166,8 @@ class HostileSwarm:
     swarm_id: str = "RED-1"
     spawn_radius_m: float = SPAWN_RADIUS_M
     evasive: bool = True
+    jam_resistant_fraction: float = 0.0
+    hardened_fraction: float = 0.0
     drones: List[AttackerDrone] = field(default_factory=list)
     first_seen: float = field(default_factory=now)
     _rng: random.Random = field(init=False, repr=False)
@@ -192,6 +211,26 @@ class HostileSwarm:
         z = self._rng.uniform(40.0, 160.0)
         return x, y, z
 
+    def _airframe_cost(
+        self, base_cost: float, is_decoy: bool, ew_resistant: bool, hardened: bool,
+    ) -> float:
+        """Price an airframe by its survivability, the real raid economy.
+
+        A decoy keeps its throwaway price. A plain drone keeps the base cost.
+        Resistance to EW or HPM marks an expensive shielded or fiber-optic drone,
+        and a drone resistant to both is the costliest, so a kinetic interceptor
+        spent on it is a fair trade rather than a runaway loss.
+        """
+        if is_decoy:
+            return base_cost
+        if ew_resistant and hardened:
+            return DUAL_RESISTANT_UNIT_COST
+        if hardened:
+            return HARDENED_UNIT_COST
+        if ew_resistant:
+            return EW_RESISTANT_UNIT_COST
+        return base_cost
+
     def _make_drone(
         self, index: int, launch_time: float, is_decoy: bool, cost: float,
     ) -> AttackerDrone:
@@ -202,6 +241,9 @@ class HostileSwarm:
         """
         position = self._ring_position(index)
         terrain_follow = self._rng.random() < TERRAIN_FOLLOW_FRACTION
+        ew_resistant = self._rng.random() < self.jam_resistant_fraction
+        hardened = self._rng.random() < self.hardened_fraction
+        cost = self._airframe_cost(cost, is_decoy, ew_resistant, hardened)
         return AttackerDrone(
             id=f"{self.swarm_id}-{index:04d}",
             position=position,
@@ -215,6 +257,8 @@ class HostileSwarm:
             alt_phase=self._rng.uniform(0.0, 2.0 * math.pi),
             alt_amp=ALT_BOB_M if terrain_follow else ALT_BOB_M * 0.25,
             cruise_alt=position[2],
+            ew_resistant=ew_resistant,
+            hardened=hardened,
         )
 
     def _spawn_saturation(self) -> List[AttackerDrone]:

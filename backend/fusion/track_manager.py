@@ -10,21 +10,24 @@ unmatched detections, and coast or expire tracks that no sensor confirmed.
 Association
 -----------
 We use global nearest-neighbor with a chi-square gate. Each track predicts a
-position and a covariance. The squared Mahalanobis distance between a detection
-and a track is the cost. Pairs beyond the gate are forbidden. We then take the
-cheapest valid pairs greedily, one detection per track and one track per
-detection. Greedy global-nearest-neighbor is near-optimal for well-separated
-contacts and stays fast at swarm scale. A coarse spatial pre-filter with numpy
-keeps the cost matrix sparse so we never score every track against every
-detection.
+position and a covariance. The cost blends the squared Mahalanobis position
+distance with a velocity-mismatch term so a target keeps its identity through a
+crossing. Pairs beyond the gate are forbidden. We then take the cheapest valid
+pairs greedily, one detection per track and one track per detection. Greedy
+global-nearest-neighbor is near-optimal for well-separated contacts and stays
+fast at swarm scale. A coarse spatial pre-filter built on a plain Python spatial
+hash (see _SpatialGrid) keeps the candidate set sparse so we never score every
+track against every detection.
 
 Lifecycle
 ---------
-A new detection that matches nothing seeds a tentative track. A track that keeps
-getting hits gains confidence and is confirmed. A track that misses updates
-coasts on its predicted state with growing covariance. After a coast timeout the
-track expires and is dropped. This gives identity stability under noise and
-graceful behavior under sensor dropout.
+A new detection that matches nothing seeds a tentative track. We keep a sliding
+window of recent association outcomes per track and confirm on N hits out of the
+last M ticks, so steady real targets confirm and one-off clutter never does. A
+track that misses updates coasts on its predicted state with growing covariance.
+A confirmed track that stops associating is demoted, and after a coast timeout it
+expires and is dropped. This gives identity stability under noise, rejects false
+tracks from clutter, and behaves gracefully under sensor dropout.
 
 Designed for 1000-plus simultaneous contacts. Association cost is bounded by the
 spatial gate, not by the full track-by-detection product.
@@ -33,12 +36,10 @@ from __future__ import annotations
 
 import itertools
 import logging
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from math import floor
-from typing import Dict, Iterable, List, Optional, Tuple
-
-import numpy as np
+from typing import Deque, Dict, Iterable, List, Optional, Tuple
 
 from csontology import Detection, Track, TrackClass, Vec3
 from fusion.kalman import ConstantVelocityKalman
@@ -103,14 +104,25 @@ class FusionConfig:
     gate_chi2 is the chi-square gate on squared Mahalanobis distance with three
     degrees of freedom. The default 11.345 is the 0.99 quantile, so a true
     measurement falls inside the gate 99 percent of the time. coast_timeout_s is
-    how long a track survives with no confirming detection. confirm_hits is how
-    many associations promote a tentative track to confirmed. meas_sigma_m is the
+    how long a track survives with no confirming detection. meas_sigma_m is the
     assumed sensor position noise in meters when a Detection carries none.
+
+    Confirmation uses N-of-M. confirm_window is M, the number of recent ticks we
+    remember per track. confirm_hits is N, the hits within that window that
+    promote a tentative track. A confirmed track that drops below N hits in the
+    window is demoted, so clutter that flickers once never sticks.
+
+    Merge fires only on true duplicates. merge_radius_m is a tight co-location
+    radius (about two measurement sigmas) and merge_overlap_ticks is how many
+    consecutive ticks two tracks must stay co-located before we collapse them.
+    velocity_cost_w weights the velocity-mismatch term in the association cost so
+    a target keeps its identity through a crossing.
     """
 
     gate_chi2: float = 11.345
     coast_timeout_s: float = 3.0
     confirm_hits: int = 3
+    confirm_window: int = 5
     meas_sigma_m: float = 5.0
     init_pos_sigma_m: float = 25.0
     init_vel_sigma_m: float = 15.0
@@ -120,13 +132,21 @@ class FusionConfig:
     confidence_decay: float = 0.3
     cluster_radius_m: float = 60.0
     dup_radius_m: float = 50.0
-    merge_radius_m: float = 25.0
+    merge_radius_m: float = 10.0
     merge_vel_ms: float = 10.0
+    merge_overlap_ticks: int = 3
+    velocity_cost_w: float = 0.05
 
 
 @dataclass
 class _TrackEntry:
-    """Internal bookkeeping that wraps a public Track with its filter."""
+    """Internal bookkeeping that wraps a public Track with its filter.
+
+    window holds the recent per-tick association outcomes, newest last, capped at
+    confirm_window. hits is the lifetime association count used only as a merge
+    tie-breaker. overlaps counts consecutive ticks this track stayed co-located
+    with another track, keyed by that track id, and drives the merge decision.
+    """
 
     track: Track
     kalman: ConstantVelocityKalman
@@ -134,6 +154,8 @@ class _TrackEntry:
     confirmed: bool = False
     last_seen: float = 0.0
     history: List[Vec3] = field(default_factory=list)
+    window: Deque[bool] = field(default_factory=deque)
+    overlaps: Dict[str, int] = field(default_factory=dict)
 
 
 class TrackManager:
@@ -183,7 +205,9 @@ class TrackManager:
         self._advance_all(now)
         measurements = self._fuse_detections(detections)
         matches, unmatched = self._associate(measurements)
+        matched_ids = {track_id for track_id, _ in matches}
         self._apply_matches(matches, measurements, now)
+        self._record_outcomes(matched_ids)
         fresh = self._reject_duplicates(measurements, unmatched)
         self._spawn_tracks(fresh, now)
         self._merge_duplicates()
@@ -191,13 +215,38 @@ class TrackManager:
         self._last_now = now
         return self.tracks()
 
-    def _merge_duplicates(self) -> None:
-        """Collapse track pairs that are co-located and moving together.
+    def _record_outcomes(self, matched_ids: set[str]) -> None:
+        """Push each existing track's hit or miss this tick and re-confirm.
 
-        Early ticks have no tracks to suppress against, so one object can seed two
-        tracks that both confirm. This pass merges any pair within merge_radius_m
-        whose velocities agree within merge_vel_ms, keeping the better-supported
-        track and folding the other one's source lineage into it.
+        Every track that lived into this tick gets one window entry: a hit if it
+        associated, a miss otherwise. Tracks spawned later this tick are not yet
+        present, so they record their seed hit in _spawn_tracks instead. A track
+        is confirmed exactly when it has N hits in the last M ticks.
+        """
+        for track_id, entry in self._entries.items():
+            self._push_window(entry, track_id in matched_ids)
+            self._reevaluate_confirm(entry)
+
+    def _push_window(self, entry: _TrackEntry, hit: bool) -> None:
+        """Append one association outcome, capped to the confirm window length."""
+        entry.window.append(hit)
+        while len(entry.window) > self._config.confirm_window:
+            entry.window.popleft()
+
+    def _reevaluate_confirm(self, entry: _TrackEntry) -> None:
+        """Confirm or demote a track on N hits within the last M ticks."""
+        entry.confirmed = sum(entry.window) >= self._config.confirm_hits
+
+    def _merge_duplicates(self) -> None:
+        """Collapse only true-duplicate track pairs, never tight formations.
+
+        One physical object can briefly seed two tracks before suppression kicks
+        in. A real second drone in formation is a distinct object even at close
+        spacing, so proximity alone must not merge. We require both very close
+        co-location, within merge_radius_m (about two measurement sigmas, well
+        under formation spacing), and persistent overlap across merge_overlap_ticks
+        consecutive ticks. Only then do we keep the better-supported track and
+        fold the other one's lineage into it.
         """
         entries = list(self._entries.items())
         if len(entries) < 2:
@@ -207,13 +256,54 @@ class TrackManager:
         for idx, pos in enumerate(positions):
             grid.insert(idx, pos)
         radius_sq = self._config.merge_radius_m**2
+        seen_pairs = self._tally_overlaps(entries, positions, grid, radius_sq)
         dead: set[str] = set()
-        for i, (tid_i, ent_i) in enumerate(entries):
+        for i, (tid_i, _ent_i) in enumerate(entries):
             if tid_i in dead:
                 continue
             self._merge_neighbors(i, entries, positions, grid, radius_sq, dead)
+        self._prune_overlaps(entries, seen_pairs, dead)
         for tid in dead:
             del self._entries[tid]
+
+    def _tally_overlaps(
+        self,
+        entries: List[Tuple[str, _TrackEntry]],
+        positions: List[Vec3],
+        grid: _SpatialGrid,
+        radius_sq: float,
+    ) -> set:
+        """Bump the consecutive-overlap counter for every co-located pair.
+
+        Returns the set of track-id pairs that overlap this tick so callers can
+        reset stale counters for pairs that drifted apart.
+        """
+        seen: set = set()
+        for i, (tid_i, ent_i) in enumerate(entries):
+            for j in set(grid.neighbors(positions[i])):
+                if j <= i:
+                    continue
+                if _dist_sq(positions[i], positions[j]) > radius_sq:
+                    continue
+                tid_j = entries[j][0]
+                ent_i.overlaps[tid_j] = ent_i.overlaps.get(tid_j, 0) + 1
+                seen.add((tid_i, tid_j))
+        return seen
+
+    def _prune_overlaps(
+        self,
+        entries: List[Tuple[str, _TrackEntry]],
+        seen_pairs: set,
+        dead: set,
+    ) -> None:
+        """Reset overlap counters for pairs that did not co-locate this tick."""
+        for tid_i, ent_i in entries:
+            stale = [
+                other for other in ent_i.overlaps
+                if (tid_i, other) not in seen_pairs or other in dead
+            ]
+            for other in stale:
+                del ent_i.overlaps[other]
 
     def _merge_neighbors(
         self,
@@ -224,7 +314,8 @@ class TrackManager:
         radius_sq: float,
         dead: set,
     ) -> None:
-        """Merge any later track that duplicates entry i into the survivor."""
+        """Merge any later track that truly duplicates entry i into the survivor."""
+        need = self._config.merge_overlap_ticks
         for j in set(grid.neighbors(positions[i])):
             if j <= i:
                 continue
@@ -234,6 +325,8 @@ class TrackManager:
             if _dist_sq(positions[i], positions[j]) > radius_sq:
                 continue
             if _vel_diff(entries[i][1].kalman.velocity, ent_j.kalman.velocity) > self._config.merge_vel_ms:
+                continue
+            if entries[i][1].overlaps.get(tid_j, 0) < need:
                 continue
             self._fold_track(entries[i][1], ent_j, dead, tid_j, entries[i][0])
 
@@ -399,23 +492,40 @@ class TrackManager:
         """Build scored (cost, track_id, meas_index) pairs that pass both gates.
 
         A spatial grid keyed on the gate radius prunes far pairs in near-linear
-        time. Survivors get an exact Mahalanobis score and the chi-square gate.
+        time. Survivors get an exact Mahalanobis score on the nominal sensor
+        sigma and the chi-square gate. We gate on the nominal sigma, not the
+        confidence-inflated one, so low-confidence clutter cannot widen its own
+        gate and steal a real measurement. Confidence scaling stays in the Kalman
+        update. The reported cost adds a velocity-mismatch term so a target keeps
+        its identity through a crossing where two positions nearly coincide.
         """
         grid = _SpatialGrid(self._config.gate_radius_m)
         for ei, entry in enumerate(entries):
             grid.insert(ei, entry.kalman.position)
         radius_sq = self._config.gate_radius_m**2
+        gate_sigma = self._config.meas_sigma_m
         pairs: List[Tuple[float, str, int]] = []
         for mi, meas in enumerate(measurements):
-            sigma = self._meas_sigma(meas)
             for ei in set(grid.neighbors(meas.position)):
                 entry = entries[ei]
                 if _dist_sq(entry.kalman.position, meas.position) > radius_sq:
                     continue
-                cost = entry.kalman.mahalanobis_sq(meas.position, sigma)
-                if cost <= self._config.gate_chi2:
-                    pairs.append((cost, entry.track.id, mi))
+                gate_cost = entry.kalman.mahalanobis_sq(meas.position, gate_sigma)
+                if gate_cost <= self._config.gate_chi2:
+                    pairs.append((self._pair_cost(entry, meas, gate_cost), entry.track.id, mi))
         return pairs
+
+    def _pair_cost(
+        self, entry: _TrackEntry, meas: _Measurement, gate_cost: float,
+    ) -> float:
+        """Association cost blending the gated position score with velocity error.
+
+        The velocity term breaks ties when two targets cross and their positions
+        nearly coincide, steering each measurement to the track whose velocity it
+        matches and preventing an identity swap.
+        """
+        vel_err = _dist_sq(entry.kalman.velocity, meas.velocity)
+        return gate_cost + self._config.velocity_cost_w * vel_err
 
     def _resolve_greedy(
         self,
@@ -442,15 +552,18 @@ class TrackManager:
         measurements: List[_Measurement],
         now: float,
     ) -> None:
-        """Correct each matched track with its measurement and bump confidence."""
+        """Correct each matched track with its measurement and bump confidence.
+
+        Confirmation is decided later in _record_outcomes from the N-of-M window,
+        so here we only fold the measurement, bump the lifetime hit count used as
+        a merge tie-breaker, and raise confidence.
+        """
         for track_id, meas_index in matches:
             entry = self._entries[track_id]
             meas = measurements[meas_index]
             entry.kalman.update(meas.position, self._meas_sigma(meas))
             entry.hits += 1
             entry.last_seen = now
-            if entry.hits >= self._config.confirm_hits:
-                entry.confirmed = True
             self._record_source(entry, meas)
             self._raise_confidence(entry)
             self._sync_track(entry, now)
@@ -477,6 +590,7 @@ class TrackManager:
             )
             entry = _TrackEntry(
                 track=track, kalman=kalman, hits=1, last_seen=now,
+                window=deque([True]),
             )
             entry.history.append(meas.position)
             track.history = list(entry.history)

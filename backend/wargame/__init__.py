@@ -16,9 +16,13 @@ from wargame.scenario import (
     load_scenario_file,
 )
 from wargame.world import WorldModel, build_world
+from wargame.sweep import SweepResult, crossover_report, run_sweep
 
 __all__ = [
     "WargameRunner",
+    "SweepResult",
+    "crossover_report",
+    "run_sweep",
     "Frame",
     "Metrics",
     "Scenario",

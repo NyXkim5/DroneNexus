@@ -24,6 +24,7 @@ from typing import AsyncIterator, List, Optional
 
 from csontology import (
     Defender,
+    DefenderKind,
     DefenderStatus,
     Detection,
     Engagement,
@@ -33,7 +34,7 @@ from csontology import (
     TrackClass,
     now,
 )
-from defense import LayeredAllocator, resolve
+from defense import LayeredAllocator
 from sensors.sim_source import SimSensorSource
 import threat as threat_module
 
@@ -45,6 +46,26 @@ from wargame.scenario import Scenario
 from wargame.world import WorldModel, build_sensor_specs, build_world
 
 logger = logging.getLogger("overwatch.wargame")
+
+# Lethal radius in meters for a kinetic point effector. A drone must be within
+# this of the threat position for the shot to connect, so a shot at empty
+# airspace kills nothing and lets the drone leak.
+_POINT_KILL_RADIUS_M = 80.0
+
+
+def _resistance(kind: DefenderKind, drone) -> float:
+    """How well a target survives one effector kind, as a kill-probability scale.
+
+    Jam-resistant drones defeat EW and other soft-kill RF entirely. Hardened
+    drones largely shrug off high-power microwave. Kinetic effectors, including
+    interceptors, nets, and lasers, work regardless, which is why the expensive
+    kinetic layer is the answer to a hardened, jam-resistant raid.
+    """
+    if kind in (DefenderKind.EW, DefenderKind.JAMMER) and drone.ew_resistant:
+        return 0.0
+    if kind is DefenderKind.HPM and drone.hardened:
+        return 0.15
+    return 1.0
 
 
 class WargameRunner:
@@ -117,8 +138,12 @@ class WargameRunner:
         """Run fusion, threat, defense for one tick and snapshot a Frame."""
         self._tick += 1
         t = now()
+        if self._audit is not None:
+            self._audit.record_detections(self._tick, t, detections)
         tracks = self._world.tracks.update(detections, t)
         self._world.last_tracks = tracks
+        if self._audit is not None:
+            self._audit.link_tracks(self._tick, tracks)
         self._classify_hostiles()
         threats = threat_module.assess(tracks, self._world.site, t)
         engagements = self._engage(threats, t)
@@ -164,15 +189,7 @@ class WargameRunner:
         ready = [d for d in self._world.defenders if d.status is DefenderStatus.READY]
         engagements = self._allocator.allocate(threats, ready, t)
         self._commit_capacity(engagements)
-        resolve(
-            engagements,
-            self._world.defenders,
-            threats,
-            t,
-            ledger=self._world.ledger,
-            rng=self._world.rng,
-        )
-        self._mark_destroyed(engagements, threats)
+        self._resolve_engagements(engagements, threats)
         self._engagements_made += len(engagements)
         return engagements
 
@@ -192,38 +209,63 @@ class WargameRunner:
             if defender.status is DefenderStatus.RELOADING:
                 self._world.reload_left[defender.id] = defender.reload_s
 
-    def _mark_destroyed(
-        self, engagements: List[Engagement], threats: List[Threat]
+    def _resolve_engagements(
+        self, engagements: List[Engagement], threats: List[Threat],
     ) -> None:
-        """Kill every attacker drone a HIT neutralized and tally its dollar cost.
+        """Resolve fire decisions into real kills, gated by radius and hardness.
 
-        Each HIT carries the threats it actually killed in neutralized_threat_ids,
-        so one area shot removes several airframes. We resolve each killed threat
-        to an ENU position and flag the nearest live drone as destroyed so it
-        leaves the truth feed next tick. We sum drone unit_cost into
-        attacker_destroyed so the cost-exchange ratio uses real airframe cost.
+        Each engagement charges its cost once. For every targeted threat we find
+        the nearest live drone within the effector lethal radius. A shot at empty
+        airspace kills nothing, so misses let drones leak. The kill probability is
+        the effector base probability scaled by how the target resists that
+        effector, so a jam-resistant drone shrugs off EW and a hardened drone
+        shrugs off HPM, forcing the defense onto kinetic interceptors.
         """
+        by_def = {d.id: d for d in self._world.defenders}
         by_threat = {th.id: th for th in threats}
+        ledger = self._world.ledger
         for eng in engagements:
-            if eng.status is not EngagementStatus.HIT:
+            ledger.record_spend(eng.cost)
+            defender = by_def.get(eng.defender_id)
+            if defender is None:
+                eng.status = EngagementStatus.LEAK
+                eng.neutralized_threat_ids = []
                 continue
-            for tid in eng.neutralized_threat_ids:
-                threat = by_threat.get(tid)
-                if threat is None:
-                    continue
-                position = self._world.resolve_threat_position(threat)
-                self._kill_nearest_drone(position)
+            killed = self._apply_effect(defender, eng, by_threat)
+            eng.neutralized_threat_ids = killed
+            eng.status = EngagementStatus.HIT if killed else EngagementStatus.MISS
 
-    def _kill_nearest_drone(self, position) -> None:
-        """Flag the live drone closest to an ENU position as destroyed.
+    def _apply_effect(
+        self, defender: Defender, eng: Engagement, by_threat: dict,
+    ) -> List[str]:
+        """Apply one effector to its targets and return the threats it killed."""
+        area = defender.effect_radius_m > 0.0
+        radius = defender.effect_radius_m if area else _POINT_KILL_RADIUS_M
+        targets = eng.neutralized_threat_ids or [eng.target_threat_id]
+        killed: List[str] = []
+        for tid in targets:
+            threat = by_threat.get(tid)
+            if threat is None:
+                continue
+            position = self._world.resolve_threat_position(threat)
+            drone = self._nearest_live_drone(position, radius)
+            if drone is None:
+                continue
+            kill_prob = defender.kill_prob * _resistance(defender.kind, drone)
+            if self._world.rng.random() < kill_prob:
+                self._destroy(drone)
+                self._world.ledger.record_outcome(
+                    EngagementStatus.HIT, drone.unit_cost,
+                )
+                killed.append(tid)
+        return killed
 
-        Adds the drone unit_cost to the world tally of attacker dollars destroyed.
-        A None position or no live drone leaves the field unchanged.
-        """
+    def _nearest_live_drone(self, position, radius: float):
+        """Return the nearest unarrived drone within radius of position, or None."""
         if position is None:
-            return
+            return None
         best = None
-        best_d2 = float("inf")
+        best_d2 = radius * radius
         for drone in self._world.swarm.drones:
             if drone.arrived:
                 continue
@@ -231,13 +273,18 @@ class WargameRunner:
             dy = drone.position[1] - position[1]
             dz = drone.position[2] - position[2]
             d2 = dx * dx + dy * dy + dz * dz
-            if d2 < best_d2:
+            if d2 <= best_d2:
                 best_d2 = d2
                 best = drone
-        if best is not None:
-            best.arrived = True
-            self._world.attacker_dollars_destroyed += best.unit_cost
-            self._world.drones_killed += 1
+        return best
+
+    def _destroy(self, drone) -> None:
+        """Flag a drone killed and credit its real airframe cost destroyed."""
+        drone.killed = True
+        drone.arrived = True
+        drone.velocity = (0.0, 0.0, 0.0)
+        self._world.attacker_dollars_destroyed += drone.unit_cost
+        self._world.drones_killed += 1
 
     def _cool_down(self) -> None:
         """Tick down reload timers and return finished defenders to READY."""
@@ -303,12 +350,13 @@ class WargameRunner:
         return sum(1 for d in self._world.swarm.drones if not d.arrived)
 
     def _count_leakers(self) -> None:
-        """Record any drone that reached the site as a one-time leaker.
+        """Record any drone that reached the site without being killed.
 
-        A leaker is a drone that arrived at the site without being intercepted.
-        Killed drones are also flagged arrived, so we only count arrivals that the
-        attacker advance loop produced, tracked by drone id distinct from kills.
+        A leaker is a drone that arrived at the site and was not intercepted. The
+        kill path sets killed True, the attacker arrival path does not, so the
+        killed flag cleanly separates a leaker from a kill. Each leaker is counted
+        once by id.
         """
         for drone in self._world.swarm.drones:
-            if drone.arrived and drone.position == self._world.site.position:
+            if drone.arrived and not drone.killed:
                 self._world.counted_leakers.add(drone.id)

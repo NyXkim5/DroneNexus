@@ -30,6 +30,7 @@ from csontology import (
     DefenderStatus,
     Engagement,
     EngagementStatus,
+    SwarmIntent,
     Threat,
     Vec3,
 )
@@ -310,12 +311,14 @@ class LayeredAllocator(Allocator):
         auction_eps: float = 1e-3,
         imminent_s: float = 12.0,
         attacker_cost_ref: float = 500.0,
+        min_kinetic_confidence: float = 0.4,
     ) -> None:
         self._resolve_position = resolve_position
         self._cost_weight = cost_weight
         self._auction_eps = auction_eps
         self._imminent_s = imminent_s
         self._attacker_cost_ref = attacker_cost_ref
+        self._min_kinetic_confidence = min_kinetic_confidence
 
     def allocate(
         self,
@@ -464,12 +467,17 @@ class LayeredAllocator(Allocator):
         The cost war is defender dollars per kill against attacker dollars per
         airframe. An effector whose cost per expected kill beats the attacker
         airframe cost is always worth firing. An expensive one, like a kinetic
-        interceptor, fires only as last resort against an imminent leaker, so it
-        never blows the cost-exchange ratio on a cheap or distant drone.
+        interceptor, fires only as a last resort against an imminent leaker, and
+        never against a known decoy or a low-confidence track, so it does not blow
+        the cost-exchange ratio on a cheap, fake, or uncertain target.
         """
         cost_per_kill = defender.unit_cost / max(0.05, defender.kill_prob)
         if cost_per_kill <= self._attacker_cost_ref:
             return True
+        if threat.intent is SwarmIntent.DECOY:
+            return False
+        if threat.confidence < self._min_kinetic_confidence:
+            return False
         tti = threat.time_to_impact_s
         return tti is not None and tti <= self._imminent_s
 

@@ -181,6 +181,8 @@ class Threat:
     priority_rank: int
     track_id: Optional[str] = None
     swarm_id: Optional[str] = None
+    intent: "SwarmIntent" = SwarmIntent.UNKNOWN
+    confidence: float = 1.0
 
 
 @dataclass

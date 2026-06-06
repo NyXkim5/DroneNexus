@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import csontology as cs
 import protocol as ow
@@ -134,29 +134,79 @@ def _engagement_severity(engagement: cs.Engagement) -> ow.AlertSeverity:
     return ow.AlertSeverity.INFO
 
 
-def engagement_to_event(engagement: cs.Engagement) -> dict:
+def _lineage_detection_ids(lineage: Optional[Dict[str, List[str]]]) -> List[str]:
+    """Flatten a threat to detection lineage map into a deduped id list."""
+    if not lineage:
+        return []
+    seen: List[str] = []
+    for det_ids in lineage.values():
+        for det_id in det_ids:
+            if det_id not in seen:
+                seen.append(det_id)
+    return seen
+
+
+def engagement_to_event(
+    engagement: cs.Engagement,
+    threat: Optional[cs.Threat] = None,
+    lineage: Optional[Dict[str, List[str]]] = None,
+) -> dict:
     """Convert a BULWARK Engagement into an OVERWATCH event row.
 
     The shape matches db.OverwatchDB.log_event arguments (drone_id, severity,
     message, data). The defender id stands in as drone_id so the engagement
-    threads through the existing events table and HUD activity feed.
+    threads through the existing events table and HUD activity feed. When a
+    threat and its detection lineage are supplied the data block carries the
+    score, swarm id, intent, and contributing detection ids for full audit.
     """
     severity = _engagement_severity(engagement)
     message = f"Engagement {engagement.id} {engagement.status.value}"
+    data: Dict[str, Any] = {
+        "engagement_id": engagement.id,
+        "defender_id": engagement.defender_id,
+        "target_threat_id": engagement.target_threat_id,
+        "neutralized_threat_ids": list(engagement.neutralized_threat_ids),
+        "status": engagement.status.value,
+        "start_time": engagement.start_time,
+        "cost": engagement.cost,
+        "lineage_detection_ids": _lineage_detection_ids(lineage),
+    }
+    if threat is not None:
+        data["score"] = threat.score
+        data["value_at_risk"] = threat.value_at_risk
+        data["swarm_id"] = threat.swarm_id
+        data["intent"] = threat.intent.value
+        data["time_to_impact_s"] = threat.time_to_impact_s
+        data["priority_rank"] = threat.priority_rank
+        data["track_id"] = threat.track_id
     return {
         "drone_id": engagement.defender_id,
         "severity": severity.value,
         "message": message,
-        "data": {
-            "engagement_id": engagement.id,
-            "defender_id": engagement.defender_id,
-            "target_threat_id": engagement.target_threat_id,
-            "status": engagement.status.value,
-            "start_time": engagement.start_time,
-            "cost": engagement.cost,
-        },
+        "data": data,
         "timestamp": _now_iso(),
     }
+
+
+async def emit_engagement_event(
+    db: Any,
+    engagement: cs.Engagement,
+    threat: Optional[cs.Threat] = None,
+    lineage: Optional[Dict[str, List[str]]] = None,
+) -> None:
+    """Write one engagement to a live OverwatchDB events table.
+
+    Builds the event dict with engagement_to_event then awaits db.log_event with
+    its keyword arguments. The lead calls this from the runner with the live
+    OverwatchDB so engagements surface on the HUD activity feed with lineage.
+    """
+    event = engagement_to_event(engagement, threat, lineage)
+    await db.log_event(
+        drone_id=event["drone_id"],
+        severity=event["severity"],
+        message=event["message"],
+        data=event["data"],
+    )
 
 
 def _defender_formation(defender: cs.Defender) -> ow.Formation:

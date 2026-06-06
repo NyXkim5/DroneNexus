@@ -95,6 +95,8 @@ class Scenario:
     seed: int = 7
     jam_fraction: float = 0.0
     blackout_windows: List[Tuple[int, int]] = field(default_factory=list)
+    jam_resistant_fraction: float = 0.0
+    hardened_fraction: float = 0.0
 
     def __post_init__(self) -> None:
         if not 10 <= self.swarm_count <= 1000:
@@ -139,13 +141,13 @@ def _hpm(count: int) -> DefenderConfig:
         kind=DefenderKind.HPM,
         count=count,
         position=(0.0, 0.0, 0.0),
-        capacity=40,
-        range_m=2000.0,
-        reload_s=3.0,
-        kill_prob=0.8,
+        capacity=18,
+        range_m=1800.0,
+        reload_s=2.5,
+        kill_prob=0.7,
         unit_cost=8.0,
-        effect_radius_m=350.0,
-        max_simultaneous=25,
+        effect_radius_m=280.0,
+        max_simultaneous=12,
     )
 
 
@@ -161,13 +163,13 @@ def _ew(count: int) -> DefenderConfig:
         kind=DefenderKind.EW,
         count=count,
         position=(0.0, 0.0, 0.0),
-        capacity=80,
-        range_m=2400.0,
-        reload_s=1.0,
-        kill_prob=0.5,
+        capacity=28,
+        range_m=2000.0,
+        reload_s=1.5,
+        kill_prob=0.45,
         unit_cost=3.0,
-        effect_radius_m=500.0,
-        max_simultaneous=40,
+        effect_radius_m=380.0,
+        max_simultaneous=16,
     )
 
 
@@ -198,6 +200,8 @@ def _saturation_1000() -> Scenario:
         tick_hz=5.0,
         max_ticks=600,
         seed=11,
+        jam_resistant_fraction=0.35,
+        hardened_fraction=0.2,
     )
 
 
@@ -258,6 +262,8 @@ def _decoy_300() -> Scenario:
         tick_hz=5.0,
         max_ticks=500,
         seed=23,
+        jam_resistant_fraction=0.25,
+        hardened_fraction=0.15,
     )
 
 
@@ -283,6 +289,47 @@ def _contested_500() -> Scenario:
         seed=29,
         jam_fraction=0.4,
         blackout_windows=[(60, 80)],
+        jam_resistant_fraction=0.35,
+        hardened_fraction=0.2,
+    )
+
+
+def _skirmish_80() -> Scenario:
+    """A small, fast saturation of cheap drones for quick sweeps and tests.
+
+    Eighty plain airframes converge so a sweep resolves in a few seconds. With
+    healthy area effectors the defense wins on cost. With the area layer crippled
+    the only kills come from kinetic interceptors fired at cheap drones, so the
+    cost-exchange ratio climbs past one. That makes it the right scenario to test
+    the crossover boundary quickly.
+    """
+    return Scenario(
+        name="skirmish_80",
+        swarm_intent=SwarmIntent.SATURATION,
+        swarm_count=80,
+        unit_cost=500.0,
+        sensors=_ring_sensors(count=3, range_m=3200.0, radius_m=400.0),
+        defenders=[
+            _hpm(count=1),
+            _ew(count=1),
+            DefenderConfig(
+                id_prefix="INT",
+                kind=DefenderKind.INTERCEPTOR,
+                count=10,
+                position=(0.0, 0.0, 0.0),
+                capacity=4,
+                range_m=2500.0,
+                reload_s=2.0,
+                kill_prob=0.85,
+                unit_cost=8_000.0,
+            ),
+        ],
+        site=SiteConfig(),
+        tick_hz=5.0,
+        max_ticks=300,
+        seed=5,
+        jam_resistant_fraction=0.2,
+        hardened_fraction=0.1,
     )
 
 
@@ -293,6 +340,7 @@ PRESETS: Dict[str, "callable"] = {
     "probe_120": _probe_120,
     "decoy_300": _decoy_300,
     "contested_500": _contested_500,
+    "skirmish_80": _skirmish_80,
 }
 
 

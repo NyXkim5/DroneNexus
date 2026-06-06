@@ -308,3 +308,152 @@ def test_empty_update_is_safe() -> None:
     mgr = TrackManager()
     assert mgr.update([], 0.0) == []
     assert mgr.predict(1.0) == []
+
+
+# ---- N-of-M confirmation and clutter rejection ----
+
+def test_clutter_does_not_confirm_false_tracks() -> None:
+    """Pure clutter must never confirm a track under N-of-M confirmation.
+
+    We feed random detections scattered over a wide volume for many ticks with
+    no consistent ground truth. No object persists, so no track should gather
+    N hits in M ticks. confirmed_tracks stays at zero, allowing a tiny bound for
+    a chance re-association.
+    """
+    rng = random.Random(101)
+    mgr = TrackManager()
+    t = 0.0
+    peak_confirmed = 0
+    for i in range(30):
+        t += 0.1
+        dets = []
+        for k in range(15):
+            pos: Vec3 = (
+                rng.uniform(-5000, 5000),
+                rng.uniform(-5000, 5000),
+                rng.uniform(40, 120),
+            )
+            vel: Vec3 = (rng.uniform(-30, 30), rng.uniform(-30, 30), 0.0)
+            dets.append(_det(f"c{i}-{k}", pos, vel, t, conf=0.3))
+        mgr.update(dets, t)
+        peak_confirmed = max(peak_confirmed, len(mgr.confirmed_tracks()))
+    assert peak_confirmed <= 1, f"clutter confirmed {peak_confirmed} false tracks"
+
+
+def test_real_target_still_confirms_under_noise() -> None:
+    """A steady real target under normal noise must still confirm with N-of-M."""
+    rng = random.Random(5)
+    mgr = TrackManager()
+    pos: Vec3 = (300.0, 100.0, 60.0)
+    vel: Vec3 = (-8.0, 3.0, 0.0)
+    t = 0.0
+    for i in range(10):
+        pos = _advance(pos, vel, 0.1)
+        t += 0.1
+        noisy = (
+            pos[0] + rng.gauss(0, 3.0),
+            pos[1] + rng.gauss(0, 3.0),
+            pos[2] + rng.gauss(0, 1.5),
+        )
+        mgr.update([_det(f"d{i}", noisy, vel, t)], t)
+    assert len(mgr.confirmed_tracks()) == 1
+
+
+# ---- Tight formation must not over-merge ----
+
+def test_two_drones_20m_apart_stay_two_tracks() -> None:
+    """Two drones 20m apart at equal velocity must stay two confirmed tracks.
+
+    The merge pass must fire only on true duplicates, never on a real second
+    drone in tight formation. Twenty meters is well above the co-location radius,
+    so both tracks survive.
+    """
+    mgr = TrackManager()
+    a_pos: Vec3 = (0.0, 0.0, 60.0)
+    b_pos: Vec3 = (20.0, 0.0, 60.0)
+    vel: Vec3 = (5.0, 5.0, 0.0)
+    t = 0.0
+    for i in range(15):
+        a_pos = _advance(a_pos, vel, 0.1)
+        b_pos = _advance(b_pos, vel, 0.1)
+        t += 0.1
+        mgr.update(
+            [_det(f"a{i}", a_pos, vel, t), _det(f"b{i}", b_pos, vel, t)], t,
+        )
+    assert len(mgr.confirmed_tracks()) == 2
+
+
+# ---- Gating must use nominal sigma, not confidence-inflated sigma ----
+
+def test_low_conf_clutter_does_not_steal_match() -> None:
+    """A low-confidence clutter point must not steal a real measurement's track.
+
+    Both the real measurement and a low-confidence clutter point sit near the
+    same track. If the gate used confidence-inflated sigma, the clutter would get
+    a tiny Mahalanobis distance and win the greedy match. Gating on nominal sigma
+    keeps the real, closer measurement bound to the track.
+    """
+    mgr = TrackManager()
+    pos: Vec3 = (200.0, 0.0, 60.0)
+    vel: Vec3 = (10.0, 0.0, 0.0)
+    t = 0.0
+    for i in range(4):
+        pos = _advance(pos, vel, 0.1)
+        t += 0.1
+        mgr.update([_det(f"d{i}", pos, vel, t)], t)
+    confirmed = mgr.confirmed_tracks()
+    assert len(confirmed) == 1
+    track_id = confirmed[0].id
+    pos = _advance(pos, vel, 0.1)
+    t += 0.1
+    # Real measurement is slightly noisy but well inside the nominal gate.
+    real_pos = (pos[0] + 12.0, pos[1], pos[2])
+    real = _det("real", real_pos, vel, t, sensor="radar-1", conf=0.95)
+    # Clutter is far enough to fail the nominal gate, but its low confidence would
+    # inflate sigma and give it a tiny Mahalanobis distance under the old gate,
+    # letting it steal the greedy match and drag the track off the target.
+    clutter_pos = (pos[0] - 35.0, pos[1] + 35.0, pos[2])
+    clutter = _det("clut", clutter_pos, (0.0, 0.0, 0.0), t, sensor="eo-9", conf=0.04)
+    mgr.update([real, clutter], t)
+    survivor = next(tr for tr in mgr.tracks() if tr.id == track_id)
+    # The track must follow the real measurement, not the clutter.
+    assert survivor.position[0] == pytest.approx(real_pos[0], abs=15.0)
+    assert survivor.position[0] > pos[0] - 10.0, "track dragged toward clutter"
+
+
+# ---- Velocity-aware association at a true crossing ----
+
+def test_crossing_targets_no_id_switch() -> None:
+    """Two symmetric crossing targets must not swap identity at the crossing.
+
+    We tag each track by its origin side at a clean early tick, then drive a
+    symmetric crossing. Velocity-aware association must keep each measurement
+    bound to the track whose velocity it matches, so no identity swap occurs.
+    """
+    mgr = TrackManager()
+    a_pos: Vec3 = (-200.0, 0.0, 60.0)
+    a_vel: Vec3 = (20.0, 0.0, 0.0)
+    b_pos: Vec3 = (200.0, 0.0, 60.0)
+    b_vel: Vec3 = (-20.0, 0.0, 0.0)
+    t = 0.0
+    a_id = None
+    b_id = None
+    for i in range(20):
+        a_pos = _advance(a_pos, a_vel, 0.1)
+        b_pos = _advance(b_pos, b_vel, 0.1)
+        t += 0.1
+        mgr.update(
+            [_det(f"a{i}", a_pos, a_vel, t), _det(f"b{i}", b_pos, b_vel, t)], t,
+        )
+        if i == 4:
+            tracks = mgr.confirmed_tracks()
+            assert len(tracks) == 2
+            west = min(tracks, key=lambda tr: tr.position[0])
+            east = max(tracks, key=lambda tr: tr.position[0])
+            a_id, b_id = west.id, east.id
+    final = mgr.confirmed_tracks()
+    assert len(final) == 2
+    by_id = {tr.id: tr for tr in final}
+    assert a_id in by_id and b_id in by_id
+    assert by_id[a_id].velocity[0] > 0.0, "west-origin track lost its eastbound velocity"
+    assert by_id[b_id].velocity[0] < 0.0, "east-origin track lost its westbound velocity"

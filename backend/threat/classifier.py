@@ -78,15 +78,19 @@ def assess(
         return []
 
     swarms = detect_swarms(tracks, site, timestamp, radius_m=radius_m, min_size=min_size)
-    swarm_of: Dict[str, str] = {}
+    swarm_of: Dict[str, Swarm] = {}
     for swarm in swarms:
         for mid in swarm.member_track_ids:
-            swarm_of[mid] = swarm.id
+            swarm_of[mid] = swarm
 
     threats: List[Threat] = []
     for track in hostiles:
         threat = _score_track(track, site)
-        threat.swarm_id = swarm_of.get(track.id)
+        member_swarm = swarm_of.get(track.id)
+        if member_swarm is not None:
+            threat.swarm_id = member_swarm.id
+            threat.intent = member_swarm.intent
+        threat.confidence = track.confidence
         threats.append(threat)
 
     ranked = _rank(threats)

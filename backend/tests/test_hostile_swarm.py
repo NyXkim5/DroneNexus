@@ -9,6 +9,7 @@ import math
 import pytest
 
 from attacker.hostile_swarm import (
+    CRUISE_SPEED_MPS,
     DECOY_UNIT_COST,
     DEFAULT_UNIT_COST,
     HostileSwarm,
@@ -78,7 +79,7 @@ def test_velocity_magnitude_matches_cruise_speed() -> None:
     swarm = HostileSwarm(SwarmIntent.SATURATION, count=20, site_position=SITE, seed=6)
     swarm.advance(0.1)
     d = swarm.get_truth()[0]
-    assert _magnitude(d.velocity) == pytest.approx(18.0, rel=0.05)
+    assert _magnitude(d.velocity) == pytest.approx(CRUISE_SPEED_MPS, rel=0.05)
 
 
 def test_eventual_arrival_at_site() -> None:
@@ -237,7 +238,7 @@ def test_velocity_magnitude_holds_under_evasion() -> None:
         if d.position == SITE:
             continue
         # Steering renormalizes back to cruise speed even while weaving.
-        assert _magnitude(d.velocity) == pytest.approx(18.0, rel=0.02)
+        assert _magnitude(d.velocity) == pytest.approx(CRUISE_SPEED_MPS, rel=0.02)
 
 
 def _live_drone_far_from_site(swarm: HostileSwarm):

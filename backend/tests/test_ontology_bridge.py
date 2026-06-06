@@ -1,9 +1,12 @@
 """Tests for the BULWARK to OVERWATCH ontology bridge."""
 from __future__ import annotations
 
+import asyncio
+
 import csontology as cs
 import ontology_bridge as bridge
 import protocol as ow
+from db.models import OverwatchDB
 
 
 def _make_track(classification: cs.TrackClass = cs.TrackClass.HOSTILE) -> cs.Track:
@@ -150,6 +153,52 @@ def test_engagement_leak_is_critical():
 def test_engagement_miss_is_warning():
     event = bridge.engagement_to_event(_engagement(cs.EngagementStatus.MISS))
     assert event["severity"] == ow.AlertSeverity.WARNING.value
+
+
+# ---- engagement_to_event with threat and lineage ----
+
+def test_engagement_event_carries_lineage_and_intent():
+    lineage = {"thr-1": ["det-1", "det-2"], "thr-2": ["det-2", "det-3"]}
+    event = bridge.engagement_to_event(
+        _engagement(cs.EngagementStatus.HIT), _make_threat(), lineage,
+    )
+    data = event["data"]
+    assert data["score"] == 0.92
+    assert data["swarm_id"] == "swm-1"
+    assert data["intent"] == cs.SwarmIntent.UNKNOWN.value
+    assert data["track_id"] == "trk-1"
+    # Lineage detection ids are flattened and deduped.
+    assert data["lineage_detection_ids"] == ["det-1", "det-2", "det-3"]
+
+
+def test_engagement_event_without_threat_omits_score():
+    event = bridge.engagement_to_event(_engagement(cs.EngagementStatus.HIT))
+    assert "score" not in event["data"]
+    assert event["data"]["lineage_detection_ids"] == []
+
+
+def test_emit_engagement_event_writes_retrievable_event(tmp_path):
+    db_path = str(tmp_path / "ow.db")
+    lineage = {"thr-1": ["det-1", "det-2"]}
+    eng = _engagement(cs.EngagementStatus.HIT)
+
+    async def go() -> dict:
+        db = OverwatchDB(db_path)
+        await db.connect()
+        try:
+            await bridge.emit_engagement_event(db, eng, _make_threat(), lineage)
+            rows = await db.get_events_by_engagement("eng-1")
+        finally:
+            await db.close()
+        return rows
+
+    rows = asyncio.run(go())
+    assert len(rows) == 1
+    data = rows[0]["data"]
+    assert data["engagement_id"] == "eng-1"
+    assert data["score"] == 0.92
+    assert data["intent"] == cs.SwarmIntent.UNKNOWN.value
+    assert data["lineage_detection_ids"] == ["det-1", "det-2"]
 
 
 # ---- defender_to_asset ----
