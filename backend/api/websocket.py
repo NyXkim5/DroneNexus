@@ -132,7 +132,11 @@ class WebSocketHandler:
             from wargame import WargameRunner, load_scenario
 
             scenario = load_scenario(scenario_name)
-            runner = WargameRunner(scenario)
+            # Surface engagement decisions as first-class OVERWATCH events when a
+            # live database is available, so the wargame feeds the same event store
+            # the rest of the platform reads.
+            events_db = getattr(self.app, "db", None)
+            runner = WargameRunner(scenario, events_db=events_db)
             async for frame in runner.run():
                 await websocket.send_text(json.dumps(frame.to_dict()))
         except KeyError as e:

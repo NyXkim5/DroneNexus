@@ -35,6 +35,7 @@ from csontology import (
     Vec3,
 )
 from defense import LayeredAllocator
+from sensors.base import SensorSource
 from sensors.sim_source import SimSensorSource
 import threat as threat_module
 
@@ -72,11 +73,20 @@ class WargameRunner:
     """Drives one counter-swarm wargame from a Scenario to completion."""
 
     def __init__(
-        self, scenario: Scenario, audit: Optional[AuditLog] = None,
+        self,
+        scenario: Scenario,
+        audit: Optional[AuditLog] = None,
+        events_db: Optional[object] = None,
+        source: Optional[SensorSource] = None,
     ) -> None:
         self._scenario = scenario
+        self._events_db = events_db
+        self._pending_events: List[tuple] = []
         self._world: WorldModel = build_world(scenario)
-        self._source = SimSensorSource(
+        # The decision engine consumes any SensorSource. The default is the
+        # simulator, but a deployment injects a RealSensorSource here to drive the
+        # same engine from a recorded capture or a live feed, with no other change.
+        self._source = source or SimSensorSource(
             sensors=build_sensor_specs(scenario),
             truth_fn=self._world.truth_targets,
             rate_hz=scenario.tick_hz,
@@ -113,6 +123,7 @@ class WargameRunner:
             while self._tick < self._scenario.max_ticks:
                 detections = self._collect_tick()
                 frame = self._step(detections)
+                await self._flush_events()
                 yield frame
                 if frame.done:
                     break
@@ -152,8 +163,52 @@ class WargameRunner:
         threats = threat_module.assess(tracks, self._world.site, t)
         engagements = self._engage(threats, t)
         self._audit_tick(t, engagements, threats, tracks)
+        self._queue_events(engagements, threats, tracks)
         self._cool_down()
         return self._build_frame(tracks, threats, engagements)
+
+    def _queue_events(
+        self,
+        engagements: List[Engagement],
+        threats: List[Threat],
+        tracks: List[Track],
+    ) -> None:
+        """Stage engagement events with lineage for emission to the OVERWATCH DB.
+
+        Emission is async and the per-tick step is sync, so we stage the data here
+        and the async run loop flushes it. Each entry carries the threat and the
+        detection lineage so the surfaced event is fully explainable.
+        """
+        if self._events_db is None or not engagements:
+            return
+        by_threat = {th.id: th for th in threats}
+        by_track = {tr.id: tr for tr in tracks}
+        for eng in engagements:
+            threat = by_threat.get(eng.target_threat_id)
+            lineage = self._event_lineage(eng, by_threat, by_track)
+            self._pending_events.append((eng, threat, lineage))
+
+    def _event_lineage(
+        self, eng: Engagement, by_threat: dict, by_track: dict,
+    ) -> dict:
+        """Map each targeted threat to its source detection ids for an event."""
+        chain: dict = {}
+        for tid in eng.neutralized_threat_ids or [eng.target_threat_id]:
+            threat = by_threat.get(tid)
+            track = by_track.get(threat.track_id) if threat else None
+            chain[tid] = list(track.source_detection_ids) if track else []
+        return chain
+
+    async def _flush_events(self) -> None:
+        """Emit staged engagement events to the OVERWATCH events DB."""
+        if self._events_db is None or not self._pending_events:
+            return
+        from ontology_bridge import emit_engagement_event
+
+        pending = self._pending_events
+        self._pending_events = []
+        for eng, threat, lineage in pending:
+            await emit_engagement_event(self._events_db, eng, threat, lineage)
 
     def _audit_tick(
         self,

@@ -131,6 +131,33 @@ def _all_resistant_raid() -> Scenario:
     )
 
 
+class _FakeEventsDB:
+    """Records log_event calls so we can prove the runner emits engagement events."""
+
+    def __init__(self) -> None:
+        self.events: list = []
+
+    async def log_event(self, **kwargs) -> None:
+        self.events.append(kwargs)
+
+
+def test_runner_emits_engagement_events_to_db() -> None:
+    fake = _FakeEventsDB()
+    scenario = _all_resistant_raid()
+
+    async def go() -> None:
+        runner = WargameRunner(scenario, events_db=fake)
+        async for _frame in runner.run(pace=False):
+            pass
+
+    asyncio.run(go())
+    # Engagements occur, so the runtime path must surface them as OVERWATCH
+    # events carrying the engagement id and lineage. This proves the bridge is
+    # wired into the runner, not only callable from a unit test.
+    assert len(fake.events) > 0
+    assert any("data" in e for e in fake.events)
+
+
 def test_resistant_raid_forces_interceptors_to_fire() -> None:
     scenario = _all_resistant_raid()
     last, runner = _run(scenario, ticks=700)
