@@ -9,8 +9,12 @@ import csontology as cs
 from wargame import load_scenario
 from wargame.audit import (
     AuditLog,
+    SCHEMA_VERSION,
+    detections_for_track,
     load_decisions,
     reconstruct_chain,
+    schema_version,
+    threats_for_engagement,
 )
 from wargame.runner import WargameRunner
 
@@ -183,7 +187,7 @@ def test_decision_row_carries_threat_fields_and_actor(tmp_path) -> None:
     assert rec.time_to_impact_s == 12.0
     assert rec.priority_rank == 1
     assert rec.actor == "AUTONOMY"
-    assert rec.schema_version == 1
+    assert rec.schema_version == SCHEMA_VERSION
 
 
 def test_custom_actor_is_recorded(tmp_path) -> None:
@@ -235,3 +239,136 @@ def test_reconstruct_chain_unknown_engagement_returns_none(tmp_path) -> None:
     db_path = str(tmp_path / "synth.db")
     _synthesize_run(db_path)
     assert reconstruct_chain(db_path, "no-such-eng") is None
+
+
+# ---- Entity-relational ontology tests (foreign keys, entity tables) ----
+
+
+def test_schema_version_is_recorded(tmp_path) -> None:
+    db_path = str(tmp_path / "meta.db")
+    AuditLog(db_path).close()
+    assert schema_version(db_path) == 2
+
+
+def test_foreign_keys_are_enforced(tmp_path) -> None:
+    """Inserting a link row that points at a missing entity must raise."""
+    import sqlite3
+
+    db_path = str(tmp_path / "fk.db")
+    AuditLog(db_path).close()
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    try:
+        # engagement_threats.engagement_row_id has no matching engagements row.
+        raised = False
+        try:
+            conn.execute(
+                "INSERT INTO engagement_threats "
+                "(engagement_row_id, threat_id, killed) VALUES (?,?,?)",
+                (999_999, "thr-orphan", 0),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            raised = True
+        assert raised
+    finally:
+        conn.close()
+
+
+def test_orphan_threat_track_fk_raises(tmp_path) -> None:
+    """A threat row pointing at a missing track surrogate must raise."""
+    import sqlite3
+
+    db_path = str(tmp_path / "fk2.db")
+    AuditLog(db_path).close()
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    try:
+        raised = False
+        try:
+            conn.execute(
+                "INSERT INTO threats (threat_id, tick, track_id, track_row_id) "
+                "VALUES (?,?,?,?)",
+                ("thr-orphan", 1, "trk-X", 999_999),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            raised = True
+        assert raised
+    finally:
+        conn.close()
+
+
+def test_entity_tables_populate_from_record_tick(tmp_path) -> None:
+    import sqlite3
+
+    db_path = str(tmp_path / "entities.db")
+    _synthesize_run(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        tracks = conn.execute("SELECT COUNT(*) FROM tracks").fetchone()[0]
+        threats = conn.execute("SELECT COUNT(*) FROM threats").fetchone()[0]
+        engs = conn.execute("SELECT COUNT(*) FROM engagements").fetchone()[0]
+        links = conn.execute(
+            "SELECT COUNT(*) FROM engagement_threats"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert tracks >= 1
+    assert threats == 1
+    assert engs == 1
+    assert links == 1
+
+
+def test_engagement_threats_link_records_kill(tmp_path) -> None:
+    db_path = str(tmp_path / "kill.db")
+    _synthesize_run(db_path)
+    targeted = threats_for_engagement(db_path, "eng-A")
+    assert len(targeted) == 1
+    assert targeted[0].threat_id == "thr-A"
+    assert targeted[0].killed is True
+    assert targeted[0].score == 0.91
+    assert targeted[0].intent == cs.SwarmIntent.SATURATION.value
+    assert targeted[0].track_id == "trk-A"
+
+
+def test_reconstruct_chain_traverses_fk_relationships(tmp_path) -> None:
+    db_path = str(tmp_path / "synth.db")
+    track_id = _synthesize_run(db_path, sensors=("radar", "eo"))
+    chain = reconstruct_chain(db_path, "eng-A")
+    assert chain is not None
+    # Outcome and threat fields come through the traversal.
+    assert chain.status == cs.EngagementStatus.HIT.value
+    assert chain.score == 0.91
+    assert chain.intent == cs.SwarmIntent.SATURATION.value
+    assert chain.time_to_impact_s == 12.0
+    assert chain.track_id == track_id
+    # Targeted-threat link traversal carries the kill flag and threat fields.
+    assert len(chain.targeted_threats) == 1
+    assert chain.targeted_threats[0].killed is True
+    assert chain.targeted_threats[0].threat_id == "thr-A"
+    # Detections are sensor-attributed via track_detections -> detections.
+    assert set(chain.detections_by_sensor) == {"radar", "eo"}
+
+
+def test_detections_for_track_resolves_full_set(tmp_path) -> None:
+    db_path = str(tmp_path / "synth.db")
+    track_id = _synthesize_run(db_path)
+    grouped = detections_for_track(db_path, track_id)
+    total = sum(len(v) for v in grouped.values())
+    assert total == 240
+
+
+def test_miss_link_is_not_killed(tmp_path) -> None:
+    db_path = str(tmp_path / "miss_link.db")
+    audit = AuditLog(db_path)
+    threat = _threat("thr-X", "trk-X")
+    eng = _engagement("eng-miss", "thr-X", cs.EngagementStatus.MISS, [])
+    audit.record_tick(
+        1, 1.0, [eng], {"thr-X": threat}, {"trk-X": _track("trk-X", ["d1"])},
+    )
+    audit.close()
+    targeted = threats_for_engagement(db_path, "eng-miss")
+    assert len(targeted) == 1
+    assert targeted[0].threat_id == "thr-X"
+    assert targeted[0].killed is False

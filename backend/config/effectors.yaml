@@ -1,0 +1,291 @@
+# BULWARK counter-swarm effector calibration.
+#
+# This file makes effector performance data driven. Scenario builders read these
+# numbers instead of hard coding constants, so measured data can replace authored
+# kill curves with no code change.
+#
+# STATUS: every value below is an ESTIMATE pending measured data. The numbers are
+# defensible planning figures drawn from open vendor literature and physics, not
+# bench results. Each field carries a provenance and a plausible min/max band.
+# Replace a value and tighten its band when real data arrives, then set source to
+# the measurement that produced it.
+#
+# Provenance vocabulary (what would replace each ESTIMATE):
+#   vendor_spec   manufacturer datasheet figure, often optimistic
+#   bench_test    controlled lab measurement against representative airframes
+#   range_trial   live field trial against flying targets, the gold standard
+#   physics_model derived from first principles, no measurement
+#   estimate      planning assumption, lowest confidence
+#
+# Units: effect_radius_m and range_m in meters, reload_s in seconds, unit_cost in
+# US dollars per engagement, kill_prob is single shot kill probability 0..1,
+# max_simultaneous is targets neutralized per area shot.
+#
+# Band meaning: min and max bound the credible range for that value given current
+# uncertainty. The sensitivity sweep varies effectors across these CALIBRATED
+# bands rather than arbitrary numbers. value must lie within [min, max].
+
+schema_version: 1
+
+effectors:
+
+  HPM:
+    description: >-
+      High power microwave area effector. Cheap reusable shot, fries drone
+      electronics across a cone regardless of jam resistance. Drives the cost
+      exchange ratio below one.
+    kill_prob:
+      value: 0.7
+      min: 0.4
+      max: 0.9
+      source: estimate
+      note: >-
+        ESTIMATE. Single pulse upset probability against a COTS quadrotor inside
+        the main beam. Replace with bench_test using calibrated field strength
+        against representative airframes, then range_trial against flying targets.
+    effect_radius_m:
+      value: 280.0
+      min: 150.0
+      max: 400.0
+      source: physics_model
+      note: >-
+        ESTIMATE. Radius where field strength still exceeds the upset threshold,
+        set by antenna gain and transmit power. Replace with bench_test field
+        mapping. Falls off with range so this is a planning figure.
+    max_simultaneous:
+      value: 12
+      min: 6
+      max: 25
+      source: estimate
+      note: >-
+        ESTIMATE. Drones inside the cone neutralized per pulse, limited by beam
+        solid angle and target density. Replace with range_trial against a live
+        swarm.
+    range_m:
+      value: 1800.0
+      min: 1000.0
+      max: 2500.0
+      source: vendor_spec
+      note: >-
+        ESTIMATE from vendor class figures. Effective standoff before the field
+        drops below upset threshold. Confirm with range_trial.
+    reload_s:
+      value: 2.5
+      min: 1.0
+      max: 5.0
+      source: vendor_spec
+      note: >-
+        ESTIMATE. Capacitor recharge and thermal recovery between pulses. Replace
+        with vendor_spec duty cycle then bench_test under sustained fire.
+    unit_cost:
+      value: 8.0
+      min: 2.0
+      max: 30.0
+      source: estimate
+      note: >-
+        ESTIMATE. Marginal cost per pulse, dominated by electrical power, not the
+        capital cost of the emitter. Replace with measured energy per shot times
+        local power price.
+
+  EW:
+    description: >-
+      Wide electronic warfare effector. Very cheap and broad but jam resistible.
+      Thins the swarm then hands survivors to HPM and interceptors.
+    kill_prob:
+      value: 0.45
+      min: 0.2
+      max: 0.7
+      source: estimate
+      note: >-
+        ESTIMATE. Probability of defeating control or navigation. Autonomous
+        airframes resist it so this is modest. Replace with bench_test across a
+        representative mix of jam resistant and naive airframes.
+    effect_radius_m:
+      value: 380.0
+      min: 200.0
+      max: 600.0
+      source: physics_model
+      note: >-
+        ESTIMATE. Footprint where jam to signal ratio defeats the link or GNSS.
+        Replace with range_trial RF survey.
+    max_simultaneous:
+      value: 16
+      min: 8
+      max: 30
+      source: estimate
+      note: >-
+        ESTIMATE. Drones in the footprint affected at once. Broad coverage so
+        higher than HPM. Replace with range_trial against a live swarm.
+    range_m:
+      value: 2000.0
+      min: 1200.0
+      max: 3000.0
+      source: vendor_spec
+      note: >-
+        ESTIMATE from vendor class figures. Standoff before jam power is too low
+        to matter. Confirm with range_trial.
+    reload_s:
+      value: 1.5
+      min: 0.5
+      max: 3.0
+      source: vendor_spec
+      note: >-
+        ESTIMATE. Retune and retarget time. EW is near continuous so this is the
+        effective revisit, not a hard reload. Confirm with bench_test.
+    unit_cost:
+      value: 3.0
+      min: 1.0
+      max: 15.0
+      source: estimate
+      note: >-
+        ESTIMATE. Marginal power cost per engagement window. Replace with
+        measured power draw times local price.
+
+  INTERCEPTOR:
+    description: >-
+      Kinetic single target effector. High kill probability but expensive per
+      shot. The layer that loses the cost exchange if it carries the fight.
+    kill_prob:
+      value: 0.85
+      min: 0.6
+      max: 0.95
+      source: vendor_spec
+      note: >-
+        ESTIMATE from vendor Pk claims, which run optimistic. Replace with
+        range_trial live fire Pk against maneuvering targets.
+    effect_radius_m:
+      value: 0.0
+      min: 0.0
+      max: 15.0
+      source: estimate
+      note: >-
+        ESTIMATE. Point target by default. A proximity or fragmentation warhead
+        gives a small lethal radius. Set from the actual warhead, replace with
+        bench_test arena trial.
+    max_simultaneous:
+      value: 1
+      min: 1
+      max: 3
+      source: estimate
+      note: >-
+        ESTIMATE. One target per shot for a point interceptor. A small radius
+        warhead can catch a tight pair. Confirm with range_trial.
+    range_m:
+      value: 2500.0
+      min: 1500.0
+      max: 4000.0
+      source: vendor_spec
+      note: >-
+        ESTIMATE from vendor engagement envelope. Replace with range_trial max
+        effective intercept range.
+    reload_s:
+      value: 2.0
+      min: 1.0
+      max: 6.0
+      source: vendor_spec
+      note: >-
+        ESTIMATE. Launcher cycle and next round ready time. Confirm with
+        bench_test rate of fire.
+    unit_cost:
+      value: 8000.0
+      min: 3000.0
+      max: 25000.0
+      source: vendor_spec
+      note: >-
+        ESTIMATE from vendor unit price. The interceptor is consumed each shot so
+        this is the dominant cost driver. Replace with procurement quote.
+
+  # Optional effectors. Present for completeness so scenarios can model a full
+  # layered defense from calibration. Same ESTIMATE caveats apply.
+
+  LASER:
+    description: >-
+      Directed energy single target effector. Near zero marginal cost per shot
+      but slow dwell to kill and weather limited.
+    kill_prob:
+      value: 0.8
+      min: 0.5
+      max: 0.95
+      source: estimate
+      note: >-
+        ESTIMATE. Per engagement kill given enough dwell. Degrades in fog, rain,
+        and dust. Replace with range_trial across weather states.
+    effect_radius_m:
+      value: 0.0
+      min: 0.0
+      max: 2.0
+      source: physics_model
+      note: ESTIMATE. Spot effector, effectively a point. Confirm with bench_test.
+    max_simultaneous:
+      value: 1
+      min: 1
+      max: 1
+      source: physics_model
+      note: ESTIMATE. One beam, one target at a time.
+    range_m:
+      value: 3000.0
+      min: 1000.0
+      max: 5000.0
+      source: vendor_spec
+      note: >-
+        ESTIMATE. Effective range before atmospheric loss kills lethality.
+        Replace with range_trial in representative weather.
+    reload_s:
+      value: 4.0
+      min: 2.0
+      max: 10.0
+      source: estimate
+      note: >-
+        ESTIMATE. Slew plus dwell to kill plus thermal recovery, the effective
+        time per target. Replace with bench_test dwell measurement.
+    unit_cost:
+      value: 5.0
+      min: 1.0
+      max: 20.0
+      source: estimate
+      note: >-
+        ESTIMATE. Marginal electrical cost per kill. Capital cost is high but
+        per shot cost is tiny. Replace with measured energy per kill.
+
+  NET:
+    description: >-
+      Kinetic capture effector. Single target, low cost, short range. Useful for
+      close in soft capture but does not scale against dense swarms.
+    kill_prob:
+      value: 0.6
+      min: 0.3
+      max: 0.85
+      source: estimate
+      note: >-
+        ESTIMATE. Capture probability against a maneuvering target. Replace with
+        range_trial.
+    effect_radius_m:
+      value: 0.0
+      min: 0.0
+      max: 5.0
+      source: estimate
+      note: ESTIMATE. Net spread gives a small catch radius. Confirm with bench_test.
+    max_simultaneous:
+      value: 1
+      min: 1
+      max: 2
+      source: estimate
+      note: ESTIMATE. One target per net, a tight pair at best.
+    range_m:
+      value: 300.0
+      min: 100.0
+      max: 600.0
+      source: vendor_spec
+      note: ESTIMATE. Short effective throw. Confirm with range_trial.
+    reload_s:
+      value: 8.0
+      min: 4.0
+      max: 20.0
+      source: vendor_spec
+      note: ESTIMATE. Reload and re aim a launched net. Confirm with bench_test.
+    unit_cost:
+      value: 150.0
+      min: 50.0
+      max: 500.0
+      source: vendor_spec
+      note: ESTIMATE. Consumable net cartridge cost. Replace with procurement quote.

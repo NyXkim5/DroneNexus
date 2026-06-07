@@ -22,6 +22,15 @@ from typing import Dict, List, Tuple
 import yaml
 
 from csontology import DefenderKind, SwarmIntent, Vec3
+from wargame.calibration import load_calibration, to_defender_kwargs
+
+# Effector performance is loaded from a calibration file with provenance and
+# uncertainty bands, so measured kill curves can replace the current estimates
+# without code changes. The path is resolved absolutely so any working directory
+# loads the same calibration.
+_CALIBRATION = load_calibration(
+    str(Path(__file__).parent.parent / "config" / "effectors.yaml")
+)
 
 logger = logging.getLogger("overwatch.wargame")
 
@@ -142,12 +151,7 @@ def _hpm(count: int) -> DefenderConfig:
         count=count,
         position=(0.0, 0.0, 0.0),
         capacity=18,
-        range_m=1800.0,
-        reload_s=2.5,
-        kill_prob=0.7,
-        unit_cost=8.0,
-        effect_radius_m=280.0,
-        max_simultaneous=12,
+        **to_defender_kwargs(_CALIBRATION.profile(DefenderKind.HPM)),
     )
 
 
@@ -164,12 +168,7 @@ def _ew(count: int) -> DefenderConfig:
         count=count,
         position=(0.0, 0.0, 0.0),
         capacity=28,
-        range_m=2000.0,
-        reload_s=1.5,
-        kill_prob=0.45,
-        unit_cost=3.0,
-        effect_radius_m=380.0,
-        max_simultaneous=16,
+        **to_defender_kwargs(_CALIBRATION.profile(DefenderKind.EW)),
     )
 
 
