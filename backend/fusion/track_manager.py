@@ -518,31 +518,66 @@ class TrackManager:
             inv_covs.append(entry.kalman.gate_inverse(gate_sigma))
             grid.insert(ei, pos)
         radius_sq = self._config.gate_radius_m**2
-        chi2 = self._config.gate_chi2
-        pairs: List[Tuple[float, str, int]] = []
-        for mi, meas in enumerate(measurements):
-            meas_pos = np.asarray(meas.position, dtype=np.float64)
-            for ei in grid.neighbors(meas.position):
-                if _dist_sq(positions[ei], meas.position) > radius_sq:
-                    continue
-                innovation = meas_pos - np.asarray(positions[ei], dtype=np.float64)
-                gate_cost = float(innovation @ inv_covs[ei] @ innovation)
-                if gate_cost <= chi2:
-                    entry = entries[ei]
-                    pairs.append((self._pair_cost(entry, meas, gate_cost), entry.track.id, mi))
-        return pairs
+        cand_e, cand_m = self._candidate_pairs(measurements, positions, grid, radius_sq)
+        if not cand_e:
+            return []
+        return self._score_candidates(measurements, entries, positions, inv_covs, cand_e, cand_m)
 
-    def _pair_cost(
-        self, entry: _TrackEntry, meas: _Measurement, gate_cost: float,
-    ) -> float:
-        """Association cost blending the gated position score with velocity error.
+    def _candidate_pairs(
+        self,
+        measurements: List[_Measurement],
+        positions: List[Vec3],
+        grid: "_SpatialGrid",
+        radius_sq: float,
+    ) -> Tuple[List[int], List[int]]:
+        """Collect (entry_index, meas_index) pairs surviving the radius prefilter.
 
-        The velocity term breaks ties when two targets cross and their positions
-        nearly coincide, steering each measurement to the track whose velocity it
-        matches and preventing an identity swap.
+        Scan order is measurement-major then grid-neighbor, the same order the
+        per-pair loop used, so downstream tie-breaking is unchanged.
         """
-        vel_err = _dist_sq(entry.kalman.velocity, meas.velocity)
-        return gate_cost + self._config.velocity_cost_w * vel_err
+        cand_e: List[int] = []
+        cand_m: List[int] = []
+        for mi, meas in enumerate(measurements):
+            mpos = meas.position
+            for ei in grid.neighbors(mpos):
+                if _dist_sq(positions[ei], mpos) <= radius_sq:
+                    cand_e.append(ei)
+                    cand_m.append(mi)
+        return cand_e, cand_m
+
+    def _score_candidates(
+        self,
+        measurements: List[_Measurement],
+        entries: List[_TrackEntry],
+        positions: List[Vec3],
+        inv_covs: List[np.ndarray],
+        cand_e: List[int],
+        cand_m: List[int],
+    ) -> List[Tuple[float, str, int]]:
+        """Batch-score candidate pairs and emit those inside the chi-square gate.
+
+        The Mahalanobis gate and the velocity-mismatch term are computed as
+        vectorized numpy ops over all candidate pairs at once, which removes the
+        per-pair Python and numpy-call overhead. Survivors are emitted in the
+        original scan order so the greedy resolver breaks ties identically and the
+        matches match the per-pair implementation.
+        """
+        ce = np.asarray(cand_e, dtype=np.intp)
+        cm = np.asarray(cand_m, dtype=np.intp)
+        pos_arr = np.asarray(positions, dtype=np.float64)
+        sinv_arr = np.asarray(inv_covs, dtype=np.float64)
+        meas_pos = np.array([m.position for m in measurements], dtype=np.float64)
+        meas_vel = np.array([m.velocity for m in measurements], dtype=np.float64)
+        ent_vel = np.array([e.kalman.velocity for e in entries], dtype=np.float64)
+        innov = meas_pos[cm] - pos_arr[ce]
+        gate_cost = np.einsum("ki,kij,kj->k", innov, sinv_arr[ce], innov)
+        vel_err = np.einsum("ki,ki->k", meas_vel[cm] - ent_vel[ce], meas_vel[cm] - ent_vel[ce])
+        cost = gate_cost + self._config.velocity_cost_w * vel_err
+        survivors = np.nonzero(gate_cost <= self._config.gate_chi2)[0]
+        pairs: List[Tuple[float, str, int]] = []
+        for k in survivors:
+            pairs.append((float(cost[k]), entries[ce[k]].track.id, int(cm[k])))
+        return pairs
 
     def _resolve_greedy(
         self,
