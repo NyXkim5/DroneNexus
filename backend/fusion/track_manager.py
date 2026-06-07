@@ -41,6 +41,8 @@ from dataclasses import dataclass, field
 from math import floor
 from typing import Deque, Dict, Iterable, List, Optional, Tuple
 
+import numpy as np
+
 from csontology import Detection, Track, TrackClass, Vec3
 from fusion.kalman import ConstantVelocityKalman
 
@@ -500,18 +502,33 @@ class TrackManager:
         its identity through a crossing where two positions nearly coincide.
         """
         grid = _SpatialGrid(self._config.gate_radius_m)
-        for ei, entry in enumerate(entries):
-            grid.insert(ei, entry.kalman.position)
-        radius_sq = self._config.gate_radius_m**2
         gate_sigma = self._config.meas_sigma_m
+        # Precompute each track's predicted position and inverse innovation
+        # covariance once. Both are measurement-independent at the nominal gate
+        # sigma, so this turns a per-pair linear solve into one inverse per track
+        # plus a cheap matrix product per candidate. Each entry sits in exactly
+        # one grid cell, so grid.neighbors yields it at most once and no dedupe is
+        # needed. The candidate scan order is unchanged, so the greedy resolver
+        # breaks ties identically and the matches are the same as before.
+        positions: List[Vec3] = []
+        inv_covs: List[np.ndarray] = []
+        for ei, entry in enumerate(entries):
+            pos = entry.kalman.position
+            positions.append(pos)
+            inv_covs.append(entry.kalman.gate_inverse(gate_sigma))
+            grid.insert(ei, pos)
+        radius_sq = self._config.gate_radius_m**2
+        chi2 = self._config.gate_chi2
         pairs: List[Tuple[float, str, int]] = []
         for mi, meas in enumerate(measurements):
-            for ei in set(grid.neighbors(meas.position)):
-                entry = entries[ei]
-                if _dist_sq(entry.kalman.position, meas.position) > radius_sq:
+            meas_pos = np.asarray(meas.position, dtype=np.float64)
+            for ei in grid.neighbors(meas.position):
+                if _dist_sq(positions[ei], meas.position) > radius_sq:
                     continue
-                gate_cost = entry.kalman.mahalanobis_sq(meas.position, gate_sigma)
-                if gate_cost <= self._config.gate_chi2:
+                innovation = meas_pos - np.asarray(positions[ei], dtype=np.float64)
+                gate_cost = float(innovation @ inv_covs[ei] @ innovation)
+                if gate_cost <= chi2:
+                    entry = entries[ei]
                     pairs.append((self._pair_cost(entry, meas, gate_cost), entry.track.id, mi))
         return pairs
 

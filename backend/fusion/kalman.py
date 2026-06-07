@@ -123,6 +123,22 @@ class ConstantVelocityKalman:
         solved = np.linalg.solve(s, innovation)
         return float(innovation @ solved)
 
+    def gate_inverse(self, meas_sigma: float) -> np.ndarray:
+        """Inverse innovation covariance for gating at a fixed measurement sigma.
+
+        The innovation covariance S = H P H^T + R depends only on this track and
+        the nominal sensor sigma, not on the candidate measurement. A caller
+        computes this once per track per tick and reuses it across every candidate
+        measurement, turning a per-pair linear solve into a cheap matrix product.
+        The squared Mahalanobis distance to a position is then
+        innovation @ gate_inverse @ innovation.
+        """
+        if meas_sigma <= 0.0:
+            raise ValueError("meas_sigma must be positive")
+        h = self._observation()
+        s = h @ self._cov @ h.T + np.eye(3) * (meas_sigma**2)
+        return np.linalg.inv(s)
+
     @staticmethod
     def _transition(dt: float) -> np.ndarray:
         """Constant-velocity state transition matrix for a time step dt."""
