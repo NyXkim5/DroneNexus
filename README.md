@@ -2,6 +2,54 @@
 
 Multi-asset ISR coordination and telemetry platform. Hardware-agnostic, plug-and-play, designed for 2-50 assets.
 
+## BULWARK -- Counter-Swarm Defense Engine
+
+BULWARK is an autonomous counter-swarm defense engine built on OVERWATCH. One
+decision engine consumes any sensor source and fuses it into one real-time
+picture, classifies swarm threats, allocates finite effectors, and resolves
+engagements. The headline metric is the cost-exchange ratio, defender dollars
+spent per attacker dollar destroyed, with the goal of driving it below one.
+
+Full design and module map: see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+The pipeline lives in `backend/`: `sensors/` (a SensorSource interface with a
+simulated and a real-data adapter), `fusion/` (multi-sensor track fusion),
+`threat/` (swarm classification and prioritization), `defense/` (layered
+allocation with a cost ledger), `attacker/` (the red force), and `wargame/` (the
+runner, scenarios, calibration, audit, and reports).
+
+### Run a wargame
+
+```bash
+cd backend
+python -m wargame.run --list                                   # list scenarios
+python -m wargame.run --scenario saturation_1000 --fast        # fast batch run
+python -m wargame.run --scenario contested_500 --audit run.db  # write an audit log
+```
+
+The HUD is `src/hud/bulwark.html`. Start the backend (`python3 main.py`) and open
+it to watch a run stream over the wargame websocket.
+
+### Inspect and tune
+
+```bash
+python -m wargame.report --db run.db                           # after-action report
+python -m wargame.report --db run.db --engagement <id>         # reconstruct a kill chain
+python -m wargame.sweep --scenario saturation_1000             # cost-exchange sensitivity
+```
+
+Effector performance lives in `backend/config/effectors.yaml` with a provenance
+and uncertainty band on every value, so measured kill curves replace the current
+estimates without code changes.
+
+### Tests
+
+```bash
+cd backend
+python -m pytest -m "not slow"     # fast unit and component tests, about 20s
+python -m pytest                   # full suite including end-to-end wargames
+```
+
 ## Project Structure
 
 ```
