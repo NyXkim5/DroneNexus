@@ -219,3 +219,21 @@ def test_swarm_outranks_a_distant_lone_track():
     top = threats[0]
     assert top.swarm_id is not None
     assert top.priority_rank == 1
+
+
+# ---- predictive ineffective-effector belief ----
+
+def test_observed_misses_mark_effector_ineffective():
+    track = make_track("a", (0.0, -300.0, 50.0), (0.0, 20.0, 0.0))
+    # Three observed survivals of EW, one of HPM. Only EW crosses the threshold.
+    track.effector_misses = {"EW": 3, "HPM": 1}
+    threats = assess([track], SITE, timestamp=100.0)
+    assert len(threats) == 1
+    assert "EW" in threats[0].ineffective_kinds
+    assert "HPM" not in threats[0].ineffective_kinds
+
+
+def test_no_misses_means_no_ineffective_kinds():
+    track = make_track("a", (0.0, -300.0, 50.0), (0.0, 20.0, 0.0))
+    threats = assess([track], SITE, timestamp=100.0)
+    assert threats[0].ineffective_kinds == frozenset()

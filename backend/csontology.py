@@ -26,7 +26,7 @@ import math
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 # ---- Coordinate frame ----
@@ -150,6 +150,12 @@ class Track:
     confidence: float = 0.0
     source_detection_ids: List[str] = field(default_factory=list)
     history: List[Vec3] = field(default_factory=list)
+    # Observed battle-damage assessment: how many times an effector kind has been
+    # fired at this track and the airframe survived. The threat layer turns a high
+    # count into an "ineffective" belief so the allocator stops wasting that
+    # effector and escalates, which is how the defense learns a target is jam
+    # resistant or hardened without being told the ground truth.
+    effector_misses: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -183,6 +189,10 @@ class Threat:
     swarm_id: Optional[str] = None
     intent: "SwarmIntent" = SwarmIntent.UNKNOWN
     confidence: float = 1.0
+    # Effector kinds observed to be ineffective against this threat, so the
+    # allocator can skip them and reach for an effector that works. Carried from
+    # the underlying track's observed survivals.
+    ineffective_kinds: frozenset = field(default_factory=frozenset)
 
 
 @dataclass

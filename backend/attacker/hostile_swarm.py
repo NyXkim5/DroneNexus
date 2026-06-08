@@ -263,7 +263,7 @@ class HostileSwarm:
 
     def _spawn_saturation(self) -> List[AttackerDrone]:
         """All drones launch at once from every bearing."""
-        start = self.first_seen
+        start = 0.0  # sim-time base so launch timing is deterministic, not wall-clock
         return [
             self._make_drone(i, start, is_decoy=False, cost=self.unit_cost)
             for i in range(self.count)
@@ -271,7 +271,7 @@ class HostileSwarm:
 
     def _spawn_waves(self) -> List[AttackerDrone]:
         """Drones split into groups that launch on staggered delays."""
-        start = self.first_seen
+        start = 0.0  # sim-time base so launch timing is deterministic, not wall-clock
         drones: List[AttackerDrone] = []
         for i in range(self.count):
             group = i % WAVE_GROUP_COUNT
@@ -283,7 +283,7 @@ class HostileSwarm:
 
     def _spawn_decoy(self) -> List[AttackerDrone]:
         """A small set of real threats hidden among many cheap decoys."""
-        start = self.first_seen
+        start = 0.0  # sim-time base so launch timing is deterministic, not wall-clock
         real_count = max(1, round(self.count * REAL_THREAT_FRACTION))
         real_indices = set(self._rng.sample(range(self.count), real_count))
         drones: List[AttackerDrone] = []
@@ -299,7 +299,7 @@ class HostileSwarm:
         Holding drones get a launch time far in the future so advance() leaves
         them parked on the spawn ring while the lead element closes the site.
         """
-        start = self.first_seen
+        start = 0.0  # sim-time base so launch timing is deterministic, not wall-clock
         lead_count = max(1, round(self.count * PROBE_LEAD_FRACTION))
         hold_launch = start + 1e9
         drones: List[AttackerDrone] = []
@@ -365,7 +365,7 @@ class HostileSwarm:
         attrition = self._attrition_fraction()
         if attrition > PRESS_ATTRITION_THRESHOLD:
             return
-        t = now()
+        t = self._sim_time
         for drone in self.drones:
             if not drone.arrived and drone.launch_time > t:
                 drone.launch_time = max(t, drone.launch_time - PRESS_PULL_S)
@@ -393,9 +393,9 @@ class HostileSwarm:
         """
         for kill_pos in self._infer_losses():
             self._trigger_reactions(kill_pos)
-        self._press_if_holding()
         self._sim_time += dt
-        t = now()
+        self._press_if_holding()
+        t = self._sim_time
         for drone in self.drones:
             self._advance_one(drone, dt, t)
 

@@ -325,3 +325,30 @@ def test_cost_discipline_reserves_interceptor_for_imminent():
     )
     out_imminent = allocator.allocate([imminent], [interceptor], now=0.0)
     assert len(out_imminent) == 1  # last-resort terminal defense fires
+
+
+def test_area_effector_skips_threats_it_is_known_to_resist():
+    # An EW area effector should skip a threat observed to resist EW and engage
+    # the one it can still kill, the predictive escalation the learned belief buys.
+    positions = {"resists": (50.0, 0.0, 80.0), "vuln": (60.0, 0.0, 80.0)}
+    resists = Threat(
+        id="resists", score=0.9, time_to_impact_s=8.0, value_at_risk=50_000.0,
+        priority_rank=1, track_id="trk-r", ineffective_kinds=frozenset({"EW"}),
+    )
+    vuln = Threat(
+        id="vuln", score=0.9, time_to_impact_s=8.0, value_at_risk=50_000.0,
+        priority_rank=2, track_id="trk-v",
+    )
+    ew = _defender(
+        "ew1", (0.0, 0.0, 0.0), capacity=4, range_m=3000.0,
+        unit_cost=3.0, kill_prob=0.5, kind=DefenderKind.EW,
+    )
+    ew.effect_radius_m = 400.0
+    ew.max_simultaneous = 16
+    allocator = LayeredAllocator(resolve_position=lambda t: positions[t.id])
+    out = allocator.allocate([resists, vuln], [ew], now=0.0)
+    covered = set()
+    for eng in out:
+        covered.update(eng.neutralized_threat_ids)
+    assert "vuln" in covered
+    assert "resists" not in covered
