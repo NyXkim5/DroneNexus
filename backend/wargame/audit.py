@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS runs (
 
 CREATE TABLE IF NOT EXISTS detections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL DEFAULT '',
     detection_id TEXT NOT NULL,
     sensor_id TEXT NOT NULL,
     tick INTEGER NOT NULL,
@@ -206,6 +207,7 @@ CREATE TABLE IF NOT EXISTS engagement_threats (
 
 CREATE TABLE IF NOT EXISTS track_detections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL DEFAULT '',
     tick INTEGER NOT NULL,
     track_id TEXT NOT NULL,
     detection_id TEXT NOT NULL,
@@ -244,7 +246,7 @@ CREATE INDEX IF NOT EXISTS idx_decisions_eng ON decisions(engagement_id);
 CREATE INDEX IF NOT EXISTS idx_detections_did ON detections(detection_id);
 CREATE INDEX IF NOT EXISTS idx_track_det_track ON track_detections(track_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_track_det_uniq
-    ON track_detections(track_id, detection_id);
+    ON track_detections(run_id, track_id, detection_id);
 CREATE INDEX IF NOT EXISTS idx_threats_tid ON threats(threat_id);
 CREATE INDEX IF NOT EXISTS idx_eng_eid ON engagements(engagement_id);
 CREATE INDEX IF NOT EXISTS idx_eng_threats_eng
@@ -313,8 +315,8 @@ class AuditLog:
         rows = [self._detection_row(tick, timestamp, det) for det in detections]
         if rows:
             self._conn.executemany(
-                "INSERT INTO detections (detection_id, sensor_id, tick, "
-                "timestamp, x, y, z, confidence) VALUES (?,?,?,?,?,?,?,?)",
+                "INSERT INTO detections (run_id, detection_id, sensor_id, tick, "
+                "timestamp, x, y, z, confidence) VALUES (?,?,?,?,?,?,?,?,?)",
                 rows,
             )
             self._conn.commit()
@@ -326,7 +328,7 @@ class AuditLog:
         """Flatten one Detection into an insert row."""
         px, py, pz = det.position
         ts = det.timestamp if det.timestamp else timestamp
-        return (det.id, det.sensor_id, tick, ts, px, py, pz, det.confidence)
+        return (self._run_id, det.id, det.sensor_id, tick, ts, px, py, pz, det.confidence)
 
     def link_tracks(self, tick: int, tracks: List[Track]) -> int:
         """Persist the track to detection links so full lineage survives capping.
@@ -340,22 +342,27 @@ class AuditLog:
         for track in tracks:
             for det_id in track.source_detection_ids:
                 det_row_id = self._latest_detection_row_id(det_id)
-                rows.append((tick, track.id, det_id, det_row_id))
+                rows.append((self._run_id, tick, track.id, det_id, det_row_id))
         if rows:
             self._conn.executemany(
                 "INSERT OR IGNORE INTO track_detections "
-                "(tick, track_id, detection_id, detection_row_id) VALUES (?,?,?,?)",
+                "(run_id, tick, track_id, detection_id, detection_row_id) "
+                "VALUES (?,?,?,?,?)",
                 rows,
             )
             self._conn.commit()
         return len(rows)
 
     def _latest_detection_row_id(self, detection_id: str) -> Optional[int]:
-        """Return the surrogate row id of the newest stored detection, if any."""
+        """Return the newest stored detection row id for this run, if any.
+
+        Scoped to this run so a repeated detection id from another run in the same
+        store never mislinks a track to the wrong run's detection.
+        """
         cur = self._conn.execute(
-            "SELECT id FROM detections WHERE detection_id = ? "
+            "SELECT id FROM detections WHERE detection_id = ? AND run_id = ? "
             "ORDER BY id DESC LIMIT 1",
-            (detection_id,),
+            (detection_id, self._run_id),
         )
         row = cur.fetchone()
         return row[0] if row else None
@@ -787,15 +794,27 @@ def _targeted_threats(
 
 
 def _detection_ids_for_track(
-    conn: sqlite3.Connection, track_id: Optional[str],
+    conn: sqlite3.Connection,
+    track_id: Optional[str],
+    run_id: Optional[str] = None,
 ) -> List[str]:
-    """Return every detection id ever linked to a track across all ticks."""
+    """Return every detection id ever linked to a track across all ticks.
+
+    When run_id is given, only that run's links are returned.
+    """
     if track_id is None:
         return []
-    cur = conn.execute(
-        "SELECT DISTINCT detection_id FROM track_detections WHERE track_id = ?",
-        (track_id,),
-    )
+    if run_id is None:
+        cur = conn.execute(
+            "SELECT DISTINCT detection_id FROM track_detections WHERE track_id = ?",
+            (track_id,),
+        )
+    else:
+        cur = conn.execute(
+            "SELECT DISTINCT detection_id FROM track_detections "
+            "WHERE track_id = ? AND run_id = ?",
+            (track_id, run_id),
+        )
     return [r[0] for r in cur.fetchall()]
 
 
@@ -838,12 +857,16 @@ def threats_for_engagement(
 
 
 def detections_for_track(
-    db_path: str, track_id: str,
+    db_path: str, track_id: str, run_id: Optional[str] = None,
 ) -> Dict[str, List[DetectionContribution]]:
-    """Return every detection behind a track, grouped under its sensor id."""
+    """Return every detection behind a track, grouped under its sensor id.
+
+    With run_id given, only links from that run are followed, so a track id reused
+    by another run in the same store does not pull in foreign detections.
+    """
     conn = _connect(db_path)
     try:
-        det_ids = _detection_ids_for_track(conn, track_id)
+        det_ids = _detection_ids_for_track(conn, track_id, run_id)
         return _group_detections(conn, det_ids)
     finally:
         conn.close()
