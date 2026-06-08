@@ -39,6 +39,10 @@ SWARM_VALUE_PER_MEMBER = 1.0
 # discipline. It is the harm one airframe does, not the whole site value, so an
 # effector worth less than this is worth spending and one worth more is not.
 EXPECTED_DAMAGE_PER_DRONE = 50_000.0
+# Horizontal position sigma in meters at which a track's certainty factor falls to
+# about half. Tight tracks sit near 1.0, coasted tracks with grown covariance fall
+# toward the 0.5 floor, so the score reflects how sure we are of the threat.
+CERTAINTY_SCALE_M = 60.0
 
 
 def _range_to_site(pos: Vec3, site: Site) -> float:
@@ -98,12 +102,24 @@ def _blend(tti_u: float, speed_u: float, value_u: float) -> float:
     )
 
 
+def _certainty(track: Track) -> float:
+    """Map a track's position uncertainty to a 0.5..1.0 confidence factor.
+
+    A tightly held track scores near 1.0. A coasted track whose covariance has
+    grown, for example during a sensor blackout, scores lower, so a confident
+    threat outranks an equally urgent but uncertain one. The factor is floored so
+    uncertainty modulates priority rather than erasing a real threat.
+    """
+    sigma = 0.5 * (track.covariance[0] + track.covariance[1])
+    return max(0.5, CERTAINTY_SCALE_M / (CERTAINTY_SCALE_M + max(0.0, sigma)))
+
+
 def _score_track(track: Track, site: Site) -> Threat:
     """Score one lone hostile track into a Threat (rank filled in later)."""
     tti = time_to_impact(track, site)
     closing = max(0.0, closing_speed_to_site(track, site))
     value_at_risk = min(site.value, EXPECTED_DAMAGE_PER_DRONE)
-    score = _blend(
+    score = _certainty(track) * _blend(
         _tti_urgency(tti),
         _speed_urgency(closing),
         _value_urgency(value_at_risk, site),

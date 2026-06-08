@@ -219,3 +219,19 @@ def test_swarm_outranks_a_distant_lone_track():
     top = threats[0]
     assert top.swarm_id is not None
     assert top.priority_rank == 1
+
+
+# ---- uncertainty-aware scoring ----
+
+def test_confident_track_outranks_an_uncertain_twin():
+    # Two identical closing threats; the one with tighter covariance must rank
+    # higher because the defense is more certain of it.
+    tight = make_track("tight", (0.0, -300.0, 50.0), (0.0, 20.0, 0.0))
+    loose = make_track("loose", (0.0, -300.0, 50.0), (0.0, 20.0, 0.0))
+    tight.covariance = (3.0, 3.0, 2.0)
+    loose.covariance = (250.0, 250.0, 50.0)
+    threats = assess([tight, loose], SITE, timestamp=100.0)
+    ranks = {t.track_id: t.priority_rank for t in threats}
+    assert ranks["tight"] < ranks["loose"]
+    scores = {t.track_id: t.score for t in threats}
+    assert scores["tight"] > scores["loose"]
