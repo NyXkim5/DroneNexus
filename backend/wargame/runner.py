@@ -161,7 +161,7 @@ class WargameRunner:
             self._audit.link_tracks(self._tick, tracks)
         self._classify_hostiles()
         threats = threat_module.assess(tracks, self._world.site, t)
-        engagements = self._engage(threats, t, tracks)
+        engagements = self._engage(threats, t)
         self._audit_tick(t, engagements, threats, tracks)
         self._queue_events(engagements, threats, tracks)
         self._cool_down()
@@ -238,9 +238,7 @@ class WargameRunner:
             if track.classification is not TrackClass.HOSTILE:
                 self._world.tracks.classify_track(track.id, TrackClass.HOSTILE)
 
-    def _engage(
-        self, threats: List[Threat], t: float, tracks: List[Track],
-    ) -> List[Engagement]:
+    def _engage(self, threats: List[Threat], t: float) -> List[Engagement]:
         """Allocate ready defenders to threats and resolve outcomes.
 
         The allocator does not mutate shared Defender objects, so we decrement
@@ -250,7 +248,7 @@ class WargameRunner:
         ready = [d for d in self._world.defenders if d.status is DefenderStatus.READY]
         engagements = self._allocator.allocate(threats, ready, t)
         self._commit_capacity(engagements)
-        self._resolve_engagements(engagements, threats, tracks)
+        self._resolve_engagements(engagements, threats)
         self._engagements_made += len(engagements)
         return engagements
 
@@ -271,10 +269,7 @@ class WargameRunner:
                 self._world.reload_left[defender.id] = defender.reload_s
 
     def _resolve_engagements(
-        self,
-        engagements: List[Engagement],
-        threats: List[Threat],
-        tracks: List[Track],
+        self, engagements: List[Engagement], threats: List[Threat],
     ) -> None:
         """Resolve fire decisions into real kills, gated by radius and hardness.
 
@@ -287,7 +282,6 @@ class WargameRunner:
         """
         by_def = {d.id: d for d in self._world.defenders}
         by_threat = {th.id: th for th in threats}
-        by_track = {tr.id: tr for tr in tracks}
         ledger = self._world.ledger
         kill_positions: List[Vec3] = []
         for eng in engagements:
@@ -297,7 +291,7 @@ class WargameRunner:
                 eng.status = EngagementStatus.LEAK
                 eng.neutralized_threat_ids = []
                 continue
-            killed = self._apply_effect(defender, eng, by_threat, by_track, kill_positions)
+            killed = self._apply_effect(defender, eng, by_threat, kill_positions)
             eng.neutralized_threat_ids = killed
             eng.status = EngagementStatus.HIT if killed else EngagementStatus.MISS
         if kill_positions:
@@ -308,20 +302,15 @@ class WargameRunner:
         defender: Defender,
         eng: Engagement,
         by_threat: dict,
-        by_track: dict,
         kill_positions: List[Vec3],
     ) -> List[str]:
         """Apply one effector to its targets and return the threats it killed.
 
         Killed drone positions are appended to kill_positions so the runner can
         tell the swarm where it took losses, which makes nearby survivors react.
-        When a present drone survives a shot, we record a miss for this effector
-        kind on the target track. The threat layer turns repeated misses into an
-        ineffective belief so the allocator stops wasting that effector.
         """
         area = defender.effect_radius_m > 0.0
         radius = defender.effect_radius_m if area else _POINT_KILL_RADIUS_M
-        kind = defender.kind.value
         targets = eng.neutralized_threat_ids or [eng.target_threat_id]
         killed: List[str] = []
         for tid in targets:
@@ -332,28 +321,15 @@ class WargameRunner:
             drone = self._nearest_live_drone(position, radius)
             if drone is None:
                 continue
-            resistance = _resistance(defender.kind, drone)
-            if self._world.rng.random() < defender.kill_prob * resistance:
+            kill_prob = defender.kill_prob * _resistance(defender.kind, drone)
+            if self._world.rng.random() < kill_prob:
                 kill_positions.append(drone.position)
                 self._destroy(drone)
                 self._world.ledger.record_outcome(
                     EngagementStatus.HIT, drone.unit_cost,
                 )
                 killed.append(tid)
-            elif resistance < 1.0:
-                # Only a survival where the effector was measurably degraded counts
-                # as resistance evidence. A plain unlucky miss on a fully
-                # vulnerable target (resistance 1.0) must never build a false
-                # ineffective belief, which would abandon a killable drone.
-                self._record_effector_miss(threat, kind, by_track)
         return killed
-
-    def _record_effector_miss(self, threat: Threat, kind: str, by_track: dict) -> None:
-        """Tally one observed survival of an effector kind on a threat's track."""
-        track = by_track.get(threat.track_id) if threat.track_id else None
-        if track is None:
-            return
-        track.effector_misses[kind] = track.effector_misses.get(kind, 0) + 1
 
     def _nearest_live_drone(self, position, radius: float):
         """Return the nearest unarrived drone within radius of position, or None."""

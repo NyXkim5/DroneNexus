@@ -31,31 +31,9 @@ from threat.scoring import _rank, _score_track
 logger = logging.getLogger("overwatch.threat")
 
 
-# Number of degraded-effect survivals before the threat layer judges an effector
-# kind ineffective against a track. The runner only records a survival as evidence
-# when the effector was measurably degraded (resistance below one), so a plain
-# unlucky miss never counts. Two confirmations is enough to adapt without acting on
-# a single observation.
-INEFFECTIVE_MISS_THRESHOLD = 2
-
-
 def _hostile_tracks(tracks: List[Track]) -> List[Track]:
     """Return only the tracks classified HOSTILE."""
     return [t for t in tracks if t.classification == TrackClass.HOSTILE]
-
-
-def _ineffective_kinds(track: Track) -> frozenset:
-    """Effector kinds this track has survived enough times to deem ineffective.
-
-    A jam-resistant drone survives EW every time and a hardened drone survives
-    HPM, so their miss counts climb past the threshold while a vulnerable drone is
-    killed before it accrues many. The allocator uses this to escalate effectors.
-    """
-    return frozenset(
-        kind
-        for kind, misses in track.effector_misses.items()
-        if misses >= INEFFECTIVE_MISS_THRESHOLD
-    )
 
 
 def detect_swarms(
@@ -113,7 +91,6 @@ def assess(
             threat.swarm_id = member_swarm.id
             threat.intent = member_swarm.intent
         threat.confidence = track.confidence
-        threat.ineffective_kinds = _ineffective_kinds(track)
         threats.append(threat)
 
     ranked = _rank(threats)

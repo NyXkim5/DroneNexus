@@ -383,11 +383,9 @@ class LayeredAllocator(Allocator):
         spatial grid counts how many unengaged threats fall within the effect
         radius of each candidate, capped at the effector simultaneous limit.
         """
-        kind = defender.kind.value
         live = [
             t for t in threats
             if t.id not in engaged
-            and kind not in t.ineffective_kinds
             and self._in_range(defender, positions[t.id])
         ]
         if not live:
@@ -473,8 +471,6 @@ class LayeredAllocator(Allocator):
         never against a known decoy or a low-confidence track, so it does not blow
         the cost-exchange ratio on a cheap, fake, or uncertain target.
         """
-        if defender.kind.value in threat.ineffective_kinds:
-            return False
         cost_per_kill = defender.unit_cost / max(0.05, defender.kill_prob)
         if cost_per_kill <= self._attacker_cost_ref:
             return True
