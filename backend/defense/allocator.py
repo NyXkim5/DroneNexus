@@ -445,21 +445,41 @@ class LayeredAllocator(Allocator):
         threats: List[Threat],
         positions: Dict[str, Optional[Vec3]],
     ) -> List[List[float]]:
-        """Benefit of each slot-threat pair, with -inf for out-of-range pairs."""
+        """Benefit of each slot-threat pair, with -inf for out-of-range pairs.
+
+        Every slot of one defender shares the same position, kind, and cost, so
+        its benefit row is identical. We compute the row once per unique defender
+        and reuse the reference for all its slots, which avoids recomputing the
+        range and cost-discipline checks per capacity copy. The auction only reads
+        the matrix, so sharing the row reference is safe and the values are exact.
+        """
+        row_cache: Dict[int, List[float]] = {}
         matrix: List[List[float]] = []
         for defender in slots:
-            row: List[float] = []
-            for threat in threats:
-                if not self._in_range(defender, positions[threat.id]):
-                    row.append(-math.inf)
-                    continue
-                if not self._worth_spending(defender, threat):
-                    row.append(-math.inf)
-                    continue
-                reward = threat.score * defender.kill_prob
-                row.append(reward - self._cost_weight * defender.unit_cost)
+            row = row_cache.get(id(defender))
+            if row is None:
+                row = self._defender_row(defender, threats, positions)
+                row_cache[id(defender)] = row
             matrix.append(row)
         return matrix
+
+    def _defender_row(
+        self,
+        defender: Defender,
+        threats: List[Threat],
+        positions: Dict[str, Optional[Vec3]],
+    ) -> List[float]:
+        """Benefit of one defender against each threat, -inf where it cannot fire."""
+        row: List[float] = []
+        cost_penalty = self._cost_weight * defender.unit_cost
+        for threat in threats:
+            if not self._in_range(defender, positions[threat.id]):
+                row.append(-math.inf)
+            elif not self._worth_spending(defender, threat):
+                row.append(-math.inf)
+            else:
+                row.append(threat.score * defender.kill_prob - cost_penalty)
+        return row
 
     def _worth_spending(self, defender: Defender, threat: Threat) -> bool:
         """True when committing this point effector to this threat wins on cost.
