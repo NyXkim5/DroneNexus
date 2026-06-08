@@ -27,8 +27,9 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import uuid
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from csontology import Detection, Engagement, Threat, Track, Vec3
 
@@ -70,6 +71,7 @@ class DecisionRecord:
     time_to_impact_s: Optional[float] = None
     priority_rank: Optional[int] = None
     actor: str = "AUTONOMY"
+    run_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -131,6 +133,12 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_meta (
     key TEXT PRIMARY KEY,
     value INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS runs (
+    run_id TEXT PRIMARY KEY,
+    scenario TEXT NOT NULL DEFAULT '',
+    label TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS detections (
@@ -207,6 +215,7 @@ CREATE TABLE IF NOT EXISTS track_detections (
 
 CREATE TABLE IF NOT EXISTS decisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL DEFAULT '',
     schema_version INTEGER NOT NULL DEFAULT 2,
     tick INTEGER NOT NULL,
     timestamp REAL NOT NULL,
@@ -246,7 +255,7 @@ _DECISION_COLUMNS = (
     "schema_version, tick, timestamp, engagement_id, defender_id, defender_kind, "
     "cost, status, aim_x, aim_y, aim_z, target_threat_ids, killed_threat_ids, "
     "lineage, score, value_at_risk, swarm_id, intent, time_to_impact_s, "
-    "priority_rank, actor, primary_track_id"
+    "priority_rank, actor, primary_track_id, run_id"
 )
 
 
@@ -260,14 +269,38 @@ def _connect(db_path: str) -> sqlite3.Connection:
 class AuditLog:
     """Append-only SQLite audit store for the counter-swarm entity ontology."""
 
-    def __init__(self, db_path: str) -> None:
+    def __init__(
+        self,
+        db_path: str,
+        run_id: Optional[str] = None,
+        scenario: str = "",
+        label: str = "",
+    ) -> None:
+        """Open the store and register this run.
+
+        run_id identifies the run that produced the decisions written through this
+        instance, so several runs can share one store without their after-action
+        logs colliding. A generated id is used when none is given. The FK lineage
+        already uses globally unique surrogate row ids, so reconstruct_chain stays
+        collision-safe across runs; run_id scopes the natural-key decision log.
+        """
         self._conn = _connect(db_path)
         self._conn.executescript(_SCHEMA)
         self._conn.execute(
             "INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)",
             ("schema_version", SCHEMA_VERSION),
         )
+        self._run_id = run_id or uuid.uuid4().hex[:12]
+        self._conn.execute(
+            "INSERT OR REPLACE INTO runs (run_id, scenario, label) VALUES (?, ?, ?)",
+            (self._run_id, scenario, label),
+        )
         self._conn.commit()
+
+    @property
+    def run_id(self) -> str:
+        """The run identifier stamped on every decision this instance writes."""
+        return self._run_id
 
     def record_detections(
         self, tick: int, timestamp: float, detections: List[Detection],
@@ -501,6 +534,7 @@ class AuditLog:
         lineage = self._lineage(targets, threats_by_id, tracks_by_id)
         ax, ay, az = eng.aim_point if eng.aim_point is not None else (None, None, None)
         row = (
+            self._run_id,
             SCHEMA_VERSION, tick, timestamp, eng.id, eng_row_id, eng.defender_id,
             kind, eng.cost, eng.status.value, ax, ay, az,
             json.dumps(targets), json.dumps(list(eng.neutralized_threat_ids)),
@@ -515,12 +549,12 @@ class AuditLog:
             primary.track_id if primary else None,
         )
         self._conn.execute(
-            "INSERT INTO decisions (schema_version, tick, timestamp, "
+            "INSERT INTO decisions (run_id, schema_version, tick, timestamp, "
             "engagement_id, engagement_row_id, defender_id, defender_kind, cost, "
             "status, aim_x, aim_y, aim_z, target_threat_ids, killed_threat_ids, "
             "lineage, score, value_at_risk, swarm_id, intent, time_to_impact_s, "
             "priority_rank, actor, primary_track_id) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             row,
         )
 
@@ -579,14 +613,35 @@ def schema_version(db_path: str) -> Optional[int]:
         conn.close()
 
 
-def load_decisions(db_path: str) -> List[DecisionRecord]:
-    """Read every recorded decision back for replay or after-action review."""
+def load_decisions(
+    db_path: str, run_id: Optional[str] = None,
+) -> List[DecisionRecord]:
+    """Read recorded decisions for replay or after-action review.
+
+    With run_id given, only that run's decisions are returned, so several runs in
+    one store do not mix. Without it, every run's decisions are returned in write
+    order.
+    """
     conn = _connect(db_path)
     try:
-        cur = conn.execute(
-            f"SELECT {_DECISION_COLUMNS} FROM decisions ORDER BY id"
-        )
+        if run_id is None:
+            cur = conn.execute(f"SELECT {_DECISION_COLUMNS} FROM decisions ORDER BY id")
+        else:
+            cur = conn.execute(
+                f"SELECT {_DECISION_COLUMNS} FROM decisions WHERE run_id = ? ORDER BY id",
+                (run_id,),
+            )
         return [_row_to_record(row) for row in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def list_runs(db_path: str) -> List[Tuple[str, str, str]]:
+    """Return the recorded runs as (run_id, scenario, label) tuples."""
+    conn = _connect(db_path)
+    try:
+        cur = conn.execute("SELECT run_id, scenario, label FROM runs ORDER BY rowid")
+        return [(r[0], r[1], r[2]) for r in cur.fetchall()]
     finally:
         conn.close()
 
@@ -614,6 +669,7 @@ def _row_to_record(row: tuple) -> DecisionRecord:
         time_to_impact_s=row[18],
         priority_rank=row[19],
         actor=row[20],
+        run_id=row[22],
     )
 
 

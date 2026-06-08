@@ -99,7 +99,7 @@ async def _run(
     scenario: Scenario, quiet: bool, pace: bool, audit_path: str | None,
 ) -> None:
     """Drive the runner to completion, printing metrics along the way."""
-    audit = AuditLog(audit_path) if audit_path else None
+    audit = AuditLog(audit_path, scenario=scenario.name) if audit_path else None
     runner = WargameRunner(scenario, audit=audit)
     last: Frame | None = None
     async for frame in runner.run(pace=pace):

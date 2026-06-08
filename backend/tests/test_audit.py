@@ -372,3 +372,49 @@ def test_miss_link_is_not_killed(tmp_path) -> None:
     assert len(targeted) == 1
     assert targeted[0].threat_id == "thr-X"
     assert targeted[0].killed is False
+
+
+# ---- multi-run provenance ----
+
+def test_runs_are_isolated_in_a_shared_store(tmp_path) -> None:
+    """Two runs sharing one store keep separate, queryable decision logs."""
+    from wargame.audit import list_runs
+
+    db_path = str(tmp_path / "shared.db")
+    threat = _threat("thr-A", "trk-A")
+    track = _track("trk-A", ["d1"])
+
+    a = AuditLog(db_path, run_id="runA", scenario="saturation_1000")
+    a.record_tick(
+        1, 1.0, [_engagement("eng-A", "thr-A", cs.EngagementStatus.HIT, ["thr-A"])],
+        {"thr-A": threat}, {"trk-A": track},
+    )
+    a.close()
+
+    b = AuditLog(db_path, run_id="runB", scenario="decoy_300")
+    b.record_tick(
+        1, 1.0, [_engagement("eng-B", "thr-A", cs.EngagementStatus.MISS, [])],
+        {"thr-A": threat}, {"trk-A": track},
+    )
+    b.close()
+
+    runs = {r[0]: r[1] for r in list_runs(db_path)}
+    assert runs == {"runA": "saturation_1000", "runB": "decoy_300"}
+    a_decisions = load_decisions(db_path, run_id="runA")
+    b_decisions = load_decisions(db_path, run_id="runB")
+    assert [d.engagement_id for d in a_decisions] == ["eng-A"]
+    assert [d.engagement_id for d in b_decisions] == ["eng-B"]
+    assert all(d.run_id == "runA" for d in a_decisions)
+    # The unscoped read still returns both runs.
+    assert len(load_decisions(db_path)) == 2
+
+
+def test_generated_run_id_when_none_given(tmp_path) -> None:
+    from wargame.audit import list_runs
+
+    db_path = str(tmp_path / "gen.db")
+    audit = AuditLog(db_path)
+    rid = audit.run_id
+    assert rid
+    audit.close()
+    assert list_runs(db_path)[0][0] == rid
