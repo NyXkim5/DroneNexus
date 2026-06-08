@@ -38,8 +38,11 @@ def centroid_of(positions: List[Vec3]) -> Vec3:
 def _link_indices(tracks: List[Track], radius_m: float) -> List[List[int]]:
     """Group track indices by single-link connectivity within radius_m.
 
-    Uses union-find so a chain of nearby tracks forms one cluster. Returns a
-    list of index groups, each group being one connected component.
+    Uses union-find so a chain of nearby tracks forms one cluster. A horizontal
+    spatial-hash grid keyed on the link radius restricts each track to candidates
+    in its own and adjacent cells, so connectivity is found in near-linear time
+    rather than the all-pairs product. Any two tracks within radius_m fall in
+    adjacent cells, so this yields the identical clusters as the dense scan.
     """
     parent = list(range(len(tracks)))
 
@@ -52,10 +55,23 @@ def _link_indices(tracks: List[Track], radius_m: float) -> List[List[int]]:
     def union(i: int, j: int) -> None:
         parent[find(i)] = find(j)
 
-    for i in range(len(tracks)):
-        for j in range(i + 1, len(tracks)):
-            if horizontal_distance(tracks[i].position, tracks[j].position) <= radius_m:
-                union(i, j)
+    cell = max(1.0, radius_m)
+    buckets: Dict[tuple, List[int]] = {}
+    keys: List[tuple] = []
+    for i, track in enumerate(tracks):
+        key = (int(track.position[0] // cell), int(track.position[1] // cell))
+        keys.append(key)
+        buckets.setdefault(key, []).append(i)
+
+    for i, track in enumerate(tracks):
+        ix, iy = keys[i]
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for j in buckets.get((ix + dx, iy + dy), ()):
+                    if j <= i:
+                        continue
+                    if horizontal_distance(track.position, tracks[j].position) <= radius_m:
+                        union(i, j)
 
     groups: Dict[int, List[int]] = {}
     for i in range(len(tracks)):
