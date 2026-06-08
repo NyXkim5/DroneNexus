@@ -382,6 +382,7 @@ class WargameRunner:
             metrics=metrics,
             tracks=tracks,
             defenders=self._world.defenders,
+            threats=threats,
             assignments=assignment_lines(engagements, threats),
             site_enu=self._world.site.position,
             scenario_name=self._scenario.name,

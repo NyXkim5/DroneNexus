@@ -65,9 +65,16 @@ canvas#tactical { position: fixed; inset: 0; z-index: 410; pointer-events: none;
 .cer-val { font-family: var(--font-data, monospace); font-size: 22px; font-weight: 700; margin-top: 3px; }
 .cer-attacker .cer-val { color: var(--red, #C23A3E); }
 .cer-defender .cer-val { color: var(--cyan, #4888D8); }
-.cer-ratio { background: var(--panel-elevated, #1A1F28); }
+.cer-ratio { background: var(--panel-elevated, #1A1F28); position: relative; }
 .cer-ratio .cer-val { font-size: 30px; color: var(--amber, #B86E17); }
+.cer-ratio.win { background: rgba(30,122,74,0.18); }
 .cer-ratio.win .cer-val { color: var(--green, #1E7A4A); }
+.cer-state {
+  font-family: var(--font-label, sans-serif); font-size: 8px; letter-spacing: 2px;
+  text-transform: uppercase; margin-top: 2px; color: var(--text-dim, #7A8899);
+}
+.cer-ratio.win .cer-state { color: var(--green, #1E7A4A); }
+.cer-ratio.lose .cer-state { color: var(--red, #C23A3E); }
 
 /* Metrics strip */
 .metrics {
@@ -111,7 +118,7 @@ canvas#tactical { position: fixed; inset: 0; z-index: 410; pointer-events: none;
 
 <div class="cer-card">
   <div class="cer-col cer-attacker"><div class="cer-label">Attacker $ Killed</div><div class="cer-val" id="cer-att">$0</div></div>
-  <div class="cer-col cer-ratio" id="cer-ratio-col"><div class="cer-label">Cost Exchange</div><div class="cer-val" id="cer-ratio">n/a</div></div>
+  <div class="cer-col cer-ratio" id="cer-ratio-col"><div class="cer-label">Cost Exchange</div><div class="cer-val" id="cer-ratio">n/a</div><div class="cer-state" id="cer-state">awaiting kills</div></div>
   <div class="cer-col cer-defender"><div class="cer-label">Defender $ Spent</div><div class="cer-val" id="cer-def">$0</div></div>
 </div>
 
@@ -123,10 +130,15 @@ canvas#tactical { position: fixed; inset: 0; z-index: 410; pointer-events: none;
   <div class="metric"><div class="k">Intercepts</div><div class="v green" id="m-hit">0</div></div>
   <div class="metric"><div class="k">Intercept Rate</div><div class="v" id="m-rate">0%</div></div>
   <div class="metric"><div class="k">Engagements</div><div class="v" id="m-eng">0</div></div>
+  <div class="metric"><div class="k">Swarm Intent</div><div class="v" id="m-intent">UNKNOWN</div></div>
 </div>
 
 <div class="legend">
-  <div class="row"><span class="swatch" style="background:#C23A3E"></span>Hostile track</div>
+  <div class="row"><span class="swatch" style="background:#C23A3E"></span>SATURATION</div>
+  <div class="row"><span class="swatch" style="background:#D98A2B"></span>WAVES</div>
+  <div class="row"><span class="swatch" style="background:#9B59C2"></span>DECOY</div>
+  <div class="row"><span class="swatch" style="background:#4AB0C2"></span>PROBE</div>
+  <div class="row"><span class="swatch" style="background:#8A96A3"></span>UNKNOWN intent</div>
   <div class="row"><span class="swatch" style="background:#4888D8"></span>Defender</div>
   <div class="row"><span class="swatch" style="background:#B86E17"></span>Assignment line</div>
   <div class="row"><span class="swatch" style="background:#E8ECF0"></span>Defended site</div>
@@ -138,6 +150,19 @@ canvas#tactical { position: fixed; inset: 0; z-index: 410; pointer-events: none;
 
 // Site origin matches csontology ORIGIN_LAT / ORIGIN_LON.
 const ORIGIN = { lat: 33.6405, lon: -117.8443 };
+
+// Per-intent track colors. Mirrors the SwarmIntent enum and the legend swatches.
+const INTENT_COLORS = {
+  SATURATION: "194,58,62",
+  WAVES: "217,138,43",
+  DECOY: "155,89,194",
+  PROBE: "74,176,194",
+  UNKNOWN: "138,150,163",
+};
+
+function intentRGB(intent) {
+  return INTENT_COLORS[intent] || INTENT_COLORS.UNKNOWN;
+}
 
 const map = L.map("map", { zoomControl: true, attributionControl: false })
   .setView([ORIGIN.lat, ORIGIN.lon], 14);
@@ -167,14 +192,19 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!frame) return;
 
+  // Tolerate an older or partial frame: default every collection.
+  const tracks = frame.tracks || [];
+  const defenders = frame.defenders || [];
+  const assignments = frame.assignments || [];
+
   const trackById = {};
-  frame.tracks.forEach((t) => { trackById[t.id] = t; });
+  tracks.forEach((t) => { trackById[t.id] = t; });
   const defById = {};
-  frame.defenders.forEach((d) => { defById[d.id] = d; });
+  defenders.forEach((d) => { defById[d.id] = d; });
 
   // Assignment lines first so markers sit on top.
   ctx.lineWidth = 1;
-  frame.assignments.forEach((a) => {
+  assignments.forEach((a) => {
     const d = defById[a.defender_id];
     const t = trackById[a.track_id];
     if (!d || !t) return;
@@ -189,17 +219,27 @@ function draw() {
     ctx.stroke();
   });
 
-  // Hostile tracks in red.
-  frame.tracks.forEach((t) => {
+  // Hostile tracks colored by inferred swarm intent. A track with a near
+  // time-to-impact gets a brighter ring so the most urgent threats stand out.
+  tracks.forEach((t) => {
     const p = project(t.lat, t.lon);
-    ctx.fillStyle = "rgba(194,58,62,0.85)";
+    const rgb = intentRGB(t.intent || "UNKNOWN");
+    ctx.fillStyle = "rgba(" + rgb + ",0.85)";
     ctx.beginPath();
     ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
     ctx.fill();
+    const tti = t.time_to_impact_s;
+    if (typeof tti === "number" && tti <= 20) {
+      ctx.strokeStyle = "rgba(" + rgb + ",0.9)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   });
 
   // Defenders in blue squares.
-  frame.defenders.forEach((d) => {
+  defenders.forEach((d) => {
     const p = project(d.lat, d.lon);
     ctx.fillStyle = d.status === "DEPLETED"
       ? "rgba(107,119,133,0.7)"
@@ -208,40 +248,80 @@ function draw() {
   });
 
   // Defended site marker.
-  const s = project(frame.site.lat, frame.site.lon);
-  ctx.strokeStyle = "#E8ECF0";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(s.x, s.y, 9, 0, Math.PI * 2);
-  ctx.stroke();
+  if (frame.site) {
+    const s = project(frame.site.lat, frame.site.lon);
+    ctx.strokeStyle = "#E8ECF0";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 9, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function dominantIntent(tracks) {
+  // Pick the most common non-UNKNOWN intent across live tracks for the readout.
+  const counts = {};
+  (tracks || []).forEach((t) => {
+    const intent = t.intent || "UNKNOWN";
+    counts[intent] = (counts[intent] || 0) + 1;
+  });
+  let best = "UNKNOWN";
+  let bestN = -1;
+  Object.keys(counts).forEach((intent) => {
+    if (intent === "UNKNOWN") return;
+    if (counts[intent] > bestN) { best = intent; bestN = counts[intent]; }
+  });
+  return best;
 }
 
 map.on("move zoom", draw);
 
 function fmtMoney(v) {
-  return "$" + Math.round(v).toLocaleString();
+  return "$" + Math.round(Number(v) || 0).toLocaleString();
 }
 
-function renderMetrics(m) {
-  document.getElementById("m-tick").textContent = m.tick;
-  document.getElementById("m-host").textContent = m.active_hostiles;
-  document.getElementById("m-trk").textContent = m.tracks_held;
-  document.getElementById("m-leak").textContent = m.leakers;
-  document.getElementById("m-hit").textContent = m.intercepts;
-  document.getElementById("m-rate").textContent =
-    (m.intercept_rate * 100).toFixed(0) + "%";
-  document.getElementById("m-eng").textContent = m.engagements_made;
+function num(v, fallback) {
+  return typeof v === "number" && isFinite(v) ? v : fallback;
+}
 
-  document.getElementById("cer-att").textContent = fmtMoney(m.attacker_destroyed);
-  document.getElementById("cer-def").textContent = fmtMoney(m.defender_spent);
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function renderMetrics(m, tracks) {
+  m = m || {};
+  setText("m-tick", num(m.tick, 0));
+  setText("m-host", num(m.active_hostiles, 0));
+  setText("m-trk", num(m.tracks_held, 0));
+  setText("m-leak", num(m.leakers, 0));
+  setText("m-hit", num(m.intercepts, 0));
+  setText("m-rate", (num(m.intercept_rate, 0) * 100).toFixed(0) + "%");
+  setText("m-eng", num(m.engagements_made, 0));
+  setText("m-intent", dominantIntent(tracks));
+
+  setText("cer-att", fmtMoney(m.attacker_destroyed));
+  setText("cer-def", fmtMoney(m.defender_spent));
+
   const ratioEl = document.getElementById("cer-ratio");
   const ratioCol = document.getElementById("cer-ratio-col");
-  if (m.cost_exchange_ratio === null) {
-    ratioEl.textContent = "n/a";
-    ratioCol.classList.remove("win");
-  } else {
-    ratioEl.textContent = m.cost_exchange_ratio.toFixed(2);
-    ratioCol.classList.toggle("win", m.cost_exchange_ratio < 1.0);
+  const stateEl = document.getElementById("cer-state");
+  const ratio = m.cost_exchange_ratio;
+  const hasRatio = typeof ratio === "number" && isFinite(ratio);
+  // Prefer the engine win flag when present, else derive it from the ratio.
+  const win = typeof m.cost_exchange_win === "boolean"
+    ? m.cost_exchange_win
+    : (hasRatio ? ratio < 1.0 : null);
+
+  if (ratioEl) ratioEl.textContent = hasRatio ? ratio.toFixed(2) : "n/a";
+  if (ratioCol) {
+    ratioCol.classList.toggle("win", win === true);
+    ratioCol.classList.toggle("lose", win === false);
+  }
+  if (stateEl) {
+    if (win === true) stateEl.textContent = "favorable";
+    else if (win === false) stateEl.textContent = "unfavorable";
+    else stateEl.textContent = "awaiting kills";
   }
 }
 
@@ -267,12 +347,7 @@ function connect() {
     if (msg.type === "ERROR") { setDot("err"); return; }
     if (msg.type !== "WARGAME_FRAME") return;
     frame = msg;
-    renderMetrics(msg.metrics);
-    if (frame.tracks.length || frame.defenders.length) {
-      const lats = frame.defenders.map((d) => d.lat).concat([frame.site.lat]);
-      const lons = frame.defenders.map((d) => d.lon).concat([frame.site.lon]);
-      void lats; void lons;
-    }
+    renderMetrics(msg.metrics, frame.tracks);
     draw();
   };
 }

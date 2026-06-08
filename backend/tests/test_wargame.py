@@ -6,6 +6,8 @@ and metrics. They run a short scenario with asyncio.run so they need no plugin
 config. Scenarios are seeded so runs are deterministic enough to bound metrics.
 """
 import asyncio
+import json
+import math
 import os
 import sys
 
@@ -16,10 +18,8 @@ import pytest
 # Full end-to-end wargame runs. Deselect for a fast loop with -m "not slow".
 pytestmark = pytest.mark.slow
 
-import pytest
-
-from csontology import SwarmIntent
-from wargame.frame import Frame
+from csontology import SwarmIntent, Threat, Track, TrackClass
+from wargame.frame import Frame, Metrics
 from wargame.runner import WargameRunner
 from wargame.scenario import (
     Scenario,
@@ -128,3 +128,124 @@ def test_yaml_preset_round_trips() -> None:
 def test_unknown_scenario_raises() -> None:
     with pytest.raises(KeyError):
         load_scenario("does_not_exist")
+
+
+# ---- Frame serialization (fast, built directly, no scenario run) ----
+
+
+def _make_track(track_id: str) -> Track:
+    """Build a minimal confirmed track for serialization tests."""
+    return Track(
+        id=track_id,
+        position=(120.0, -40.0, 60.0),
+        velocity=(-5.0, 3.0, 0.0),
+        covariance=(2.0, 2.0, 1.0),
+        last_update=1.0,
+        classification=TrackClass.HOSTILE,
+        confidence=0.8,
+    )
+
+
+def _make_metrics(ratio) -> Metrics:
+    """Build a scoreboard with a chosen cost-exchange ratio for tests."""
+    return Metrics(
+        tick=3,
+        sim_time_s=0.3,
+        active_hostiles=4,
+        tracks_held=2,
+        leakers=1,
+        engagements_made=5,
+        intercepts=3,
+        intercept_rate=0.6,
+        defender_spent=1500.0,
+        attacker_destroyed=3000.0,
+        cost_exchange_ratio=ratio,
+    )
+
+
+def test_frame_to_dict_surfaces_intent_and_impact() -> None:
+    track = _make_track("T1")
+    threat = Threat(
+        id="X1",
+        score=0.91,
+        time_to_impact_s=12.5,
+        value_at_risk=500.0,
+        priority_rank=1,
+        track_id="T1",
+        swarm_id="S1",
+        intent=SwarmIntent.SATURATION,
+    )
+    frame = Frame(
+        metrics=_make_metrics(0.5),
+        tracks=[track],
+        defenders=[],
+        threats=[threat],
+    )
+    payload = frame.to_dict()
+    # json.dumps must succeed end to end.
+    json.dumps(payload)
+    t = payload["tracks"][0]
+    assert t["intent"] == "SATURATION"
+    assert isinstance(t["intent"], str)
+    assert t["time_to_impact_s"] == 12.5
+    assert t["swarm_id"] == "S1"
+    assert t["threat_score"] == 0.91
+
+
+def test_frame_to_dict_defaults_intent_when_unscored() -> None:
+    frame = Frame(
+        metrics=_make_metrics(None),
+        tracks=[_make_track("T9")],
+        defenders=[],
+    )
+    payload = frame.to_dict()
+    json.dumps(payload)
+    t = payload["tracks"][0]
+    assert t["intent"] == "UNKNOWN"
+    assert t["time_to_impact_s"] is None
+    assert t["swarm_id"] is None
+
+
+def test_metrics_to_dict_scoreboard_keys_present() -> None:
+    payload = _make_metrics(0.5).to_dict()
+    for key in ("leakers", "intercepts", "cost_exchange_ratio"):
+        assert key in payload
+    assert payload["leakers"] == 1
+    assert payload["intercepts"] == 3
+    assert isinstance(payload["cost_exchange_ratio"], float)
+    assert payload["cost_exchange_win"] is True
+
+
+def test_metrics_to_dict_ratio_null_when_undefined() -> None:
+    payload = _make_metrics(None).to_dict()
+    assert payload["cost_exchange_ratio"] is None
+    assert payload["cost_exchange_win"] is None
+    json.dumps(payload)
+
+
+def test_metrics_to_dict_ratio_null_when_not_finite() -> None:
+    # NaN and inf are not JSON, so they must serialize as null.
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        payload = _make_metrics(bad).to_dict()
+        assert payload["cost_exchange_ratio"] is None
+        assert payload["cost_exchange_win"] is None
+        text = json.dumps(payload)
+        assert "NaN" not in text and "Infinity" not in text
+
+
+def test_frame_to_dict_keeps_existing_keys() -> None:
+    frame = Frame(
+        metrics=_make_metrics(0.5),
+        tracks=[_make_track("T1")],
+        defenders=[],
+        threats=[],
+    )
+    payload = frame.to_dict()
+    for key in ("type", "scenario", "done", "metrics", "site",
+                "tracks", "defenders", "assignments"):
+        assert key in payload
+    assert payload["type"] == "WARGAME_FRAME"
+    track = payload["tracks"][0]
+    for key in ("id", "enu", "lat", "lon", "velocity",
+                "classification", "confidence"):
+        assert key in track
