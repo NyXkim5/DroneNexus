@@ -151,6 +151,7 @@ class Frame:
     cascade_results: List["CascadeResult"] = field(default_factory=list)
     engagement_order: Optional["EngagementOrder"] = None
     visual_targets: List[dict] = field(default_factory=list)
+    heatmap_data: Optional[dict] = None
 
     def to_dict(self) -> Dict[str, object]:
         """Serialize the whole frame to a JSON-ready dict for the websocket."""
@@ -173,6 +174,7 @@ class Frame:
             "cascade_results": [cr.to_dict() for cr in self.cascade_results],
             "engagement_order": self.engagement_order.to_dict() if self.engagement_order else None,
             "visual_targets": self.visual_targets,
+            "heatmap_data": self.heatmap_data,
         }
 
     def _threats_by_track(self) -> Dict[str, Threat]:

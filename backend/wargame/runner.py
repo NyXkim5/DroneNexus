@@ -45,10 +45,12 @@ from vision.cascade import CascadeEngine, CascadeResult, DependencyEdge
 from decision.engine import DecisionEngine
 from decision.models import EngagementMode, EngagementOrder
 
+from attacker.swarm_adapter import FlockingSwarmAdapter
 from wargame.audit import AuditLog
 from wargame.degradation import DegradationModel
 
 from wargame.frame import Frame, Metrics, assignment_lines
+from vision.heatmap import DetectionHeatmap
 from wargame.scenario import Scenario
 from wargame.world import WorldModel, build_sensor_specs, build_world
 
@@ -110,6 +112,16 @@ class WargameRunner:
         self._dt = 1.0 / scenario.tick_hz
         self._tick = 0
         self._engagements_made = 0
+        self._heatmap = DetectionHeatmap()
+
+        # Optional Reynolds flocking adapter. When use_flocking is set on the
+        # scenario, the adapter wraps the swarm and advance_all() replaces the
+        # bare swarm.advance() call each tick. The adapter calls swarm.advance()
+        # internally, then layers flocking forces on top.
+        self._flocking_adapter: Optional[FlockingSwarmAdapter] = None
+        if scenario.use_flocking:
+            self._flocking_adapter = FlockingSwarmAdapter(self._world.swarm)
+            self._flocking_adapter.initialize_boids()
 
         self._vision_detector: Optional[SimDetector] = None
         self._vision_feed: Optional[SimFeedSource] = None
@@ -160,8 +172,16 @@ class WargameRunner:
         We advance the red force first so this tick samples fresh truth, then read
         one synchronous burst from the source. The source owns no clock here, the
         runner does, so detections and the pipeline stay in lockstep per tick.
+
+        When flocking is enabled, the adapter drives advance — it calls
+        swarm.advance() internally and then overlays Reynolds forces so drones
+        exhibit separation, cohesion, and alignment while still converging on
+        the site. The target is the site ENU position.
         """
-        self._world.swarm.advance(self._dt)
+        if self._flocking_adapter is not None:
+            self._flocking_adapter.advance_all(self._dt, self._world.site.position)
+        else:
+            self._world.swarm.advance(self._dt)
         detections = self._source.sample_once()
         return self._degradation.apply(detections, self._tick, self._world.rng)
 
@@ -180,6 +200,7 @@ class WargameRunner:
         if self._audit is not None:
             self._audit.link_tracks(self._tick, tracks)
         self._classify_hostiles()
+        self._feed_heatmap(detections, tracks)
         threats = threat_module.assess(tracks, self._world.site, t)
         cascade_results = []
         engagement_order = None
@@ -196,7 +217,8 @@ class WargameRunner:
         self._audit_tick(t, engagements, threats, tracks)
         self._queue_events(engagements, threats, tracks)
         self._cool_down()
-        return self._build_frame(tracks, threats, engagements, cascade_results, engagement_order, visual_targets)
+        heatmap_data = self._heatmap.to_dict() if self._tick % 5 == 0 else None
+        return self._build_frame(tracks, threats, engagements, cascade_results, engagement_order, visual_targets, heatmap_data)
 
     def _queue_events(
         self,
@@ -400,6 +422,26 @@ class WargameRunner:
             else:
                 self._world.reload_left[defender.id] = left
 
+    def _feed_heatmap(self, detections: List[Detection], tracks: List[Track]) -> None:
+        """Feed sensor detections and hostile track positions into the heatmap.
+
+        Detection positions cover sensor hits from this tick. Hostile track
+        positions cover the fused air picture so the heatmap accumulates both
+        raw sensor noise and confirmed track corridors. tick() is called once
+        per step to apply exponential decay before the next accumulation.
+        """
+        detection_positions = [
+            (d.position[0], d.position[1]) for d in detections
+        ]
+        self._heatmap.add_detections(detection_positions)
+        hostile_positions = [
+            (tr.position[0], tr.position[1])
+            for tr in tracks
+            if tr.classification.value == "HOSTILE"
+        ]
+        self._heatmap.add_detections(hostile_positions)
+        self._heatmap.tick()
+
     def _build_frame(
         self,
         tracks: List[Track],
@@ -408,6 +450,7 @@ class WargameRunner:
         cascade_results: Optional[List[CascadeResult]] = None,
         engagement_order: Optional[EngagementOrder] = None,
         visual_targets: Optional[List] = None,
+        heatmap_data: Optional[dict] = None,
     ) -> Frame:
         """Compute metrics and bundle a renderable Frame for this tick."""
         metrics = self._compute_metrics(tracks)
@@ -424,6 +467,7 @@ class WargameRunner:
             cascade_results=cascade_results or [],
             engagement_order=engagement_order,
             visual_targets=[t.to_dict() for t in visual_targets] if visual_targets else [],
+            heatmap_data=heatmap_data,
         )
 
     def _compute_metrics(self, tracks: List[Track]) -> Metrics:
