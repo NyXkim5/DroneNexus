@@ -107,6 +107,7 @@ class Scenario:
     jam_resistant_fraction: float = 0.0
     hardened_fraction: float = 0.0
     target_scenario: Optional[str] = None
+    use_flocking: bool = False
 
     def __post_init__(self) -> None:
         # Pure vision-only scenarios use swarm_count=0, which is exempt from the
