@@ -1,0 +1,87 @@
+/*
+ * Local font embed for air-gapped deployment.
+ * No requests to fonts.googleapis.com or fonts.gstatic.com.
+ *
+ * Font files in this directory:
+ *   inter-300.woff2  inter-400.woff2  inter-500.woff2
+ *   inter-600.woff2  inter-700.woff2
+ *   jetbrains-mono-400.woff2  jetbrains-mono-700.woff2
+ *
+ * Source: Google Fonts v20 (Inter) / v24 (JetBrains Mono), latin subset.
+ */
+
+/* ── Inter ─────────────────────────────────────────────────── */
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+    src: url('./inter-300.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('./inter-400.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('./inter-500.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('./inter-600.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('./inter-700.woff2') format('woff2');
+}
+
+/* ── JetBrains Mono ─────────────────────────────────────────── */
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('./jetbrains-mono-400.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('./jetbrains-mono-400.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('./jetbrains-mono-700.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('./jetbrains-mono-700.woff2') format('woff2');
+}
