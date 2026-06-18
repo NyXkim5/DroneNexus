@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import yaml
 
@@ -106,16 +106,20 @@ class Scenario:
     blackout_windows: List[Tuple[int, int]] = field(default_factory=list)
     jam_resistant_fraction: float = 0.0
     hardened_fraction: float = 0.0
+    target_scenario: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not 10 <= self.swarm_count <= 1000:
             raise ValueError(f"swarm_count must be in 10..1000, got {self.swarm_count}")
         if self.tick_hz <= 0:
             raise ValueError("tick_hz must be positive")
-        if not self.sensors:
-            raise ValueError("scenario needs at least one sensor")
-        if not self.defenders:
-            raise ValueError("scenario needs at least one defender")
+        # Vision-only scenarios wire in a target_scenario instead of a sensor
+        # layout, so the sensor and defender lists may be empty in that case.
+        if not self.target_scenario:
+            if not self.sensors:
+                raise ValueError("scenario needs at least one sensor")
+            if not self.defenders:
+                raise ValueError("scenario needs at least one defender")
 
 
 def _ring_sensors(count: int, range_m: float, radius_m: float) -> List[SensorConfig]:
