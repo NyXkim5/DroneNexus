@@ -1,0 +1,77 @@
+%YAML:1.0
+
+# OpenVINS estimator configuration tuned for the DroneNexus drone-sim
+# environment. Mono camera, lower noise values appropriate for simulation.
+
+# ── General ──────────────────────────────────────────────────────────────
+
+use_fej: true
+use_imuavg: true
+use_rk4_integration: true
+use_stereo: false
+max_cameras: 1
+calib_cam_extrinsics: true
+calib_cam_intrinsics: true
+calib_cam_timeoffset: true
+
+# ── State ────────────────────────────────────────────────────────────────
+
+max_clones: 8
+max_slam: 25
+max_slam_in_update: 15
+max_msckf_in_update: 30
+
+# ── Feature tracking ────────────────────────────────────────────────────
+
+num_pts: 150
+track_frequency: 30.0
+fast_threshold: 15
+grid_x: 5
+grid_y: 5
+min_px_dist: 10
+knn_ratio: 0.70
+downsample_cameras: false
+multi_threading: true
+
+# ── Feature representation ──────────────────────────────────────────────
+
+feat_rep_msckf: GLOBAL_3D
+feat_rep_slam: GLOBAL_3D
+feat_rep_aruco: GLOBAL_3D
+
+# ── Zero velocity update ────────────────────────────────────────────────
+
+try_zupt: false
+zupt_max_velocity: 0.1
+
+# ── IMU noise (sim-appropriate, lower than real hardware) ────────────────
+
+gyroscope_noise_density: 0.001
+gyroscope_random_walk: 0.0001
+accelerometer_noise_density: 0.01
+accelerometer_random_walk: 0.001
+
+# ── IMU initial covariance ──────────────────────────────────────────────
+
+up_msckf_sigma_px: 1.0
+up_slam_sigma_px: 1.0
+
+init_window_time: 1.0
+init_imu_thresh: 0.5
+
+# ── Camera intrinsics (mono, drone-sim defaults) ────────────────────────
+
+cam0_wh: [640, 480]
+cam0_is_fisheye: false
+cam0_k: [458.654, 457.296, 367.215, 248.375]
+cam0_d: [-0.28340811, 0.07395907, 0.00019359, 1.76187114e-05]
+
+# ── Camera extrinsics (body to cam0, identity-ish for sim) ──────────────
+
+T_imu_cam0:
+  - [0.0148655429818, -0.9999880929308, 0.0007336164523, -0.0216401454975]
+  - [0.9999011082149,  0.0149672133247, 0.0025715529948, -0.0645888296850]
+  - [-0.0025831793246, 0.0006955748533, 0.9999964242783,  0.0098166707810]
+  - [0.0, 0.0, 0.0, 1.0]
+
+calib_camimu_dt: 0.0

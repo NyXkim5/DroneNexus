@@ -102,6 +102,7 @@ def _track_to_dict(
         "velocity": [round(c, 2) for c in track.velocity],
         "classification": track.classification.value,
         "confidence": round(track.confidence, 3),
+        "covariance": [round(c, 2) for c in track.covariance],
         "intent": intent,
         "swarm_id": threat.swarm_id if threat is not None else None,
         "threat_score": round(threat.score, 3) if threat is not None else None,
@@ -128,6 +129,8 @@ def _defender_to_dict(defender: Defender) -> Dict[str, object]:
         "lat": lat,
         "lon": lon,
         "capacity": defender.capacity,
+        "range_m": round(defender.range_m, 1),
+        "unit_cost": round(defender.unit_cost, 2),
         "status": defender.status.value,
     }
 
@@ -152,6 +155,8 @@ class Frame:
     engagement_order: Optional["EngagementOrder"] = None
     visual_targets: List[dict] = field(default_factory=list)
     heatmap_data: Optional[dict] = None
+    # Raw engagements for this tick, kept for CoT bridge integration.
+    engagements: List[Engagement] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, object]:
         """Serialize the whole frame to a JSON-ready dict for the websocket."""

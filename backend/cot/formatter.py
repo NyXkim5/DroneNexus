@@ -1,5 +1,5 @@
 """
-CoT XML formatter for OVERWATCH tracks and threats.
+CoT XML formatter for OVERWATCH tracks, threats, defenders, and engagements.
 
 All functions are pure — they take data objects and return XML strings with no
 side effects. This makes them trivially testable without any network setup.
@@ -9,20 +9,39 @@ CoT type codes used here:
     a-u-A-M-H-Q  unknown air
     a-f-A-M-H-Q  friendly air
     a-f-G-E-S    friendly ground equipment sensor (OVERWATCH heartbeat)
+    a-f-G-E-W    friendly ground equipment weapon (defender effector)
+    a-h-G         hostile ground (swarm cluster area marker)
 """
 from __future__ import annotations
 
 import math
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 
-from csontology import Track, Threat, TrackClass, Vec3, enu_to_latlon, SwarmIntent
+from csontology import (
+    Defender,
+    DefenderKind,
+    DefenderStatus,
+    Engagement,
+    EngagementStatus,
+    SwarmIntent,
+    Threat,
+    Track,
+    TrackClass,
+    Vec3,
+    enu_to_latlon,
+)
 
 # Seconds a track CoT event remains valid in TAK before going stale.
 _TRACK_STALE_S = 60
 # Seconds the OVERWATCH sensor heartbeat remains valid.
 _HEARTBEAT_STALE_S = 120
+# Seconds a defender or engagement CoT event remains valid.
+_DEFENDER_STALE_S = 90
+# Seconds a swarm cluster marker remains valid.
+_SWARM_STALE_S = 30
 
 _COT_TYPE: dict[TrackClass, str] = {
     TrackClass.HOSTILE: "a-h-A-M-H-Q",
@@ -205,6 +224,153 @@ def format_heartbeat_cot(
     ET.SubElement(detail, "contact", {"callsign": "OVERWATCH-GCS"})
     ET.SubElement(detail, "remarks").text = (
         f"OVERWATCH C2 | Tracks: {n_tracks} | Threats: {n_threats}"
+    )
+
+    return ET.tostring(event, encoding="unicode", xml_declaration=False)
+
+
+_DEFENDER_TYPE = "a-f-G-E-W"
+
+
+def format_defender_cot(defender: Defender) -> str:
+    """Convert a Defender effector into a CoT XML string.
+
+    Emits a friendly ground weapon marker with a sensor subelement so TAK
+    can draw range rings around the effector position.
+    """
+    now_ts = time.time()
+    stale_ts = now_ts + _DEFENDER_STALE_S
+
+    lat, lon, alt = enu_to_latlon(*defender.position)
+
+    event = ET.Element("event", {
+        "version": "2.0",
+        "uid": f"OVERWATCH.DEF.{defender.id}",
+        "type": _DEFENDER_TYPE,
+        "time": _iso(now_ts),
+        "start": _iso(now_ts),
+        "stale": _iso(stale_ts),
+        "how": "m-g",
+    })
+
+    ET.SubElement(event, "point", {
+        "lat": f"{lat:.7f}",
+        "lon": f"{lon:.7f}",
+        "hae": f"{alt:.2f}",
+        "ce": "5",
+        "le": "5",
+    })
+
+    detail = ET.SubElement(event, "detail")
+    ET.SubElement(detail, "contact", {
+        "callsign": f"{defender.kind.value}-{defender.id}",
+    })
+    ET.SubElement(detail, "remarks").text = (
+        f"Kind: {defender.kind.value} | Status: {defender.status.value} | "
+        f"Capacity: {defender.capacity} | Range: {defender.range_m:.0f}m | "
+        f"Pk: {defender.kill_prob:.2f}"
+    )
+    ET.SubElement(detail, "sensor", {"range": f"{defender.range_m:.0f}"})
+
+    return ET.tostring(event, encoding="unicode", xml_declaration=False)
+
+
+def format_engagement_cot(
+    engagement: Engagement,
+    defender: Defender,
+    threat: Threat,
+    track: Track,
+) -> str:
+    """Convert an Engagement result into a CoT XML string.
+
+    Uses hostile type for HIT, unknown type for MISS/LEAK. Adds a
+    __flow-tags__ subelement with OVERWATCH-BDA for ATAK flow tagging.
+    """
+    now_ts = track.last_update
+    stale_ts = now_ts + _TRACK_STALE_S
+
+    lat, lon, alt = enu_to_latlon(*track.position)
+
+    cot_type = (
+        "a-h-A-M-H-Q"
+        if engagement.status == EngagementStatus.HIT
+        else "a-u-A-M-H-Q"
+    )
+
+    event = ET.Element("event", {
+        "version": "2.0",
+        "uid": f"OVERWATCH.ENG.{engagement.id}",
+        "type": cot_type,
+        "time": _iso(now_ts),
+        "start": _iso(now_ts),
+        "stale": _iso(stale_ts),
+        "how": "m-g",
+    })
+
+    ET.SubElement(event, "point", {
+        "lat": f"{lat:.7f}",
+        "lon": f"{lon:.7f}",
+        "hae": f"{alt:.2f}",
+        "ce": "10",
+        "le": "10",
+    })
+
+    detail = ET.SubElement(event, "detail")
+    neutralized = ",".join(engagement.neutralized_threat_ids) or "none"
+    ET.SubElement(detail, "remarks").text = (
+        f"Status: {engagement.status.value} | Defender: {defender.id} | "
+        f"Cost: ${engagement.cost:.2f} | Neutralized: {neutralized}"
+    )
+    ET.SubElement(detail, "__flow-tags__", {"OVERWATCH-BDA": _iso(now_ts)})
+
+    return ET.tostring(event, encoding="unicode", xml_declaration=False)
+
+
+def format_swarm_cluster_cot(
+    cluster_id: str,
+    center: Vec3,
+    member_count: int,
+    radius_m: float,
+    intent: str,
+    timestamp: float,
+) -> str:
+    """Convert a swarm cluster into a CoT area marker XML string.
+
+    Emits a hostile ground marker with a shape subelement describing an
+    ellipse boundary so TAK draws the cluster footprint.
+    """
+    stale_ts = timestamp + _SWARM_STALE_S
+
+    lat, lon, alt = enu_to_latlon(*center)
+
+    event = ET.Element("event", {
+        "version": "2.0",
+        "uid": f"OVERWATCH.SWARM.{cluster_id}",
+        "type": "a-h-G",
+        "time": _iso(timestamp),
+        "start": _iso(timestamp),
+        "stale": _iso(stale_ts),
+        "how": "m-g",
+    })
+
+    ET.SubElement(event, "point", {
+        "lat": f"{lat:.7f}",
+        "lon": f"{lon:.7f}",
+        "hae": f"{alt:.2f}",
+        "ce": "50",
+        "le": "50",
+    })
+
+    detail = ET.SubElement(event, "detail")
+    ET.SubElement(detail, "contact", {"callsign": f"SWARM-{cluster_id}"})
+    ET.SubElement(detail, "remarks").text = (
+        f"Members: {member_count} | Radius: {radius_m:.0f}m | Intent: {intent}"
+    )
+    ET.SubElement(detail, "shape").append(
+        ET.Element("ellipse", {
+            "major": f"{radius_m:.1f}",
+            "minor": f"{radius_m:.1f}",
+        })
     )
 
     return ET.tostring(event, encoding="unicode", xml_declaration=False)

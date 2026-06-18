@@ -1,0 +1,364 @@
+{
+  "scenarios": [
+    {
+      "scenario_name": "combined_saturation_strike",
+      "config_label": "default",
+      "num_runs": 3,
+      "stats": {
+        "intercept_rate": {
+          "mean": 0.8314,
+          "std": 0.0426,
+          "min": 0.7714,
+          "max": 0.8657
+        },
+        "cost_exchange_ratio": {
+          "mean": 0.8772,
+          "std": 0.0119,
+          "min": 0.8605,
+          "max": 0.8863
+        },
+        "leakers": {
+          "mean": 209.0,
+          "std": 14.8997,
+          "min": 197,
+          "max": 230
+        },
+        "engagements_made": {
+          "mean": 350.0,
+          "std": 0.0,
+          "min": 350,
+          "max": 350
+        },
+        "sim_time_s": {
+          "mean": 90.4,
+          "std": 0.1633,
+          "min": 90.2,
+          "max": 90.6
+        }
+      },
+      "runs": [
+        {
+          "intercept_rate": 0.8657142857142858,
+          "cost_exchange_ratio": 0.8850276243093923,
+          "leakers": 197,
+          "engagements_made": 350,
+          "sim_time_s": 90.2
+        },
+        {
+          "intercept_rate": 0.7714285714285715,
+          "cost_exchange_ratio": 0.8604655326768129,
+          "leakers": 230,
+          "engagements_made": 350,
+          "sim_time_s": 90.4
+        },
+        {
+          "intercept_rate": 0.8571428571428571,
+          "cost_exchange_ratio": 0.8862517289073306,
+          "leakers": 200,
+          "engagements_made": 350,
+          "sim_time_s": 90.60000000000001
+        }
+      ]
+    },
+    {
+      "scenario_name": "contested_500",
+      "config_label": "default",
+      "num_runs": 3,
+      "stats": {
+        "intercept_rate": {
+          "mean": 0.8343,
+          "std": 0.0321,
+          "min": 0.7914,
+          "max": 0.8686
+        },
+        "cost_exchange_ratio": {
+          "mean": 0.8169,
+          "std": 0.0381,
+          "min": 0.7634,
+          "max": 0.8494
+        },
+        "leakers": {
+          "mean": 208.0,
+          "std": 11.225,
+          "min": 196,
+          "max": 223
+        },
+        "engagements_made": {
+          "mean": 350.0,
+          "std": 0.0,
+          "min": 350,
+          "max": 350
+        },
+        "sim_time_s": {
+          "mean": 91.5333,
+          "std": 1.3888,
+          "min": 89.8,
+          "max": 93.2
+        }
+      },
+      "runs": [
+        {
+          "intercept_rate": 0.8685714285714285,
+          "cost_exchange_ratio": 0.7634154090548054,
+          "leakers": 196,
+          "engagements_made": 350,
+          "sim_time_s": 91.60000000000001
+        },
+        {
+          "intercept_rate": 0.7914285714285715,
+          "cost_exchange_ratio": 0.8494387980556783,
+          "leakers": 223,
+          "engagements_made": 350,
+          "sim_time_s": 93.2
+        },
+        {
+          "intercept_rate": 0.8428571428571429,
+          "cost_exchange_ratio": 0.8379598953792502,
+          "leakers": 205,
+          "engagements_made": 350,
+          "sim_time_s": 89.80000000000001
+        }
+      ]
+    },
+    {
+      "scenario_name": "decoy_300",
+      "config_label": "default",
+      "num_runs": 3,
+      "stats": {
+        "intercept_rate": {
+          "mean": 0.8989,
+          "std": 0.0699,
+          "min": 0.8298,
+          "max": 0.9947
+        },
+        "cost_exchange_ratio": {
+          "mean": 3.5824,
+          "std": 1.5319,
+          "min": 2.1262,
+          "max": 5.6996
+        },
+        "leakers": {
+          "mean": 131.0,
+          "std": 13.1403,
+          "min": 113,
+          "max": 144
+        },
+        "engagements_made": {
+          "mean": 188.0,
+          "std": 0.0,
+          "min": 188,
+          "max": 188
+        },
+        "sim_time_s": {
+          "mean": 91.9333,
+          "std": 1.5173,
+          "min": 90.4,
+          "max": 94.0
+        }
+      },
+      "runs": [
+        {
+          "intercept_rate": 0.8723404255319149,
+          "cost_exchange_ratio": 2.126208543380207,
+          "leakers": 136,
+          "engagements_made": 188,
+          "sim_time_s": 90.4
+        },
+        {
+          "intercept_rate": 0.8297872340425532,
+          "cost_exchange_ratio": 5.699630156472262,
+          "leakers": 144,
+          "engagements_made": 188,
+          "sim_time_s": 94.0
+        },
+        {
+          "intercept_rate": 0.9946808510638298,
+          "cost_exchange_ratio": 2.9215020051039007,
+          "leakers": 113,
+          "engagements_made": 188,
+          "sim_time_s": 91.4
+        }
+      ]
+    },
+    {
+      "scenario_name": "probe_120",
+      "config_label": "default",
+      "num_runs": 3,
+      "stats": {
+        "intercept_rate": {
+          "mean": 0.5339,
+          "std": 0.1164,
+          "min": 0.3696,
+          "max": 0.625
+        },
+        "cost_exchange_ratio": {
+          "mean": 0.0154,
+          "std": 0.0081,
+          "min": 0.0096,
+          "max": 0.0268
+        },
+        "leakers": {
+          "mean": 0.0,
+          "std": 0.0,
+          "min": 0,
+          "max": 0
+        },
+        "engagements_made": {
+          "mean": 68.0,
+          "std": 16.9706,
+          "min": 56,
+          "max": 92
+        },
+        "sim_time_s": {
+          "mean": 80.0,
+          "std": 0.0,
+          "min": 80.0,
+          "max": 80.0
+        }
+      },
+      "runs": [
+        {
+          "intercept_rate": 0.6071428571428571,
+          "cost_exchange_ratio": 0.00988235294117647,
+          "leakers": 0,
+          "engagements_made": 56,
+          "sim_time_s": 80.0
+        },
+        {
+          "intercept_rate": 0.3695652173913043,
+          "cost_exchange_ratio": 0.026823529411764704,
+          "leakers": 0,
+          "engagements_made": 92,
+          "sim_time_s": 80.0
+        },
+        {
+          "intercept_rate": 0.625,
+          "cost_exchange_ratio": 0.0096,
+          "leakers": 0,
+          "engagements_made": 56,
+          "sim_time_s": 80.0
+        }
+      ]
+    },
+    {
+      "scenario_name": "saturation_1000",
+      "config_label": "default",
+      "num_runs": 3,
+      "stats": {
+        "intercept_rate": {
+          "mean": 1.3067,
+          "std": 0.0738,
+          "min": 1.2057,
+          "max": 1.38
+        },
+        "cost_exchange_ratio": {
+          "mean": 0.544,
+          "std": 0.0182,
+          "min": 0.5188,
+          "max": 0.5611
+        },
+        "leakers": {
+          "mean": 542.6667,
+          "std": 25.8242,
+          "min": 517,
+          "max": 578
+        },
+        "engagements_made": {
+          "mean": 350.0,
+          "std": 0.0,
+          "min": 350,
+          "max": 350
+        },
+        "sim_time_s": {
+          "mean": 90.2667,
+          "std": 0.1886,
+          "min": 90.0,
+          "max": 90.4
+        }
+      },
+      "runs": [
+        {
+          "intercept_rate": 1.38,
+          "cost_exchange_ratio": 0.518834008097166,
+          "leakers": 517,
+          "engagements_made": 350,
+          "sim_time_s": 90.4
+        },
+        {
+          "intercept_rate": 1.3342857142857143,
+          "cost_exchange_ratio": 0.5522206262568228,
+          "leakers": 533,
+          "engagements_made": 350,
+          "sim_time_s": 90.0
+        },
+        {
+          "intercept_rate": 1.2057142857142857,
+          "cost_exchange_ratio": 0.5610858143607705,
+          "leakers": 578,
+          "engagements_made": 350,
+          "sim_time_s": 90.4
+        }
+      ]
+    },
+    {
+      "scenario_name": "skirmish_80",
+      "config_label": "default",
+      "num_runs": 3,
+      "stats": {
+        "intercept_rate": {
+          "mean": 0.7101,
+          "std": 0.082,
+          "min": 0.6522,
+          "max": 0.8261
+        },
+        "cost_exchange_ratio": {
+          "mean": 0.0029,
+          "std": 0.0006,
+          "min": 0.0023,
+          "max": 0.0036
+        },
+        "leakers": {
+          "mean": 0.0,
+          "std": 0.0,
+          "min": 0,
+          "max": 0
+        },
+        "engagements_made": {
+          "mean": 46.0,
+          "std": 0.0,
+          "min": 46,
+          "max": 46
+        },
+        "sim_time_s": {
+          "mean": 60.0,
+          "std": 0.0,
+          "min": 60.0,
+          "max": 60.0
+        }
+      },
+      "runs": [
+        {
+          "intercept_rate": 0.6521739130434783,
+          "cost_exchange_ratio": 0.003648,
+          "leakers": 0,
+          "engagements_made": 46,
+          "sim_time_s": 60.0
+        },
+        {
+          "intercept_rate": 0.6521739130434783,
+          "cost_exchange_ratio": 0.0027804878048780486,
+          "leakers": 0,
+          "engagements_made": 46,
+          "sim_time_s": 60.0
+        },
+        {
+          "intercept_rate": 0.8260869565217391,
+          "cost_exchange_ratio": 0.002303030303030303,
+          "leakers": 0,
+          "engagements_made": 46,
+          "sim_time_s": 60.0
+        }
+      ]
+    }
+  ]
+}

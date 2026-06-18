@@ -126,9 +126,19 @@ def _is_waves(bands: int, fraction_closing: float) -> bool:
 
 
 def _is_decoy(closing: List[float], fraction_closing: float) -> bool:
-    """Most members loiter or drift while a minority commit fast."""
+    """Most members loiter or drift while a minority commit fast.
+
+    Also triggers when many drones close slowly (all below PROBE_SLOW_MS),
+    indicating a swarm deliberately burning defender ammo on cheap targets
+    rather than committing to a real attack.
+    """
     fast = sum(1 for c in closing if c >= PROBE_SLOW_MS)
-    return fraction_closing < 0.5 and 0 < fast < len(closing)
+    slow_closers = sum(1 for c in closing if CLOSING_SPEED_MIN_MS <= c < PROBE_SLOW_MS)
+    if fraction_closing < 0.5 and 0 < fast < len(closing):
+        return True
+    if len(closing) >= 10 and fast == 0 and slow_closers > len(closing) * 0.6:
+        return True
+    return False
 
 
 def _is_probe(size: int, closing: List[float], fraction_closing: float) -> bool:

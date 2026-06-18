@@ -9,6 +9,13 @@ for arm/disarm/takeoff/land/goto operations.
 import math
 
 import rclpy
+
+from drone_control.platform_fsm import (
+    InvalidTransitionError,
+    PlatformFSM,
+    PlatformState,
+)
+from drone_control.preflight import PreflightChecker, PreflightCheckResult
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
@@ -41,6 +48,11 @@ class FlightControllerNode(Node):
             f'Flight controller starting: drone_id={self.drone_id}, '
             f'autopilot={self.autopilot_type}'
         )
+
+        # ── Platform FSM ─────────────────────────────────────────────────
+        self._fsm = PlatformFSM(on_transition=self._on_state_transition)
+        self._preflight = PreflightChecker()
+        self._prev_connected = False
 
         # ── Internal state ───────────────────────────────────────────────
         self._mavros_state = MavrosState()
@@ -103,6 +115,15 @@ class FlightControllerNode(Node):
     def _mavros_state_cb(self, msg: MavrosState):
         self._mavros_state = msg
 
+        # Drive FSM connect/disconnect based on MAVROS connection changes
+        if msg.connected and not self._prev_connected:
+            if self._fsm.can_transition('connect'):
+                self._fsm.transition('connect')
+        elif not msg.connected and self._prev_connected:
+            if self._fsm.can_transition('disconnect'):
+                self._fsm.transition('disconnect')
+        self._prev_connected = msg.connected
+
     def _global_pos_cb(self, msg: NavSatFix):
         self._global_position = msg
 
@@ -119,9 +140,29 @@ class FlightControllerNode(Node):
     def _imu_cb(self, msg: Imu):
         self._imu = msg
 
+    # ── FSM transition callback ──────────────────────────────────────────
+    def _on_state_transition(self, old_state, new_state, event):
+        """Log every FSM state transition."""
+        self.get_logger().info(
+            f'Platform FSM: {old_state.value} -[{event}]-> {new_state.value}'
+        )
+
     # ── State publisher ──────────────────────────────────────────────────
     def _publish_state(self):
         """Aggregate all telemetry into a single DroneState message."""
+        # Detect altitude-based FSM transitions
+        if (
+            self._fsm.state is PlatformState.TAKING_OFF
+            and self._altitude_agl > 2.0
+        ):
+            self._fsm.transition('altitude_reached')
+
+        if (
+            self._fsm.state is PlatformState.LANDING
+            and self._altitude_agl < 0.3
+        ):
+            self._fsm.transition('ground_contact')
+
         msg = DroneState()
         msg.header = Header()
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -166,7 +207,7 @@ class FlightControllerNode(Node):
         msg.armed = self._mavros_state.armed
         msg.in_air = self._altitude_agl > 0.3
         msg.flight_mode = self._mavros_state.mode
-        msg.status = 'CONNECTED' if self._mavros_state.connected else 'DISCONNECTED'
+        msg.status = self._fsm.state.value
 
         self.state_pub.publish(msg)
 
@@ -197,7 +238,38 @@ class FlightControllerNode(Node):
             return self._handle_mode_change(response, request.mode)
 
     def _handle_arm(self, response, arm: bool):
-        """Arm or disarm the vehicle."""
+        """Arm or disarm the vehicle with preflight safety gate."""
+        event = 'arm' if arm else 'disarm'
+        if not self._fsm.can_transition(event):
+            response.success = False
+            response.message = (
+                f'FSM rejected "{event}": '
+                f'not valid in state {self._fsm.state.value}'
+            )
+            return response
+
+        # Run preflight checks before arming
+        if arm:
+            checks = self._preflight.run_all(self._get_preflight_state())
+            if not self._preflight.passed:
+                failures = [
+                    c for c in checks
+                    if c.result is PreflightCheckResult.FAILURE
+                    or c.result is PreflightCheckResult.SOFT_FAILURE
+                ]
+                names = ', '.join(f'{c.name}: {c.message}' for c in failures)
+                response.success = False
+                response.message = f'Preflight failed: {names}'
+                return response
+            warnings = [
+                c for c in checks
+                if c.result is PreflightCheckResult.WARNING
+            ]
+            for w in warnings:
+                self.get_logger().warn(
+                    f'Preflight warning [{w.name}]: {w.message}'
+                )
+
         if not self.arming_client.wait_for_service(timeout_sec=5.0):
             response.success = False
             response.message = 'Arming service not available'
@@ -209,6 +281,7 @@ class FlightControllerNode(Node):
         rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
 
         if future.result() is not None and future.result().success:
+            self._fsm.transition(event)
             response.success = True
             response.message = f'Vehicle {"armed" if arm else "disarmed"}'
         else:
@@ -217,8 +290,35 @@ class FlightControllerNode(Node):
 
         return response
 
+    def _get_preflight_state(self) -> dict:
+        """Build state dict from current telemetry for preflight checks."""
+        return {
+            "battery_pct": self._battery.percentage * 100.0,
+            "battery_voltage": self._battery.voltage,
+            "gps_satellites": 0,
+            "gps_hdop": 0.0,
+            "gps_fix_type": "FIX_3D",
+            "connected": self._mavros_state.connected,
+            "armed": self._mavros_state.armed,
+            "expected_armed": False,
+            "lat": self._global_position.latitude,
+            "lon": self._global_position.longitude,
+            "alt": self._altitude_agl,
+            "flight_mode": self._mavros_state.mode,
+            "accel_bias": None,
+            "gyro_bias": None,
+        }
+
     def _handle_takeoff(self, response, altitude: float = 5.0):
         """Command vehicle takeoff."""
+        if not self._fsm.can_transition('takeoff'):
+            response.success = False
+            response.message = (
+                f'FSM rejected "takeoff": '
+                f'not valid in state {self._fsm.state.value}'
+            )
+            return response
+
         if not self.takeoff_client.wait_for_service(timeout_sec=5.0):
             response.success = False
             response.message = 'Takeoff service not available'
@@ -232,6 +332,7 @@ class FlightControllerNode(Node):
         rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
 
         if future.result() is not None and future.result().success:
+            self._fsm.transition('takeoff')
             response.success = True
             response.message = f'Takeoff to {altitude}m commanded'
         else:
@@ -242,6 +343,14 @@ class FlightControllerNode(Node):
 
     def _handle_land(self, response):
         """Command vehicle landing."""
+        if not self._fsm.can_transition('land'):
+            response.success = False
+            response.message = (
+                f'FSM rejected "land": '
+                f'not valid in state {self._fsm.state.value}'
+            )
+            return response
+
         if not self.land_client.wait_for_service(timeout_sec=5.0):
             response.success = False
             response.message = 'Land service not available'
@@ -255,6 +364,7 @@ class FlightControllerNode(Node):
         rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
 
         if future.result() is not None and future.result().success:
+            self._fsm.transition('land')
             response.success = True
             response.message = 'Landing commanded'
         else:

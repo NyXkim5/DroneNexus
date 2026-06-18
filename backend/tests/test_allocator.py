@@ -299,7 +299,10 @@ def test_auction_assigns_distinct_threats_under_contention():
         "int1", (0.0, 0.0, 0.0), capacity=2, range_m=3000.0,
         unit_cost=8_000.0, kill_prob=0.85, kind=DefenderKind.INTERCEPTOR,
     )
-    allocator = LayeredAllocator(resolve_position=lambda t: positions[t.id])
+    allocator = LayeredAllocator(
+        resolve_position=lambda t: positions[t.id],
+        attacker_cost_ref=2000.0,
+    )
     out = allocator.allocate(threats, [interceptor], now=0.0)
     engaged = [e.target_threat_id for e in out]
     assert len(out) == 2
@@ -312,7 +315,10 @@ def test_cost_discipline_reserves_interceptor_for_imminent():
         "int1", (0.0, 0.0, 0.0), capacity=2, range_m=3000.0,
         unit_cost=8_000.0, kill_prob=0.85, kind=DefenderKind.INTERCEPTOR,
     )
-    allocator = LayeredAllocator(resolve_position=lambda t: positions[t.id])
+    allocator = LayeredAllocator(
+        resolve_position=lambda t: positions[t.id],
+        attacker_cost_ref=2000.0,
+    )
     distant = Threat(
         id="far", score=0.9, time_to_impact_s=120.0, value_at_risk=50_000.0,
         priority_rank=1, track_id="trk-far",

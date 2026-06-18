@@ -97,6 +97,75 @@ canvas#heatmap-canvas { position: fixed; inset: 0; z-index: 405; pointer-events:
 }
 .legend .row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
 .legend .swatch { width: 12px; height: 12px; border-radius: 2px; }
+
+/* --- Sensor Fusion: Defender Status Panel --- */
+.defender-panel {
+  position: fixed; top: 60px; left: 12px; width: 240px; max-height: calc(100vh - 180px);
+  overflow-y: auto; z-index: 500; pointer-events: auto;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px; font-family: var(--font-data, monospace); font-size: 11px;
+}
+.defender-panel .dp-header {
+  padding: 8px 10px; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899); border-bottom: 1px solid var(--border, #252B35);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.defender-panel .dp-entry {
+  padding: 6px 10px; border-bottom: 1px solid rgba(37,43,53,0.5);
+  display: flex; align-items: center; gap: 8px;
+}
+.dp-icon { font-size: 13px; width: 20px; text-align: center; }
+.dp-name { flex: 1; color: var(--text, #D4DAE0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dp-badge {
+  padding: 1px 6px; border-radius: 3px; font-size: 8px; letter-spacing: 1px;
+  font-weight: 700; text-transform: uppercase;
+}
+.dp-badge.ready { background: rgba(30,122,74,0.25); color: var(--green, #1E7A4A); }
+.dp-badge.reloading { background: rgba(184,110,23,0.25); color: var(--amber, #B86E17); }
+.dp-badge.engaging { background: rgba(72,136,216,0.25); color: var(--cyan, #4888D8); }
+.dp-badge.depleted { background: rgba(194,58,62,0.25); color: var(--red, #C23A3E); }
+.dp-badge.offline { background: rgba(107,119,133,0.25); color: var(--text-tertiary, #6B7785); }
+.dp-cap-bar {
+  width: 50px; height: 6px; background: rgba(37,43,53,0.8); border-radius: 3px;
+  overflow: hidden; position: relative;
+}
+.dp-cap-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+
+/* --- Sensor Fusion: Engagement Feed --- */
+.engagement-feed {
+  position: fixed; bottom: 64px; left: 12px; width: 360px; max-height: 260px;
+  overflow-y: auto; z-index: 500; pointer-events: auto;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px; font-family: var(--font-data, monospace); font-size: 10px;
+}
+.engagement-feed .ef-header {
+  padding: 6px 10px; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899); border-bottom: 1px solid var(--border, #252B35);
+  position: sticky; top: 0; background: var(--panel, #141820); z-index: 1;
+}
+.engagement-feed .ef-entry {
+  padding: 3px 10px; border-bottom: 1px solid rgba(37,43,53,0.3);
+  color: var(--text-secondary, #8A96A3);
+}
+.ef-entry.hit { color: var(--green, #1E7A4A); }
+.ef-entry.miss { color: var(--red, #C23A3E); }
+.ef-entry.leak { color: var(--red, #C23A3E); }
+
+/* --- Sensor Fusion: Layer Toggle Buttons --- */
+.layer-toggles {
+  position: fixed; bottom: 64px; left: 50%; transform: translateX(-50%); z-index: 500;
+  display: flex; gap: 4px; pointer-events: auto;
+}
+.layer-toggles button {
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  color: var(--text-dim, #7A8899); font-family: var(--font-data, monospace); font-size: 9px;
+  letter-spacing: 1px; padding: 4px 10px; border-radius: 3px; cursor: pointer;
+  text-transform: uppercase; transition: all 0.15s;
+}
+.layer-toggles button.active {
+  border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4);
+  background: rgba(59,130,196,0.1);
+}
 </style>
 </head>
 <body>
@@ -146,6 +215,26 @@ canvas#heatmap-canvas { position: fixed; inset: 0; z-index: 405; pointer-events:
   <div class="row"><span class="swatch" style="background:#E8ECF0"></span>Defended site</div>
 </div>
 
+<!-- Defender Status Panel -->
+<div class="defender-panel" id="defender-panel">
+  <div class="dp-header"><span>Defenders</span><span id="dp-count">0</span></div>
+  <div id="dp-list"></div>
+</div>
+
+<!-- Engagement Feed -->
+<div class="engagement-feed" id="engagement-feed">
+  <div class="ef-header">Engagement Feed</div>
+  <div id="ef-list"></div>
+</div>
+
+<!-- Layer Toggle Buttons -->
+<div class="layer-toggles">
+  <button id="toggle-confidence" class="active">Confidence</button>
+  <button id="toggle-ranges" class="">Ranges</button>
+  <button id="toggle-clusters" class="active">Clusters</button>
+  <button id="toggle-feed">Feed</button>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 "use strict";
@@ -184,6 +273,20 @@ sizeCanvas();
 
 let frame = null;
 let ws = null;
+
+// --- Sensor Fusion overlay state ---
+const sfLayers = {
+  confidence: true,
+  ranges: false,
+  clusters: true,
+  feed: true,
+};
+const engagementLog = [];
+const MAX_FEED_ENTRIES = 20;
+const loggedAssignments = new Set();
+let frameCount = 0;
+// Track initial capacities so the bar can show remaining/total.
+const defenderMaxCap = {};
 
 function project(lat, lon) {
   const p = map.latLngToContainerPoint([lat, lon]);
@@ -238,15 +341,53 @@ function draw() {
       ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
       ctx.stroke();
     }
+
+    // Confidence ring: green > 0.8, yellow 0.5-0.8, red <= 0.5
+    if (sfLayers.confidence && typeof t.confidence === "number") {
+      const conf = t.confidence;
+      const confColor = conf > 0.8 ? "rgba(30,122,74,0.7)"
+        : conf > 0.5 ? "rgba(217,175,43,0.6)"
+        : "rgba(194,58,62,0.6)";
+      // Ring radius proportional to position covariance (uncertainty).
+      const cov = t.covariance;
+      let covMag = 8;
+      if (Array.isArray(cov) && cov.length >= 2) {
+        covMag = Math.max(6, Math.min(24, Math.sqrt(cov[0] * cov[0] + cov[1] * cov[1]) * 0.4));
+      }
+      ctx.strokeStyle = confColor;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, covMag, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   });
 
-  // Defenders in blue squares.
+  // Defenders in blue squares with optional range rings.
   defenders.forEach((d) => {
     const p = project(d.lat, d.lon);
     ctx.fillStyle = d.status === "DEPLETED"
       ? "rgba(107,119,133,0.7)"
       : "rgba(72,136,216,0.95)";
     ctx.fillRect(p.x - 4, p.y - 4, 8, 8);
+
+    // Range ring overlay: project range_m to pixels via a second lat point.
+    if (sfLayers.ranges && typeof d.range_m === "number" && d.range_m > 0) {
+      const degPerMeter = 1 / 111320;
+      const edgeLat = d.lat + d.range_m * degPerMeter;
+      const pEdge = project(edgeLat, d.lon);
+      const radiusPx = Math.abs(pEdge.y - p.y);
+      if (radiusPx > 2) {
+        ctx.strokeStyle = d.status === "DEPLETED"
+          ? "rgba(107,119,133,0.2)"
+          : "rgba(72,136,216,0.18)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radiusPx, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
   });
 
   // Defended site marker.
@@ -257,6 +398,60 @@ function draw() {
     ctx.beginPath();
     ctx.arc(s.x, s.y, 9, 0, Math.PI * 2);
     ctx.stroke();
+  }
+
+  // Swarm cluster visualization: group tracks by swarm_id, draw dashed circle.
+  if (sfLayers.clusters) {
+    const swarmGroups = {};
+    tracks.forEach((t) => {
+      if (!t.swarm_id) return;
+      if (!swarmGroups[t.swarm_id]) {
+        swarmGroups[t.swarm_id] = { members: [], intent: t.intent || "UNKNOWN" };
+      }
+      swarmGroups[t.swarm_id].members.push(t);
+    });
+
+    const CLUSTER_INTENT_COLORS = {
+      STRIKE: "rgba(194,58,62,0.5)",
+      SATURATION: "rgba(194,58,62,0.5)",
+      RECONNAISSANCE: "rgba(217,175,43,0.5)",
+      PROBE: "rgba(217,175,43,0.5)",
+      EVASION: "rgba(72,136,216,0.5)",
+      DECOY: "rgba(155,89,194,0.5)",
+    };
+    const DEFAULT_CLUSTER_COLOR = "rgba(138,150,163,0.4)";
+
+    Object.keys(swarmGroups).forEach((sid) => {
+      const group = swarmGroups[sid];
+      const members = group.members;
+      if (members.length < 2) return;
+      let cx = 0, cy = 0;
+      members.forEach((m) => { cx += m.lat; cy += m.lon; });
+      cx /= members.length;
+      cy /= members.length;
+      const center = project(cx, cy);
+      let maxDist = 0;
+      members.forEach((m) => {
+        const mp = project(m.lat, m.lon);
+        const dx = mp.x - center.x;
+        const dy = mp.y - center.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > maxDist) maxDist = dist;
+      });
+      const radius = Math.max(maxDist + 10, 20);
+      const clusterColor = CLUSTER_INTENT_COLORS[group.intent] || DEFAULT_CLUSTER_COLOR;
+      ctx.strokeStyle = clusterColor;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Label: count and intent.
+      ctx.font = "9px monospace";
+      ctx.fillStyle = clusterColor.replace("0.5)", "0.9)").replace("0.4)", "0.9)");
+      ctx.fillText(members.length + "x " + group.intent, center.x + radius + 4, center.y + 3);
+    });
   }
 }
 
@@ -349,7 +544,20 @@ function connect() {
     if (msg.type === "ERROR") { setDot("err"); return; }
     if (msg.type !== "WARGAME_FRAME") return;
     frame = msg;
+    frameCount++;
     renderMetrics(msg.metrics, frame.tracks);
+    renderDefenderPanel(frame.defenders);
+    // Collect new engagement entries from assignments (dedup by key).
+    (frame.assignments || []).forEach(function(a) {
+      if (a.status === "HIT" || a.status === "MISS" || a.status === "LEAK") {
+        const key = a.defender_id + "|" + a.track_id + "|" + a.status;
+        if (!loggedAssignments.has(key)) {
+          loggedAssignments.add(key);
+          addEngagementEntry(a);
+        }
+      }
+    });
+    renderEngagementFeed();
     draw();
     if (window._bulwarkOnMessage) window._bulwarkOnMessage(msg);
   };
@@ -359,6 +567,102 @@ document.getElementById("start").addEventListener("click", connect);
 
 // Expose the WebSocket for cascade confirm uplink.
 window._bulwarkGetWs = () => ws;
+
+// --- Defender type icons ---
+const DEFENDER_ICONS = {
+  INTERCEPTOR: "\u{1F3AF}",
+  NET: "\u{1F6E1}",
+  JAMMER: "\u{1F4E1}",
+  EW: "\u{26A1}",
+  HPM: "\u{1F525}",
+  LASER: "\u{1F4A0}",
+};
+
+function defenderIcon(kind) {
+  return DEFENDER_ICONS[kind] || "\u{2B1B}";
+}
+
+function statusBadgeClass(status) {
+  const s = (status || "").toLowerCase();
+  if (s === "ready") return "ready";
+  if (s === "reloading") return "reloading";
+  if (s === "engaging") return "engaging";
+  if (s === "depleted") return "depleted";
+  return "offline";
+}
+
+function renderDefenderPanel(defenders) {
+  const list = document.getElementById("dp-list");
+  const countEl = document.getElementById("dp-count");
+  if (!list || !defenders) return;
+  countEl.textContent = defenders.length;
+  let html = "";
+  defenders.forEach(function(d) {
+    // Track max capacity for bar fill ratio.
+    if (!defenderMaxCap[d.id] || d.capacity > defenderMaxCap[d.id]) {
+      defenderMaxCap[d.id] = d.capacity;
+    }
+    const maxCap = defenderMaxCap[d.id] || 1;
+    const pct = Math.max(0, Math.min(100, (d.capacity / maxCap) * 100));
+    const barColor = pct > 50 ? "var(--green, #1E7A4A)"
+      : pct > 20 ? "var(--amber, #B86E17)"
+      : "var(--red, #C23A3E)";
+    const badge = statusBadgeClass(d.status);
+    html += '<div class="dp-entry">'
+      + '<span class="dp-icon">' + defenderIcon(d.kind) + '</span>'
+      + '<span class="dp-name">' + d.id + '</span>'
+      + '<span class="dp-badge ' + badge + '">' + (d.status || "?") + '</span>'
+      + '<div class="dp-cap-bar"><div class="dp-cap-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>'
+      + '</div>';
+  });
+  list.innerHTML = html;
+}
+
+function addEngagementEntry(assignment) {
+  if (!assignment) return;
+  const status = assignment.status || "";
+  const defId = assignment.defender_id || "?";
+  const trkId = assignment.track_id || "?";
+  const cost = assignment.cost;
+  let text = defId + " -> " + trkId + ": " + status;
+  if (typeof cost === "number") {
+    text += " (cost: $" + Math.round(cost).toLocaleString() + ")";
+  }
+  engagementLog.unshift({ text: text, status: status });
+  if (engagementLog.length > MAX_FEED_ENTRIES) {
+    engagementLog.length = MAX_FEED_ENTRIES;
+  }
+}
+
+function renderEngagementFeed() {
+  const list = document.getElementById("ef-list");
+  const feedEl = document.getElementById("engagement-feed");
+  if (!list || !feedEl) return;
+  feedEl.style.display = sfLayers.feed ? "" : "none";
+  let html = "";
+  engagementLog.forEach(function(e) {
+    const cls = (e.status === "HIT") ? "hit" : (e.status === "MISS" || e.status === "LEAK") ? "miss" : "";
+    html += '<div class="ef-entry ' + cls + '">' + e.text + '</div>';
+  });
+  list.innerHTML = html;
+}
+
+// Wire layer toggle buttons.
+function wireToggle(btnId, layerKey) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.classList.toggle("active", sfLayers[layerKey]);
+  btn.addEventListener("click", function() {
+    sfLayers[layerKey] = !sfLayers[layerKey];
+    btn.classList.toggle("active", sfLayers[layerKey]);
+    draw();
+    if (layerKey === "feed") renderEngagementFeed();
+  });
+}
+wireToggle("toggle-confidence", "confidence");
+wireToggle("toggle-ranges", "ranges");
+wireToggle("toggle-clusters", "clusters");
+wireToggle("toggle-feed", "feed");
 </script>
 
 <!-- Cascade targeting overlay canvas -->
@@ -425,7 +729,7 @@ window._bulwarkGetWs = () => ws;
     if (data.engagement_order) {
       engPanel.update(data.engagement_order);
     }
-    if (data.heatmap_data) {
+    if (data.heatmap_data && frameCount % 5 === 0) {
       heatmapOverlay.update(data.heatmap_data);
     }
   };

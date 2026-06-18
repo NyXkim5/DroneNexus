@@ -22,16 +22,21 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from csontology import (
+    Defender,
+    Engagement,
     ORIGIN_LAT,
     ORIGIN_LON,
     Threat,
     Track,
 )
 from cot.formatter import (
+    format_defender_cot,
+    format_engagement_cot,
     format_heartbeat_cot,
+    format_swarm_cluster_cot,
     format_threat_cot,
     format_track_cot,
 )
@@ -147,6 +152,62 @@ class CoTBridge:
             else:
                 result.append(format_track_cot(track))
         return result
+
+    async def publish_full_picture(
+        self,
+        tracks: List[Track],
+        threats: List[Threat],
+        defenders: List[Defender],
+        engagements: List[Engagement],
+        swarm_clusters: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
+        """Send the complete BULWARK operational picture to TAK.
+
+        Extends publish() with defender status, engagement results, and
+        swarm clusters so operators see the full picture.
+        """
+        if not self._sender:
+            logger.warning("publish_full_picture called before start()")
+            return
+
+        await self.publish(tracks, threats)
+
+        for defender in defenders:
+            xml = format_defender_cot(defender)
+            await self._sender.send(xml)
+
+        defender_by_id: Dict[str, Defender] = {d.id: d for d in defenders}
+        threat_by_id: Dict[str, Threat] = {t.id: t for t in threats}
+        track_by_id: Dict[str, Track] = {t.id: t for t in tracks}
+
+        for eng in engagements:
+            defender = defender_by_id.get(eng.defender_id)
+            threat = threat_by_id.get(eng.target_threat_id)
+            if defender is None or threat is None:
+                continue
+            track = track_by_id.get(threat.track_id or "")
+            if track is None:
+                continue
+            xml = format_engagement_cot(eng, defender, threat, track)
+            await self._sender.send(xml)
+
+        if swarm_clusters:
+            for cluster in swarm_clusters:
+                xml = format_swarm_cluster_cot(
+                    cluster_id=cluster["cluster_id"],
+                    center=cluster["center"],
+                    member_count=cluster["member_count"],
+                    radius_m=cluster["radius_m"],
+                    intent=cluster["intent"],
+                    timestamp=cluster["timestamp"],
+                )
+                await self._sender.send(xml)
+
+        logger.debug(
+            "Full picture: %d tracks, %d threats, %d defenders, %d engagements, %d clusters",
+            len(tracks), len(threats), len(defenders), len(engagements),
+            len(swarm_clusters) if swarm_clusters else 0,
+        )
 
     async def _heartbeat_loop(self) -> None:
         """Emit a sensor heartbeat every _HEARTBEAT_INTERVAL_S seconds."""

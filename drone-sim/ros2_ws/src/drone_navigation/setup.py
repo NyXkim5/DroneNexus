@@ -10,6 +10,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/openvins.launch.py']),
+        ('share/' + package_name + '/config', ['config/openvins_drone_sim.yaml']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -25,6 +27,7 @@ setup(
             'obstacle_avoidance = drone_navigation.obstacle_avoidance:main',
             'vio_fallback = drone_navigation.vio_fallback:main',
             'waypoint_executor = drone_navigation.waypoint_executor:main',
+            'openvins_bridge = drone_navigation.openvins_bridge:main',
         ],
     },
 )

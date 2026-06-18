@@ -17,3 +17,6 @@ __pycache__/
 *.db-wal
 *.bak
 .research/
+
+# RL model binaries
+backend/models/*.zip

@@ -4,7 +4,12 @@ waypoint_executor.py
 ROS 2 node that executes waypoint missions. Reads mission files (JSON/YAML),
 sends waypoints to the autopilot via MAVLink/MAVROS, monitors progress,
 and handles mission completion and interruption.
+
+Motion commands are routed through MotionHandlerManager for validation
+and safety-limit enforcement before being converted to MAVROS setpoints.
 """
+
+from __future__ import annotations
 
 import json
 import math
@@ -24,6 +29,16 @@ from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import NavSatFix
 from mavros_msgs.msg import Waypoint, WaypointList, WaypointReached
 from mavros_msgs.srv import WaypointPush, WaypointClear, SetMode
+
+from drone_navigation.motion_handler import (
+    ControlMode,
+    HoverHandler,
+    MotionCommand,
+    MotionHandlerManager,
+    PositionHandler,
+    SafetyLimits,
+    SpeedHandler,
+)
 
 
 class MissionState(Enum):
@@ -81,6 +96,9 @@ class WaypointExecutorNode(Node):
         self.declare_parameter('default_altitude_m', 10.0)
         self.declare_parameter('default_speed_m_s', 5.0)
         self.declare_parameter('mission_dir', '/config/missions')
+        self.declare_parameter('max_speed_ms', 15.0)
+        self.declare_parameter('max_altitude_m', 120.0)
+        self.declare_parameter('min_altitude_m', 0.5)
 
         self.drone_id = self.get_parameter('drone_id').get_parameter_value().string_value
         self.reach_radius = self.get_parameter('waypoint_reach_radius_m').get_parameter_value().double_value
@@ -88,6 +106,17 @@ class WaypointExecutorNode(Node):
         self.mission_dir = self.get_parameter('mission_dir').get_parameter_value().string_value
 
         self.get_logger().info(f'Waypoint executor starting: drone_id={self.drone_id}')
+
+        # ── Motion handler manager ───────────────────────────────────────
+        safety_limits = SafetyLimits(
+            max_speed_ms=self.get_parameter('max_speed_ms').get_parameter_value().double_value,
+            max_altitude_m=self.get_parameter('max_altitude_m').get_parameter_value().double_value,
+            min_altitude_m=self.get_parameter('min_altitude_m').get_parameter_value().double_value,
+        )
+        self._motion_mgr = MotionHandlerManager()
+        self._motion_mgr.register_handler(ControlMode.HOVER, HoverHandler(safety_limits))
+        self._motion_mgr.register_handler(ControlMode.POSITION, PositionHandler(safety_limits))
+        self._motion_mgr.register_handler(ControlMode.SPEED, SpeedHandler(safety_limits))
 
         # ── State ────────────────────────────────────────────────────────
         self._state = MissionState.IDLE
@@ -115,6 +144,8 @@ class WaypointExecutorNode(Node):
         self.progress_pub = self.create_publisher(Int32, 'drone/mission_progress', 10)
         self.distance_pub = self.create_publisher(
             Float64, 'drone/waypoint_distance', 10)
+        self.setpoint_pub = self.create_publisher(
+            PoseStamped, 'mavros/setpoint_position/local', 10)
 
         # ── MAVROS clients ───────────────────────────────────────────────
         self.wp_push_client = self.create_client(WaypointPush, 'mavros/mission/push')
@@ -136,9 +167,13 @@ class WaypointExecutorNode(Node):
         self.get_logger().info(f'Waypoint {wp_seq} reached')
         self._current_wp_index = wp_seq + 1
 
+        self.hover()
+
         if self._current_wp_index >= len(self._waypoints):
             self._state = MissionState.COMPLETED
             self.get_logger().info(f'Mission "{self._mission_name}" completed')
+        else:
+            self._send_waypoint_as_position(self._current_wp_index)
 
     def _mission_cmd_cb(self, msg: String):
         """Handle mission commands: load:<path>, start, pause, resume, abort."""
@@ -248,6 +283,7 @@ class WaypointExecutorNode(Node):
             self.set_mode_client.call_async(mode_req)
 
         self._state = MissionState.EXECUTING
+        self._send_waypoint_as_position(0)
         self.get_logger().info(f'Mission "{self._mission_name}" started')
 
     def _pause_mission(self):
@@ -278,6 +314,57 @@ class WaypointExecutorNode(Node):
                 self.set_mode_client.call_async(req)
             self._state = MissionState.ABORTED
             self.get_logger().warn('Mission ABORTED - returning to launch')
+
+    # ── Motion handler interface ────────────────────────────────────────
+    def _send_waypoint_as_position(self, wp_index: int) -> bool:
+        """Build a POSITION MotionCommand from a waypoint and publish."""
+        wp = self._waypoints[wp_index]
+        cmd = MotionCommand(
+            mode=ControlMode.POSITION,
+            position=(wp.latitude, wp.longitude, wp.altitude),
+            yaw=wp.param4 if not math.isnan(wp.param4) else None,
+        )
+        if not self._motion_mgr.send(cmd):
+            self.get_logger().error(f'Motion manager rejected waypoint {wp_index}')
+            return False
+        handler = self._motion_mgr.get_active_handler()
+        setpoint = handler.get_setpoint() if handler else None
+        if setpoint is not None:
+            pose = _command_to_pose(setpoint)
+            self.setpoint_pub.publish(pose)
+        return True
+
+    def hover(self) -> bool:
+        """Send a HOVER command to hold current position."""
+        cmd = MotionCommand(
+            mode=ControlMode.HOVER,
+            position=_current_gps_as_tuple(self._current_position),
+        )
+        if not self._motion_mgr.send(cmd):
+            self.get_logger().error('Motion manager rejected HOVER command')
+            return False
+        handler = self._motion_mgr.get_active_handler()
+        setpoint = handler.get_setpoint() if handler else None
+        if setpoint is not None:
+            pose = _command_to_pose(setpoint)
+            self.setpoint_pub.publish(pose)
+        return True
+
+    def set_speed(self, vx: float, vy: float, vz: float) -> bool:
+        """Send a SPEED command with the given velocity vector."""
+        cmd = MotionCommand(
+            mode=ControlMode.SPEED,
+            velocity=(vx, vy, vz),
+        )
+        if not self._motion_mgr.send(cmd):
+            self.get_logger().error('Motion manager rejected SPEED command')
+            return False
+        handler = self._motion_mgr.get_active_handler()
+        setpoint = handler.get_setpoint() if handler else None
+        if setpoint is not None:
+            pose = _command_to_pose(setpoint)
+            self.setpoint_pub.publish(pose)
+        return True
 
     # ── Monitoring ───────────────────────────────────────────────────────
     def _monitor_progress(self):
@@ -330,6 +417,38 @@ class WaypointExecutorNode(Node):
     def destroy_node(self):
         self.get_logger().info('Waypoint executor shutting down')
         super().destroy_node()
+
+
+def _yaw_to_quaternion(yaw: float) -> tuple[float, float, float, float]:
+    """Convert yaw (radians) to a quaternion (x, y, z, w)."""
+    half = yaw * 0.5
+    return (0.0, 0.0, math.sin(half), math.cos(half))
+
+
+def _command_to_pose(cmd: MotionCommand) -> PoseStamped:
+    """Convert a validated MotionCommand to a PoseStamped for MAVROS."""
+    pose = PoseStamped()
+    pose.header.frame_id = 'map'
+    if cmd.position is not None:
+        pose.pose.position.x = cmd.position[0]
+        pose.pose.position.y = cmd.position[1]
+        pose.pose.position.z = cmd.position[2]
+    if cmd.yaw is not None:
+        qx, qy, qz, qw = _yaw_to_quaternion(cmd.yaw)
+        pose.pose.orientation.x = qx
+        pose.pose.orientation.y = qy
+        pose.pose.orientation.z = qz
+        pose.pose.orientation.w = qw
+    else:
+        pose.pose.orientation.w = 1.0
+    return pose
+
+
+def _current_gps_as_tuple(
+    fix: NavSatFix,
+) -> tuple[float, float, float]:
+    """Extract (lat, lon, alt) from a NavSatFix message."""
+    return (fix.latitude, fix.longitude, fix.altitude)
 
 
 def main(args=None):

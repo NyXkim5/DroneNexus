@@ -482,6 +482,7 @@ class WargameRunner:
             engagement_order=engagement_order,
             visual_targets=[t.to_dict() for t in visual_targets] if visual_targets else [],
             heatmap_data=heatmap_data,
+            engagements=engagements,
         )
 
     def _compute_metrics(self, tracks: List[Track]) -> Metrics:

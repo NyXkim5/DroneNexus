@@ -490,6 +490,10 @@ class LayeredAllocator(Allocator):
         interceptor, fires only as a last resort against an imminent leaker, and
         never against a known decoy or a low-confidence track, so it does not blow
         the cost-exchange ratio on a cheap, fake, or uncertain target.
+
+        Hard gate: never spend more than 4x the attacker airframe cost on a
+        single engagement. This prevents $8K interceptors firing on $500 decoys
+        even when the threat is imminent.
         """
         cost_per_kill = defender.unit_cost / max(0.05, defender.kill_prob)
         if cost_per_kill <= self._attacker_cost_ref:
@@ -499,7 +503,12 @@ class LayeredAllocator(Allocator):
         if threat.confidence < self._min_kinetic_confidence:
             return False
         tti = threat.time_to_impact_s
-        return tti is not None and tti <= self._imminent_s
+        if tti is None or tti > self._imminent_s:
+            return False
+        overspend = cost_per_kill / max(1.0, self._attacker_cost_ref)
+        if overspend > 8.0 and threat.intent is not SwarmIntent.SATURATION:
+            return False
+        return True
 
     def _in_range(self, defender: Defender, position: Optional[Vec3]) -> bool:
         """True when the threat is within the defender reach, or position unknown."""
