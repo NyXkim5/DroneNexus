@@ -16,6 +16,15 @@ from typing import Dict, Optional
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
 from api.auth import UserModel, decode_access_token
+from api.metrics import (
+    COMMANDS_TOTAL,
+    COST_EXCHANGE_RATIO,
+    ENGAGEMENTS_TOTAL,
+    WARGAME_FRAME_DURATION,
+    WARGAME_TICKS_TOTAL,
+    WS_CONNECTIONS_ACTIVE,
+    WS_CONNECTIONS_TOTAL,
+)
 from api.rate_limiter import BandwidthTracker, MessageRateLimiter
 from config import OverwatchSettings
 
@@ -104,6 +113,8 @@ class WebSocketHandler:
         )
         self.ws_client_meta[client_id] = client
 
+        WS_CONNECTIONS_TOTAL.inc()
+        WS_CONNECTIONS_ACTIVE.inc()
         client_count = len(self.app.aggregator.ws_clients)
         logger.info(f"WebSocket client {client_id} connected ({client_count} total)")
 
@@ -156,6 +167,7 @@ class WebSocketHandler:
             self.app.aggregator.ws_clients.discard(websocket)
             self.ws_client_meta.pop(client_id, None)
             self.bandwidth.reset(client_id)
+            WS_CONNECTIONS_ACTIVE.dec()
             logger.info(f"WebSocket client {client_id} disconnected ({len(self.app.aggregator.ws_clients)} total)")
 
     async def _send_state_sync(self, ws: WebSocket) -> None:
@@ -242,6 +254,8 @@ class WebSocketHandler:
             events_db = getattr(self.app, "db", None)
             runner = WargameRunner(scenario, events_db=events_db)
             async for frame in runner.run():
+                WARGAME_TICKS_TOTAL.inc()
+                self._record_frame_metrics(frame)
                 if rate_limiter.should_send("wargame"):
                     payload = json.dumps(frame.to_dict())
                     await websocket.send_text(payload)
@@ -278,6 +292,20 @@ class WebSocketHandler:
             )
         except Exception as e:
             logger.warning(f"CoT publish failed: {e}")
+
+    @staticmethod
+    def _record_frame_metrics(frame: object) -> None:
+        """Update Prometheus gauges and counters from a wargame frame."""
+        engagements = getattr(frame, "engagements", None) or []
+        for eng in engagements:
+            status = getattr(eng, "status", None)
+            if status is not None:
+                ENGAGEMENTS_TOTAL.labels(status=status.value).inc()
+        metrics = getattr(frame, "metrics", None)
+        if metrics is not None:
+            ratio = getattr(metrics, "cost_exchange_ratio", None)
+            if ratio is not None:
+                COST_EXCHANGE_RATIO.set(ratio)
 
     async def _dispatch_command(self, data: dict, ws: WebSocket) -> None:
         command = data.get("command", "")
@@ -341,6 +369,9 @@ class WebSocketHandler:
         except Exception as e:
             message = str(e)
             logger.error(f"Directive execution error: {e}")
+
+        # Record metric
+        COMMANDS_TOTAL.labels(command=command, success=str(success)).inc()
 
         # Log command
         if hasattr(self.app, 'db') and self.app.db:

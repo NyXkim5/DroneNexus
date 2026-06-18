@@ -22,3 +22,6 @@ __pycache__/
 
 # RL model binaries
 backend/models/*.zip
+
+# TLS certificates
+certs/

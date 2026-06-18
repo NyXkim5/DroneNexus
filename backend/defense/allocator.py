@@ -291,6 +291,15 @@ class _Grid:
         return (int(pos[0] // c), int(pos[1] // c), int(pos[2] // c))
 
 
+_INTENT_VALUE_SCALE = {
+    SwarmIntent.DECOY: 0.1,
+    SwarmIntent.PROBE: 0.5,
+    SwarmIntent.SATURATION: 1.0,
+    SwarmIntent.WAVES: 1.0,
+    SwarmIntent.UNKNOWN: 1.0,
+}
+
+
 class LayeredAllocator(Allocator):
     """Layered counter-swarm allocation: cheap area effects first, kinetic last.
 
@@ -382,11 +391,17 @@ class LayeredAllocator(Allocator):
         Candidate aim points are the unengaged threat positions themselves. A
         spatial grid counts how many unengaged threats fall within the effect
         radius of each candidate, capped at the effector simultaneous limit.
+
+        When the area effector cost per kill exceeds the attacker reference cost,
+        DECOY-intent threats are excluded from the coverage count so expensive
+        area weapons do not waste shots on cheap decoys.
         """
+        expensive = self._cost_per_kill(defender) > self._attacker_cost_ref
         live = [
             t for t in threats
             if t.id not in engaged
             and self._in_range(defender, positions[t.id])
+            and not (expensive and t.intent is SwarmIntent.DECOY)
         ]
         if not live:
             return None, []
@@ -469,7 +484,11 @@ class LayeredAllocator(Allocator):
         threats: List[Threat],
         positions: Dict[str, Optional[Vec3]],
     ) -> List[float]:
-        """Benefit of one defender against each threat, -inf where it cannot fire."""
+        """Benefit of one defender against each threat, -inf where it cannot fire.
+
+        Threat scores are scaled by intent so decoys and probes yield lower
+        benefit and are deprioritized versus real attacks.
+        """
         row: List[float] = []
         cost_penalty = self._cost_weight * defender.unit_cost
         for threat in threats:
@@ -478,7 +497,8 @@ class LayeredAllocator(Allocator):
             elif not self._worth_spending(defender, threat):
                 row.append(-math.inf)
             else:
-                row.append(threat.score * defender.kill_prob - cost_penalty)
+                scale = _INTENT_VALUE_SCALE.get(threat.intent, 1.0)
+                row.append(threat.score * scale * defender.kill_prob - cost_penalty)
         return row
 
     def _worth_spending(self, defender: Defender, threat: Threat) -> bool:
@@ -491,9 +511,10 @@ class LayeredAllocator(Allocator):
         never against a known decoy or a low-confidence track, so it does not blow
         the cost-exchange ratio on a cheap, fake, or uncertain target.
 
-        Hard gate: never spend more than 4x the attacker airframe cost on a
-        single engagement. This prevents $8K interceptors firing on $500 decoys
-        even when the threat is imminent.
+        Hard gate: overspend caps prevent expensive effectors from wasting
+        budget on cheap targets. SATURATION threats get a looser 8x cap because
+        every leaker counts. All other intents are capped at 4x. This prevents
+        $8K interceptors firing on $500 decoys even when the threat is imminent.
         """
         cost_per_kill = defender.unit_cost / max(0.05, defender.kill_prob)
         if cost_per_kill <= self._attacker_cost_ref:
@@ -506,7 +527,8 @@ class LayeredAllocator(Allocator):
         if tti is None or tti > self._imminent_s:
             return False
         overspend = cost_per_kill / max(1.0, self._attacker_cost_ref)
-        if overspend > 8.0 and threat.intent is not SwarmIntent.SATURATION:
+        max_overspend = 8.0 if threat.intent is SwarmIntent.SATURATION else 4.0
+        if overspend > max_overspend:
             return False
         return True
 

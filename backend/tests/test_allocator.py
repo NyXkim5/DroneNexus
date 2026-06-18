@@ -16,6 +16,7 @@ from csontology import (
     DefenderKind,
     DefenderStatus,
     EngagementStatus,
+    SwarmIntent,
     Threat,
     Vec3,
 )
@@ -292,6 +293,7 @@ def test_auction_assigns_distinct_threats_under_contention():
         Threat(
             id=f"t{i}", score=0.9 - 0.01 * i, time_to_impact_s=5.0,
             value_at_risk=50_000.0, priority_rank=i + 1, track_id=f"trk{i}",
+            intent=SwarmIntent.SATURATION,
         )
         for i in range(3)
     ]
@@ -321,13 +323,121 @@ def test_cost_discipline_reserves_interceptor_for_imminent():
     )
     distant = Threat(
         id="far", score=0.9, time_to_impact_s=120.0, value_at_risk=50_000.0,
-        priority_rank=1, track_id="trk-far",
+        priority_rank=1, track_id="trk-far", intent=SwarmIntent.SATURATION,
     )
     out_distant = allocator.allocate([distant], [interceptor], now=0.0)
     assert out_distant == []  # too costly per kill, not imminent, so held back
     imminent = Threat(
         id="near", score=0.9, time_to_impact_s=5.0, value_at_risk=50_000.0,
-        priority_rank=1, track_id="trk-near",
+        priority_rank=1, track_id="trk-near", intent=SwarmIntent.SATURATION,
     )
     out_imminent = allocator.allocate([imminent], [interceptor], now=0.0)
     assert len(out_imminent) == 1  # last-resort terminal defense fires
+
+
+# ---- Intent-based threat value scaling ----
+
+def _intent_threat(
+    tid: str, score: float, rank: int, intent: SwarmIntent,
+    tti: float = 5.0, confidence: float = 1.0,
+) -> Threat:
+    """Build a threat with an explicit intent for cost-discipline tests."""
+    return Threat(
+        id=tid, score=score, time_to_impact_s=tti,
+        value_at_risk=1000.0, priority_rank=rank,
+        track_id=f"trk-{tid}", intent=intent, confidence=confidence,
+    )
+
+
+def test_decoy_threat_gets_lower_benefit_than_saturation():
+    """DECOY threats should produce a much lower benefit score in the auction."""
+    positions = {"d1": (100.0, 0.0, 80.0), "s1": (100.0, 0.0, 80.0)}
+    interceptor = _defender(
+        "int1", (0.0, 0.0, 0.0), capacity=1, range_m=3000.0,
+        unit_cost=100.0, kill_prob=0.9,
+    )
+    allocator = LayeredAllocator(
+        resolve_position=lambda t: positions[t.id],
+        attacker_cost_ref=500.0,
+    )
+    decoy = _intent_threat("d1", 0.9, 1, SwarmIntent.DECOY)
+    satur = _intent_threat("s1", 0.9, 1, SwarmIntent.SATURATION)
+    row = allocator._defender_row(interceptor, [decoy, satur], positions)
+    # DECOY benefit should be roughly 0.1x of SATURATION benefit
+    assert row[0] < row[1]
+    assert row[0] < row[1] * 0.2
+
+
+def test_expensive_area_effector_skips_decoys():
+    """An expensive area effector should not waste shots on DECOY threats."""
+    positions = {f"t{i}": (float(i * 30), 0.0, 80.0) for i in range(5)}
+    threats = [
+        _intent_threat(f"t{i}", 0.9, i, SwarmIntent.DECOY)
+        for i in range(5)
+    ]
+    expensive_area = _defender(
+        "exp1", (0.0, 0.0, 0.0), capacity=3, range_m=3000.0,
+        unit_cost=5000.0, kill_prob=0.3, kind=DefenderKind.HPM,
+    )
+    expensive_area.effect_radius_m = 400.0
+    expensive_area.max_simultaneous = 25
+    allocator = LayeredAllocator(
+        resolve_position=lambda t: positions[t.id],
+        attacker_cost_ref=500.0,
+    )
+    out = allocator.allocate(threats, [expensive_area], now=0.0)
+    assert out == []  # all decoys, expensive effector should skip them
+
+
+def test_cheap_area_effector_engages_decoys():
+    """A cheap area effector should still engage DECOY threats."""
+    positions = {f"t{i}": (float(i * 30), 0.0, 80.0) for i in range(5)}
+    threats = [
+        _intent_threat(f"t{i}", 0.9, i, SwarmIntent.DECOY)
+        for i in range(5)
+    ]
+    cheap_area = _defender(
+        "hpm1", (0.0, 0.0, 0.0), capacity=3, range_m=3000.0,
+        unit_cost=8.0, kill_prob=0.9, kind=DefenderKind.HPM,
+    )
+    cheap_area.effect_radius_m = 400.0
+    cheap_area.max_simultaneous = 25
+    allocator = LayeredAllocator(
+        resolve_position=lambda t: positions[t.id],
+        attacker_cost_ref=500.0,
+    )
+    out = allocator.allocate(threats, [cheap_area], now=0.0)
+    assert len(out) >= 1  # cheap effector fires on decoys
+
+
+def test_overspend_gate_4x_blocks_probe():
+    """A 5x overspend should be blocked for PROBE (non-SATURATION) threats."""
+    positions = {"p1": (100.0, 0.0, 80.0)}
+    # cost_per_kill = 10000 / 0.85 ~= 11765, attacker_ref = 2000, ratio ~5.9x
+    interceptor = _defender(
+        "int1", (0.0, 0.0, 0.0), capacity=1, range_m=3000.0,
+        unit_cost=10_000.0, kill_prob=0.85, kind=DefenderKind.INTERCEPTOR,
+    )
+    allocator = LayeredAllocator(
+        resolve_position=lambda t: positions[t.id],
+        attacker_cost_ref=2000.0,
+    )
+    probe = _intent_threat("p1", 0.9, 1, SwarmIntent.PROBE, tti=5.0)
+    out = allocator.allocate([probe], [interceptor], now=0.0)
+    assert out == []  # 5.9x overspend > 4x gate for non-SATURATION
+
+
+def test_overspend_gate_8x_allows_saturation():
+    """A 5x overspend should still be allowed for SATURATION threats."""
+    positions = {"s1": (100.0, 0.0, 80.0)}
+    interceptor = _defender(
+        "int1", (0.0, 0.0, 0.0), capacity=1, range_m=3000.0,
+        unit_cost=10_000.0, kill_prob=0.85, kind=DefenderKind.INTERCEPTOR,
+    )
+    allocator = LayeredAllocator(
+        resolve_position=lambda t: positions[t.id],
+        attacker_cost_ref=2000.0,
+    )
+    satur = _intent_threat("s1", 0.9, 1, SwarmIntent.SATURATION, tti=5.0)
+    out = allocator.allocate([satur], [interceptor], now=0.0)
+    assert len(out) == 1  # 5.9x overspend < 8x gate for SATURATION

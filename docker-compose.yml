@@ -2,9 +2,9 @@ services:
   overwatch:
     build: .
     container_name: overwatch
-    ports:
-      - "8000:8000"
-      - "8765:8765"
+    expose:
+      - "8000"
+      - "8765"
     env_file:
       - .env
     volumes:
@@ -27,6 +27,38 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - overwatch-net
+
+  nginx:
+    build: ./nginx
+    container_name: overwatch-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      overwatch:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /var/cache/nginx:size=50M
+      - /var/run:size=10M
+      - /tmp:size=10M
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
     logging:
       driver: json-file
       options:

@@ -24,17 +24,15 @@ from api.websocket import WebSocketHandler
 from api.routes import router as api_router
 from api.auth import auth_router
 from api.export import export_router
+from api.metrics import metrics_router
+from api.logging_config import configure_logging
 from db.models import OverwatchDB
 from telemetry.replay import ReplayEngine
 from missions.state_machine import MissionStateMachine
 from swarm.coordinator import SwarmCoordinator
 from simulation.mock_drone import MockSwarm
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    stream=sys.stdout,
-)
+configure_logging()
 logger = logging.getLogger("overwatch")
 
 
@@ -360,8 +358,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OVERWATCH ISR Platform",
     version="1.0.0",
-    description="ISR asset telemetry and command backend",
+    description=(
+        "ISR asset coordination platform for 2-50 assets. "
+        "Provides real-time telemetry streaming over WebSocket, "
+        "REST command dispatch, BULWARK counter-swarm wargaming, "
+        "and TAK/CoT integration."
+    ),
     lifespan=lifespan,
+    openapi_tags=[
+        {"name": "Taskforce", "description": "Swarm-level launch, recover, and formation commands"},
+        {"name": "Operations", "description": "Mission creation, execution, and abort"},
+        {"name": "Overlays", "description": "Formation overlays and visual layers"},
+        {"name": "Auth", "description": "JWT authentication and token management"},
+        {"name": "Metrics", "description": "Prometheus metrics endpoint"},
+    ],
 )
 
 app.add_middleware(
@@ -379,6 +389,7 @@ app.add_middleware(RateLimiter, rate_limit=120, window_seconds=60)
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1/auth")
 app.include_router(export_router, prefix="/api/v1/products")
+app.include_router(metrics_router)
 
 
 # ---- WebSocket endpoints ----

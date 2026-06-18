@@ -303,7 +303,7 @@ class TestThreatToDefensePipeline:
 
         allocator = LayeredAllocator(
             resolve_position=resolver,
-            attacker_cost_ref=500.0,
+            attacker_cost_ref=2000.0,
         )
         engagements = allocator.allocate([threat], [defender], time.time())
         assert len(engagements) >= 1
