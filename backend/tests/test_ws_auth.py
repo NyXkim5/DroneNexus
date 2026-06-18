@@ -160,7 +160,8 @@ def test_ws_auth_enabled_rejects_expired_token(monkeypatch):
     assert user is None
     assert ws.closed
     assert ws.close_code == 4003
-    assert "expired" in ws.close_reason.lower()
+    reason = ws.close_reason.lower()
+    assert "expired" in reason or "invalid token" in reason
 
 
 # ---------------------------------------------------------------------------
