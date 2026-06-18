@@ -686,6 +686,7 @@ function connect() {
     });
     renderEngagementFeed();
     draw();
+    if (window._roeOnFrame) window._roeOnFrame(msg);
     if (window._bulwarkOnMessage) window._bulwarkOnMessage(msg);
   };
 }
@@ -1100,5 +1101,302 @@ wireToggle("toggle-feed", "feed");
   .ep-empty { color: #555; padding: 12px; text-align: center; }
   #engagement-panel { background: #0a0a14ee; border: 1px solid #0f3; border-radius: 4px; }
 </style>
+
+<!-- ============================================================ -->
+<!-- C2 Mission Planner                                           -->
+<!-- ============================================================ -->
+<style>
+.mp-toggle-btn {
+  position: fixed; top: 68px; left: 218px; z-index: 501;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  color: var(--text-dim, #7A8899); font-family: var(--font-data, monospace);
+  font-size: 9px; letter-spacing: 1px; padding: 5px 10px; border-radius: 3px;
+  cursor: pointer; text-transform: uppercase; transition: all 0.15s;
+  display: flex; align-items: center; gap: 5px; pointer-events: auto;
+}
+.mp-toggle-btn.active { border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4); background: rgba(59,130,196,0.1); }
+.mp-panel {
+  position: fixed; top: 60px; left: 264px; width: 280px; z-index: 500;
+  pointer-events: auto; background: var(--panel, #141820);
+  border: 1px solid var(--border, #252B35); border-radius: 4px;
+  font-family: var(--font-data, monospace); font-size: 11px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.45); user-select: none;
+  display: none; max-height: calc(100vh - 130px); overflow: hidden; flex-direction: column;
+}
+.mp-panel.visible { display: flex; }
+.mp-header { padding: 8px 10px; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim, #7A8899); border-bottom: 1px solid var(--border, #252B35); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.mp-header-count { background: rgba(59,130,196,0.15); color: var(--accent, #3B82C4); padding: 1px 6px; border-radius: 3px; font-size: 9px; font-weight: 700; }
+.mp-hint { padding: 10px; color: var(--text-dim, #7A8899); font-size: 9px; text-align: center; letter-spacing: 0.5px; line-height: 1.5; border-bottom: 1px solid var(--border, #252B35); flex-shrink: 0; }
+.mp-list { overflow-y: auto; flex: 1; min-height: 0; }
+.mp-list::-webkit-scrollbar { width: 4px; }
+.mp-list::-webkit-scrollbar-thumb { background: var(--border, #252B35); border-radius: 2px; }
+.mp-empty { padding: 18px 10px; color: var(--text-dim, #7A8899); font-size: 9px; text-align: center; letter-spacing: 1px; text-transform: uppercase; }
+.mp-wp { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid rgba(37,43,53,0.5); cursor: grab; transition: background 0.1s; }
+.mp-wp:hover { background: rgba(59,130,196,0.06); }
+.mp-wp.dragging { background: rgba(59,130,196,0.12); opacity: 0.85; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+.mp-wp.drag-over-above { border-top: 2px solid var(--accent, #3B82C4); }
+.mp-wp.drag-over-below { border-bottom: 2px solid var(--accent, #3B82C4); }
+.mp-wp-idx { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.mp-wp-idx.GOTO { background: var(--accent, #3B82C4); }
+.mp-wp-idx.ORBIT { background: var(--accent, #3B82C4); box-shadow: 0 0 0 2px var(--panel, #141820), 0 0 0 3.5px var(--accent, #3B82C4); }
+.mp-wp-idx.LOITER { background: var(--amber, #B86E17); }
+.mp-wp-idx.RTL { background: var(--green, #1E7A4A); }
+.mp-wp-type { font-size: 8px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-dim, #7A8899); width: 36px; flex-shrink: 0; }
+.mp-wp-type.GOTO { color: var(--accent, #3B82C4); }
+.mp-wp-type.ORBIT { color: var(--accent, #3B82C4); }
+.mp-wp-type.LOITER { color: var(--amber, #B86E17); }
+.mp-wp-type.RTL { color: var(--green, #1E7A4A); }
+.mp-wp-coord { flex: 1; font-size: 9px; color: var(--text, #D4DAE0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.mp-wp-params { font-size: 8px; color: var(--text-dim, #7A8899); white-space: nowrap; flex-shrink: 0; }
+.mp-wp-del { width: 16px; height: 16px; border: none; background: transparent; color: var(--text-dim, #7A8899); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 2px; flex-shrink: 0; padding: 0; line-height: 1; transition: color 0.1s, background 0.1s; }
+.mp-wp-del:hover { color: var(--red, #C23A3E); background: rgba(194,58,62,0.15); }
+.mp-actions { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border, #252B35); flex-shrink: 0; }
+.mp-btn { flex: 1; height: 30px; border-radius: 3px; cursor: pointer; font-family: var(--font-data, monospace); font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; transition: background 0.12s, border-color 0.12s, box-shadow 0.12s; outline: none; }
+.mp-btn:active { transform: scale(0.96); }
+.mp-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.mp-btn--clear { background: transparent; border: 1px solid var(--border, #252B35); color: var(--text-dim, #7A8899); }
+.mp-btn--clear:hover:not(:disabled) { border-color: var(--red, #C23A3E); color: var(--red, #C23A3E); background: rgba(194,58,62,0.1); }
+.mp-btn--execute { background: rgba(30,122,74,0.12); border: 1.5px solid var(--green, #1E7A4A); color: var(--green, #1E7A4A); }
+.mp-btn--execute:hover:not(:disabled) { background: rgba(30,122,74,0.25); box-shadow: 0 0 8px rgba(30,122,74,0.3); }
+.mp-edit-overlay { position: fixed; z-index: 510; background: var(--panel, #141820); border: 1px solid var(--accent, #3B82C4); border-radius: 4px; padding: 8px; font-family: var(--font-data, monospace); font-size: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); pointer-events: auto; display: none; }
+.mp-edit-overlay.visible { display: block; }
+.mp-edit-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.mp-edit-row:last-child { margin-bottom: 0; }
+.mp-edit-label { font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim, #7A8899); width: 40px; }
+.mp-edit-input { background: var(--panel, #141820); border: 1px solid var(--border, #252B35); color: var(--text, #D4DAE0); font-family: var(--font-data, monospace); font-size: 10px; padding: 3px 6px; width: 60px; border-radius: 2px; outline: none; }
+.mp-edit-input:focus { border-color: var(--accent, #3B82C4); }
+.mp-edit-btns { display: flex; gap: 4px; justify-content: flex-end; margin-top: 6px; }
+.mp-edit-ok, .mp-edit-cancel { border: none; font-family: var(--font-data, monospace); font-size: 8px; letter-spacing: 0.8px; padding: 3px 8px; border-radius: 2px; cursor: pointer; }
+.mp-edit-ok { background: rgba(30,122,74,0.2); color: var(--green, #1E7A4A); }
+.mp-edit-ok:hover { background: rgba(30,122,74,0.35); }
+.mp-edit-cancel { background: rgba(122,136,153,0.1); color: var(--text-dim, #7A8899); }
+.mp-edit-cancel:hover { background: rgba(122,136,153,0.2); }
+.mp-cursor-active { cursor: crosshair !important; }
+.mp-cursor-active .leaflet-container { cursor: crosshair !important; }
+.mp-cursor-active .leaflet-grab { cursor: crosshair !important; }
+.mp-cursor-active .leaflet-interactive { cursor: crosshair !important; }
+</style>
+
+<button class="mp-toggle-btn" id="mp-toggle">MISSION</button>
+<div class="mp-panel" id="mp-panel">
+  <div class="mp-header"><span>Mission Planner</span><span class="mp-header-count" id="mp-count">0</span></div>
+  <div class="mp-hint" id="mp-hint">Click map to add waypoints. Right-click marker to cycle type. Double-click marker to edit alt/speed.</div>
+  <div class="mp-list" id="mp-list"><div class="mp-empty" id="mp-empty">No waypoints</div></div>
+  <div class="mp-actions">
+    <button class="mp-btn mp-btn--clear" id="mp-clear" disabled>Clear All</button>
+    <button class="mp-btn mp-btn--execute" id="mp-execute" disabled>Execute</button>
+  </div>
+</div>
+<div class="mp-edit-overlay" id="mp-edit-overlay">
+  <div class="mp-edit-row"><span class="mp-edit-label">Alt (m)</span><input class="mp-edit-input" id="mp-edit-alt" type="number" min="5" max="500" step="5" /></div>
+  <div class="mp-edit-row"><span class="mp-edit-label">Spd (m/s)</span><input class="mp-edit-input" id="mp-edit-speed" type="number" min="1" max="50" step="1" /></div>
+  <div class="mp-edit-btns"><button class="mp-edit-cancel" id="mp-edit-cancel">Cancel</button><button class="mp-edit-ok" id="mp-edit-ok">Apply</button></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var WP_TYPES = ["GOTO", "ORBIT", "LOITER", "RTL"];
+  var WP_COLORS = { GOTO: "#3B82C4", ORBIT: "#3B82C4", LOITER: "#B86E17", RTL: "#1E7A4A" };
+  var DEFAULT_ALT = 30, DEFAULT_SPEED = 10;
+  var planningActive = false, waypoints = [], routeLine = null, dragState = null;
+  var toggleBtn = document.getElementById("mp-toggle"), panel = document.getElementById("mp-panel");
+  var listEl = document.getElementById("mp-list"), countEl = document.getElementById("mp-count");
+  var clearBtn = document.getElementById("mp-clear"), execBtn = document.getElementById("mp-execute");
+  var editOverlay = document.getElementById("mp-edit-overlay");
+  var editAltIn = document.getElementById("mp-edit-alt"), editSpdIn = document.getElementById("mp-edit-speed");
+  var editOkBtn = document.getElementById("mp-edit-ok"), editCancelBtn = document.getElementById("mp-edit-cancel");
+  var editingIdx = -1;
+
+  function activate() { planningActive = true; toggleBtn.classList.add("active"); panel.classList.add("visible"); document.body.classList.add("mp-cursor-active"); }
+  function deactivate() { planningActive = false; toggleBtn.classList.remove("active"); panel.classList.remove("visible"); document.body.classList.remove("mp-cursor-active"); closeEditOverlay(); }
+  toggleBtn.addEventListener("click", function () { planningActive ? deactivate() : activate(); });
+
+  function createMarker(wp, idx) {
+    var color = WP_COLORS[wp.type] || WP_COLORS.GOTO;
+    var marker = L.circleMarker([wp.lat, wp.lon], { radius: 10, fillColor: color, fillOpacity: 0.9, color: color, weight: wp.type === "ORBIT" ? 3 : 1.5, opacity: 1 }).addTo(map);
+    marker.bindTooltip(String(idx + 1), { permanent: true, direction: "center", className: "mp-marker-label", offset: [0, 0] });
+    marker.on("contextmenu", function (e) { L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e); cycleType(idx); });
+    marker.on("dblclick", function (e) { L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e); openEditOverlay(idx, e.containerPoint); });
+    return marker;
+  }
+  function addWaypoint(lat, lon, type, alt, speed) { var wp = { lat: lat, lon: lon, alt: alt || DEFAULT_ALT, speed: speed || DEFAULT_SPEED, type: type || "GOTO", marker: null }; wp.marker = createMarker(wp, waypoints.length); waypoints.push(wp); renderList(); updateRoute(); }
+  function removeWaypoint(idx) { if (idx < 0 || idx >= waypoints.length) return; if (waypoints[idx].marker) map.removeLayer(waypoints[idx].marker); waypoints.splice(idx, 1); rebuildMarkers(); renderList(); updateRoute(); closeEditOverlay(); }
+  function clearAll() { waypoints.forEach(function (wp) { if (wp.marker) map.removeLayer(wp.marker); }); waypoints = []; if (routeLine) { map.removeLayer(routeLine); routeLine = null; } renderList(); updateRoute(); closeEditOverlay(); }
+  function cycleType(idx) { if (idx < 0 || idx >= waypoints.length) return; var ci = WP_TYPES.indexOf(waypoints[idx].type); waypoints[idx].type = WP_TYPES[(ci + 1) % WP_TYPES.length]; rebuildMarker(idx); renderList(); }
+  function rebuildMarker(idx) { var wp = waypoints[idx]; if (wp.marker) map.removeLayer(wp.marker); wp.marker = createMarker(wp, idx); }
+  function rebuildMarkers() { waypoints.forEach(function (wp, i) { if (wp.marker) map.removeLayer(wp.marker); wp.marker = createMarker(wp, i); }); }
+  function updateRoute() { if (routeLine) { map.removeLayer(routeLine); routeLine = null; } if (waypoints.length < 2) return; routeLine = L.polyline(waypoints.map(function (wp) { return [wp.lat, wp.lon]; }), { color: "#3B82C4", weight: 2, opacity: 0.7, dashArray: "8 6", interactive: false }).addTo(map); }
+
+  function openEditOverlay(idx, pt) { if (idx < 0 || idx >= waypoints.length) return; editingIdx = idx; editAltIn.value = waypoints[idx].alt; editSpdIn.value = waypoints[idx].speed; var x = pt ? pt.x + 16 : 300, y = pt ? pt.y - 40 : 200; if (x + 160 > window.innerWidth) x = window.innerWidth - 170; if (y < 50) y = 50; editOverlay.style.left = x + "px"; editOverlay.style.top = y + "px"; editOverlay.classList.add("visible"); editAltIn.focus(); }
+  function closeEditOverlay() { editOverlay.classList.remove("visible"); editingIdx = -1; }
+  editOkBtn.addEventListener("click", function () { if (editingIdx < 0 || editingIdx >= waypoints.length) return; var a = parseFloat(editAltIn.value), s = parseFloat(editSpdIn.value); if (isFinite(a) && a > 0) waypoints[editingIdx].alt = a; if (isFinite(s) && s > 0) waypoints[editingIdx].speed = s; closeEditOverlay(); renderList(); });
+  editCancelBtn.addEventListener("click", closeEditOverlay);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { if (editOverlay.classList.contains("visible")) closeEditOverlay(); else if (planningActive) deactivate(); } });
+
+  function renderList() {
+    var n = waypoints.length; countEl.textContent = n; clearBtn.disabled = n === 0; execBtn.disabled = n === 0;
+    if (n === 0) { listEl.innerHTML = '<div class="mp-empty">No waypoints</div>'; return; }
+    var html = ""; waypoints.forEach(function (wp, i) {
+      html += '<div class="mp-wp" data-mp-idx="' + i + '"><span class="mp-wp-idx ' + wp.type + '">' + (i+1) + '</span><span class="mp-wp-type ' + wp.type + '">' + wp.type + '</span><span class="mp-wp-coord">' + wp.lat.toFixed(5) + ', ' + wp.lon.toFixed(5) + '</span><span class="mp-wp-params">' + wp.alt + 'm ' + wp.speed + 'm/s</span><button class="mp-wp-del" data-mp-del="' + i + '">X</button></div>';
+    }); listEl.innerHTML = html;
+    listEl.querySelectorAll(".mp-wp-del").forEach(function (btn) { btn.addEventListener("click", function (e) { e.stopPropagation(); removeWaypoint(parseInt(btn.getAttribute("data-mp-del"), 10)); }); });
+    listEl.querySelectorAll(".mp-wp").forEach(function (row) { row.addEventListener("mousedown", function (e) { if (e.target.classList.contains("mp-wp-del") || e.button !== 0) return; startDrag(e, row); }); });
+  }
+  function startDrag(e, el) { dragState = { srcIdx: parseInt(el.getAttribute("data-mp-idx"), 10), el: el }; el.classList.add("dragging"); document.addEventListener("mousemove", onDragMove); document.addEventListener("mouseup", onDragEnd); e.preventDefault(); }
+  function onDragMove(e) { if (!dragState) return; listEl.querySelectorAll(".mp-wp").forEach(function (r) { r.classList.remove("drag-over-above", "drag-over-below"); }); var t = getDropTarget(e.clientY); if (t && t.row !== dragState.el) t.row.classList.add(t.position === "above" ? "drag-over-above" : "drag-over-below"); }
+  function onDragEnd(e) { document.removeEventListener("mousemove", onDragMove); document.removeEventListener("mouseup", onDragEnd); if (!dragState) return; listEl.querySelectorAll(".mp-wp").forEach(function (r) { r.classList.remove("dragging", "drag-over-above", "drag-over-below"); }); var t = getDropTarget(e.clientY); if (t) { var d = parseInt(t.row.getAttribute("data-mp-idx"), 10); if (t.position === "below") d++; moveWaypoint(dragState.srcIdx, d); } dragState = null; }
+  function getDropTarget(y) { var rows = listEl.querySelectorAll(".mp-wp"), best = null, dist = Infinity, pos = "above"; for (var i = 0; i < rows.length; i++) { var r = rows[i].getBoundingClientRect(), mid = r.top + r.height / 2, d = Math.abs(y - mid); if (d < dist) { dist = d; best = rows[i]; pos = y < mid ? "above" : "below"; } } return best ? { row: best, position: pos } : null; }
+  function moveWaypoint(from, to) { if (from === to || from === to - 1) return; var wp = waypoints.splice(from, 1)[0]; if (to > from) to--; waypoints.splice(Math.max(0, Math.min(to, waypoints.length)), 0, wp); rebuildMarkers(); renderList(); updateRoute(); }
+
+  map.on("click", function (e) { if (!planningActive) return; addWaypoint(e.latlng.lat, e.latlng.lng, "GOTO", DEFAULT_ALT, DEFAULT_SPEED); });
+  clearBtn.addEventListener("click", clearAll);
+  execBtn.addEventListener("click", function () { if (waypoints.length === 0) return; sendCommand("EXECUTE_MISSION", { waypoints: waypoints.map(function (wp) { return { lat: wp.lat, lon: wp.lon, alt: wp.alt, speed: wp.speed, type: wp.type }; }) }); });
+  var s = document.createElement("style"); s.textContent = ".mp-marker-label{background:transparent!important;border:none!important;box-shadow:none!important;font-family:monospace;font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.8);padding:0!important;margin:0!important}"; document.head.appendChild(s);
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- ROE Status Dashboard                                         -->
+<!-- ============================================================ -->
+<style>
+.roe-panel { position: fixed; bottom: 64px; right: 244px; width: 220px; max-height: 300px; z-index: 500; pointer-events: auto; background: var(--panel, #141820); border: 1px solid var(--border, #252B35); border-radius: 4px; font-family: var(--font-data, monospace); font-size: 11px; display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.45); user-select: none; overflow: hidden; }
+.roe-header { padding: 8px 10px; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim, #7A8899); border-bottom: 1px solid var(--border, #252B35); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.roe-header-left { display: flex; align-items: center; gap: 6px; }
+.roe-posture-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim, #7A8899); flex-shrink: 0; }
+.roe-posture-dot.free { background: var(--green, #1E7A4A); box-shadow: 0 0 6px var(--green, #1E7A4A); }
+.roe-posture-dot.hold { background: var(--red, #C23A3E); box-shadow: 0 0 6px var(--red, #C23A3E); }
+.roe-posture-label { font-size: 9px; font-weight: 700; letter-spacing: 1px; }
+.roe-posture-label.free { color: var(--green, #1E7A4A); }
+.roe-posture-label.hold { color: var(--red, #C23A3E); }
+.roe-rule-row { padding: 6px 10px; border-bottom: 1px solid var(--border, #252B35); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.roe-rule-name { font-size: 10px; color: var(--text, #D4DAE0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.roe-auth-level { font-size: 8px; font-weight: 700; letter-spacing: 1px; padding: 1px 5px; border-radius: 3px; background: rgba(59,130,196,0.15); color: #3B82C4; flex-shrink: 0; margin-left: 6px; }
+.roe-conditions { padding: 6px 10px; border-bottom: 1px solid var(--border, #252B35); flex-shrink: 0; }
+.roe-cond-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 9px; color: var(--text-dim, #7A8899); }
+.roe-cond-icon { width: 12px; text-align: center; font-size: 9px; flex-shrink: 0; }
+.roe-cond-icon.met { color: var(--green, #1E7A4A); }
+.roe-cond-icon.unmet { color: var(--red, #C23A3E); }
+.roe-cond-icon.unknown { color: var(--text-dim, #7A8899); }
+.roe-counts { padding: 6px 10px; border-bottom: 1px solid var(--border, #252B35); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.roe-count-item { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+.roe-count-item.authorized { color: var(--green, #1E7A4A); }
+.roe-count-item.denied { color: var(--red, #C23A3E); }
+.roe-feed { flex: 1; overflow-y: auto; min-height: 0; }
+.roe-feed::-webkit-scrollbar { width: 4px; }
+.roe-feed::-webkit-scrollbar-thumb { background: var(--border, #252B35); border-radius: 2px; }
+.roe-feed-entry { padding: 4px 10px; border-bottom: 1px solid rgba(37,43,53,0.35); font-size: 9px; line-height: 1.4; }
+.roe-feed-top { display: flex; align-items: center; gap: 5px; }
+.roe-feed-target { color: var(--text, #D4DAE0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px; }
+.roe-feed-badge { padding: 0 4px; border-radius: 2px; font-size: 7px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; flex-shrink: 0; }
+.roe-feed-badge.auth { background: rgba(30,122,74,0.25); color: var(--green, #1E7A4A); }
+.roe-feed-badge.deny { background: rgba(194,58,62,0.25); color: var(--red, #C23A3E); }
+.roe-feed-rule { color: var(--text-dim, #7A8899); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; font-size: 8px; }
+.roe-feed-reason { font-size: 8px; color: var(--text-dim, #7A8899); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; opacity: 0.7; }
+.roe-feed-empty { padding: 12px 10px; color: var(--text-dim, #7A8899); font-size: 9px; text-align: center; letter-spacing: 1px; text-transform: uppercase; }
+</style>
+
+<div class="roe-panel" id="roe-panel">
+  <div class="roe-header"><div class="roe-header-left"><span class="roe-posture-dot" id="roe-posture-dot"></span><span>ROE STATUS</span></div><span class="roe-posture-label" id="roe-posture-label">STANDBY</span></div>
+  <div class="roe-rule-row"><span class="roe-rule-name" id="roe-rule-name">--</span><span class="roe-auth-level" id="roe-auth-level">--</span></div>
+  <div class="roe-conditions" id="roe-conditions"></div>
+  <div class="roe-counts"><span class="roe-count-item authorized" id="roe-auth-count">AUTHORIZED: 0</span><span class="roe-count-item denied" id="roe-deny-count">DENIED: 0</span></div>
+  <div class="roe-feed" id="roe-feed"><div class="roe-feed-empty">Awaiting ROE evaluations</div></div>
+</div>
+
+<script>
+"use strict";
+(function () {
+  var ROE_CONDITIONS = [
+    { key: "positive_id", label: "POSITIVE ID" }, { key: "within_corridor", label: "WITHIN CORRIDOR" },
+    { key: "threat_imminent", label: "THREAT IMMINENT" }, { key: "authorized_weapon", label: "AUTHORIZED WEAPON" },
+    { key: "altitude_floor", label: "ALTITUDE FLOOR" }, { key: "civilian_clear", label: "CIVILIAN CLEAR" }
+  ];
+  var MAX_FEED = 6, authCount = 0, denyCount = 0, feedEntries = [], condState = {};
+  var postureLabel = document.getElementById("roe-posture-label"), postureDot = document.getElementById("roe-posture-dot");
+  var ruleNameEl = document.getElementById("roe-rule-name"), authLevelEl = document.getElementById("roe-auth-level");
+  var authCountEl = document.getElementById("roe-auth-count"), denyCountEl = document.getElementById("roe-deny-count");
+  var conditionsEl = document.getElementById("roe-conditions"), feedEl = document.getElementById("roe-feed");
+
+  function esc(t) { var d = document.createElement("div"); d.appendChild(document.createTextNode(t || "")); return d.innerHTML; }
+  function renderConds() { var h = ""; ROE_CONDITIONS.forEach(function (c) { var s = condState[c.key], ic = s === true ? "met" : s === false ? "unmet" : "unknown", ch = s === true ? "\u2713" : s === false ? "\u2717" : "-"; h += '<div class="roe-cond-row"><span class="roe-cond-icon ' + ic + '">' + ch + '</span><span class="roe-cond-label">' + c.label + '</span></div>'; }); conditionsEl.innerHTML = h; }
+  function renderFeed() { if (!feedEntries.length) { feedEl.innerHTML = '<div class="roe-feed-empty">Awaiting ROE evaluations</div>'; return; } var h = ""; feedEntries.forEach(function (e) { var bc = e.authorized ? "auth" : "deny", bt = e.authorized ? "AUTH" : "DENY"; h += '<div class="roe-feed-entry"><div class="roe-feed-top"><span class="roe-feed-target">' + esc(e.target_id.length > 10 ? e.target_id.substring(0,8) + ".." : e.target_id) + '</span><span class="roe-feed-badge ' + bc + '">' + bt + '</span><span class="roe-feed-rule">' + esc(e.rule_name) + '</span></div><div class="roe-feed-reason" title="' + esc(e.reason) + '">' + esc(e.reason) + '</div></div>'; }); feedEl.innerHTML = h; }
+
+  window._roeOnFrame = function (frame) {
+    var evals = frame && frame.roe_evaluations;
+    if (!evals || !evals.length) return;
+    var hasAuth = false, latest = evals[evals.length - 1];
+    evals.forEach(function (ev) { if (ev.authorized) { authCount++; hasAuth = true; } else denyCount++; feedEntries.unshift({ target_id: ev.target_id || "?", authorized: ev.authorized, rule_name: ev.rule_name || "--", reason: ev.reason || "" }); });
+    if (feedEntries.length > MAX_FEED) feedEntries.length = MAX_FEED;
+    if (latest && latest.conditions_met) { var cm = latest.conditions_met; ROE_CONDITIONS.forEach(function (c) { if (c.key in cm) condState[c.key] = cm[c.key]; }); }
+    if (latest) { ruleNameEl.textContent = latest.rule_name || "--"; authLevelEl.textContent = latest.authorization_level || "--"; }
+    postureDot.className = "roe-posture-dot " + (hasAuth ? "free" : "hold");
+    postureLabel.className = "roe-posture-label " + (hasAuth ? "free" : "hold");
+    postureLabel.textContent = hasAuth ? "WEAPONS FREE" : "WEAPONS HOLD";
+    authCountEl.textContent = "AUTHORIZED: " + authCount; denyCountEl.textContent = "DENIED: " + denyCount;
+    renderConds(); renderFeed();
+  };
+  renderConds();
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- Comms Resilience: Auto-reconnect + Command Queue             -->
+<!-- ============================================================ -->
+<style>
+#c2r-status-bar { position: fixed; top: 0; left: 0; width: 100%; height: 3px; z-index: 600; background: var(--green, #1E7A4A); transition: background 0.3s ease; pointer-events: none; }
+#c2r-status-bar.reconnecting { background: var(--amber, #B86E17); animation: c2r-pulse 1.2s ease-in-out infinite; }
+#c2r-status-bar.lost { background: var(--red, #C23A3E); animation: none; }
+@keyframes c2r-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+#c2r-retry-info { position: fixed; top: 3px; left: 50%; transform: translateX(-50%); z-index: 600; background: var(--panel, #141820); border: 1px solid var(--amber, #B86E17); border-top: none; border-radius: 0 0 4px 4px; padding: 3px 12px; font-family: var(--font-data, monospace); font-size: 10px; letter-spacing: 0.5px; color: var(--amber, #B86E17); pointer-events: none; opacity: 0; transition: opacity 0.2s ease; white-space: nowrap; }
+#c2r-retry-info.visible { opacity: 1; }
+#c2r-retry-info.lost { border-color: var(--red, #C23A3E); color: var(--red, #C23A3E); }
+#c2r-queue-badge { position: fixed; top: 8px; right: 8px; z-index: 600; min-width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 10px; background: var(--amber, #B86E17); color: #000; font-family: var(--font-data, monospace); font-size: 10px; font-weight: 700; padding: 0 6px; pointer-events: none; opacity: 0; transition: opacity 0.15s ease; }
+#c2r-queue-badge.visible { opacity: 1; }
+</style>
+<div id="c2r-status-bar"></div>
+<div id="c2r-retry-info"></div>
+<div id="c2r-queue-badge">0</div>
+<script>
+"use strict";
+(function () {
+  var BACKOFF_INIT = 1000, BACKOFF_MAX = 15000, MAX_RETRIES = 20, MAX_QUEUE = 10;
+  var retryCount = 0, backoffMs = BACKOFF_INIT, retryTimer = null, countdownTimer = null, userClose = false, cmdQueue = [];
+  var bar = document.getElementById("c2r-status-bar"), info = document.getElementById("c2r-retry-info"), badge = document.getElementById("c2r-queue-badge");
+
+  function setBar(s) { bar.className = ""; info.className = ""; if (s === "reconnecting") bar.classList.add("reconnecting"); else if (s === "lost") { bar.classList.add("lost"); info.classList.add("visible", "lost"); } }
+  function showInfo(t) { info.textContent = t; info.classList.add("visible"); info.classList.remove("lost"); }
+  function hideInfo() { info.classList.remove("visible", "lost"); }
+  function updateBadge() { badge.textContent = cmdQueue.length; cmdQueue.length > 0 ? badge.classList.add("visible") : badge.classList.remove("visible"); }
+
+  function flushQueue() { if (!window.ws || window.ws.readyState !== 1) return; while (cmdQueue.length > 0) { var e = cmdQueue.shift(); try { window.ws.send(JSON.stringify({ type: "CMD", command: e.command, params: e.params })); } catch (_) { cmdQueue.unshift(e); break; } } updateBadge(); }
+
+  var _origSend = window.sendCommand;
+  window.sendCommand = function (cmd, params) { if (typeof params === "undefined") params = {}; if (window.ws && window.ws.readyState === 1) return _origSend.call(window, cmd, params); if (cmdQueue.length < MAX_QUEUE) { cmdQueue.push({ command: cmd, params: params }); updateBadge(); } return _origSend.call(window, cmd, params); };
+
+  var _origConnect = window.connect;
+  function clearTimers() { if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; } if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; } }
+  function scheduleRetry() {
+    if (retryCount >= MAX_RETRIES) { setBar("lost"); info.textContent = "CONNECTION LOST"; info.classList.add("visible", "lost"); return; }
+    setBar("reconnecting"); var wait = backoffMs, nextAt = Date.now() + wait;
+    function tick() { var r = Math.max(0, nextAt - Date.now()); showInfo("RECONNECTING " + (retryCount + 1) + "/" + MAX_RETRIES + "  " + (r / 1000).toFixed(1) + "s"); }
+    tick(); countdownTimer = setInterval(tick, 250);
+    retryTimer = setTimeout(function () { if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; } retryCount++; wrappedConnect(); }, wait);
+    backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX);
+  }
+  function wrappedConnect() {
+    userClose = false; clearTimers(); _origConnect();
+    var cur = window.ws; if (!cur) return;
+    var oo = cur.onopen, oc = cur.onclose, oe = cur.onerror;
+    cur.onopen = function (ev) { retryCount = 0; backoffMs = BACKOFF_INIT; clearTimers(); setBar("connected"); hideInfo(); if (oo) oo.call(cur, ev); flushQueue(); };
+    cur.onclose = function (ev) { if (oc) oc.call(cur, ev); if (!userClose) scheduleRetry(); };
+    cur.onerror = function (ev) { if (oe) oe.call(cur, ev); setBar("reconnecting"); };
+  }
+  window.connect = wrappedConnect;
+  var startBtn = document.getElementById("start");
+  if (startBtn) startBtn.addEventListener("click", function () { userClose = true; clearTimers(); retryCount = 0; backoffMs = BACKOFF_INIT; }, true);
+  if (window.ws && window.ws.readyState === 1) setBar("connected");
+})();
+</script>
 </body>
 </html>

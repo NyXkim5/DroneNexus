@@ -3,10 +3,12 @@ OVERWATCH JWT Authentication Module
 
 Provides login, token validation, and role-based access control.
 Auth is controlled by OverwatchSettings.auth_enabled (default: False).
-When disabled, all endpoints are open — existing tests are unaffected.
+When disabled, all endpoints are open -- existing tests are unaffected.
 """
-import os
-import time
+from __future__ import annotations
+
+import hashlib
+import hmac
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -16,21 +18,49 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
+from config import DEFAULT_JWT_SECRET, OverwatchSettings
+
 logger = logging.getLogger("overwatch.auth")
 
 # ---------------------------------------------------------------------------
-# Configuration
+# Configuration (loaded from OverwatchSettings / env vars)
 # ---------------------------------------------------------------------------
-SECRET_KEY: str = os.environ.get("OVERWATCH_JWT_SECRET", "overwatch-dev-secret-change-in-prod")
-ALGORITHM: str = "HS256"
-TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
+_settings = OverwatchSettings()
+
+SECRET_KEY: str = _settings.jwt_secret
+ALGORITHM: str = _settings.jwt_algorithm
+TOKEN_EXPIRE_MINUTES: int = _settings.jwt_expire_minutes
+
+if SECRET_KEY == DEFAULT_JWT_SECRET:
+    logger.warning(
+        "JWT secret is the default value. "
+        "Set OVERWATCH_JWT_SECRET to a strong random string in production."
+    )
+
 
 # ---------------------------------------------------------------------------
-# Default user store (plaintext — swap for a real DB in production)
+# Password hashing helpers
+# ---------------------------------------------------------------------------
+
+def _hash_password(plaintext: str) -> str:
+    """Return SHA-256 hex digest of a plaintext password."""
+    return hashlib.sha256(plaintext.encode()).hexdigest()
+
+
+def _verify_password(plaintext: str, stored_hash: str) -> bool:
+    """Constant-time comparison of input hash against stored hash."""
+    return hmac.compare_digest(
+        hashlib.sha256(plaintext.encode()).hexdigest(),
+        stored_hash,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Default user store (hashed -- swap for a real DB in production)
 # ---------------------------------------------------------------------------
 _USERS: dict[str, dict] = {
-    "operator": {"password": "nexus-alpha", "role": "operator"},
-    "viewer":   {"password": "nexus-view",  "role": "viewer"},
+    "operator": {"password_hash": _hash_password("nexus-alpha"), "role": "operator"},
+    "viewer":   {"password_hash": _hash_password("nexus-view"),  "role": "viewer"},
 }
 
 # ---------------------------------------------------------------------------
@@ -88,7 +118,6 @@ def decode_access_token(token: str) -> dict:
 def _auth_enabled() -> bool:
     """Return True when JWT enforcement is on."""
     try:
-        from config import OverwatchSettings
         return OverwatchSettings().auth_enabled
     except Exception:
         return False
@@ -193,7 +222,7 @@ async def login(body: LoginRequest):
       - viewer   / nexus-view   (read-only)
     """
     user_record = _USERS.get(body.username)
-    if not user_record or user_record["password"] != body.password:
+    if not user_record or not _verify_password(body.password, user_record["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",

@@ -13,9 +13,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
+from api.auth import UserModel, decode_access_token
 from api.rate_limiter import BandwidthTracker, MessageRateLimiter
+from config import OverwatchSettings
 
 logger = logging.getLogger("overwatch.websocket")
 
@@ -59,8 +61,31 @@ class WebSocketHandler:
         self._wargame_rate_limiter = MessageRateLimiter(10.0)
         self._wargame_rate_limiter.set_rate("wargame", _DEFAULT_RATES["wargame"])
 
+    async def _authenticate_ws(self, websocket: WebSocket) -> Optional[UserModel]:
+        """Validate JWT from query params. Returns user or closes socket."""
+        settings = OverwatchSettings()
+        if not settings.auth_enabled:
+            return UserModel(username="anonymous", role="operator")
+
+        token = websocket.query_params.get("token")
+        if token is None:
+            await websocket.close(code=4001, reason="Authentication required")
+            return None
+
+        try:
+            payload = decode_access_token(token)
+            return UserModel(username=payload["sub"], role=payload["role"])
+        except HTTPException as exc:
+            await websocket.close(code=4003, reason=exc.detail)
+            return None
+
     async def handle(self, websocket: WebSocket) -> None:
         await websocket.accept()
+
+        user = await self._authenticate_ws(websocket)
+        if user is None:
+            return
+        logger.info(f"WS authenticated: user={user.username} role={user.role}")
 
         # Register with aggregator broadcast set
         self.app.aggregator.ws_clients.add(websocket)
@@ -198,6 +223,12 @@ class WebSocketHandler:
         then a clean close. This endpoint is isolated from the telemetry stream.
         """
         await websocket.accept()
+
+        user = await self._authenticate_ws(websocket)
+        if user is None:
+            return
+        logger.info(f"Wargame WS authenticated: user={user.username} role={user.role}")
+
         client_id = str(uuid.uuid4())[:8]
         logger.info(f"Wargame WS {client_id} connected, scenario={scenario_name}")
 

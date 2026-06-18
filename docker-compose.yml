@@ -1,11 +1,44 @@
-version: "3.8"
 services:
   overwatch:
     build: .
+    container_name: overwatch
     ports:
       - "8000:8000"
-    environment:
-      - OVERWATCH_ENV=production
+      - "8765:8765"
+    env_file:
+      - .env
     volumes:
-      - ./config:/app/config
+      - overwatch-data:/data
+      - ./config:/app/config:ro
     restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=100M
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - overwatch-net
+
+volumes:
+  overwatch-data:
+    driver: local
+
+networks:
+  overwatch-net:
+    driver: bridge

@@ -2,9 +2,13 @@
 OVERWATCH ISR Platform — Configuration
 Loaded from environment variables with OVERWATCH_ prefix.
 """
+from __future__ import annotations
+
 from pydantic_settings import BaseSettings
 from pydantic import BaseModel
 from typing import List, Tuple
+
+DEFAULT_JWT_SECRET = "overwatch-dev-secret-change-in-prod"
 
 
 class AssetConfig(BaseModel):
@@ -118,6 +122,11 @@ class OverwatchSettings(BaseSettings):
 
     # Authentication (disabled by default so existing tests pass)
     auth_enabled: bool = False
+
+    # JWT
+    jwt_secret: str = DEFAULT_JWT_SECRET
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 480
 
     # FPV
     fpv: FPVSettings = FPVSettings()
