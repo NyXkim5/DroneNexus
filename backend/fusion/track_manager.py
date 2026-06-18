@@ -45,7 +45,9 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 from csontology import Detection, Track, TrackClass, Vec3
+from fusion.delay_compensator import DelayCompensator
 from fusion.kalman import ConstantVelocityKalman
+from fusion.sensor_models import compute_R, get_model
 
 logger = logging.getLogger("overwatch.fusion")
 
@@ -92,12 +94,18 @@ class _Measurement:
     Multiple sensors that see the same physical object produce detections within
     a small radius. We collapse those into a single measurement before track
     association so one object yields one track, not one track per sensor.
+
+    timestamp is the latest detection timestamp in the cluster, used for delay
+    compensation. source_detections is populated only when per-sensor R or delay
+    compensation is active; otherwise it stays empty to avoid overhead.
     """
 
     position: Vec3
     velocity: Vec3
     confidence: float
     source_ids: List[str]
+    timestamp: float = 0.0
+    source_detections: List[Detection] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -149,6 +157,7 @@ class _TrackEntry:
     confirm_window. hits is the lifetime association count used only as a merge
     tie-breaker. overlaps counts consecutive ticks this track stayed co-located
     with another track, keyed by that track id, and drives the merge decision.
+    compensator is present only when use_delay_compensation is active.
     """
 
     track: Track
@@ -159,6 +168,7 @@ class _TrackEntry:
     history: List[Vec3] = field(default_factory=list)
     window: Deque[bool] = field(default_factory=deque)
     overlaps: Dict[str, int] = field(default_factory=dict)
+    compensator: Optional[DelayCompensator] = None
 
 
 class TrackManager:
@@ -173,13 +183,41 @@ class TrackManager:
         self,
         config: Optional[FusionConfig] = None,
         association_method: str = "gnn",
+        use_sensor_models: bool = False,
+        use_delay_compensation: bool = False,
+        sensor_registry: Optional[Dict[str, Tuple[str, Vec3]]] = None,
+        delay_threshold_s: float = 0.05,
     ) -> None:
+        """Initialise the track manager.
+
+        Args:
+            config: Tuning configuration. Defaults to FusionConfig().
+            association_method: 'gnn' or 'hungarian'.
+            use_sensor_models: When True, per-detection range-and-geometry R
+                matrices replace the flat sigma**2 * I in every Kalman update.
+                Requires sensor_registry to supply sensor kind and position.
+            use_delay_compensation: When True, a DelayCompensator is attached
+                to every track. Detections whose timestamp is more than
+                delay_threshold_s behind now are processed via backward-forward
+                rewind rather than at arrival time.
+            sensor_registry: Maps sensor_id to (sensor_kind, sensor_position).
+                Only required when use_sensor_models or use_delay_compensation
+                is True. Sensor kind must be one of 'RADAR', 'EOIR',
+                'RF_PASSIVE'. Detections from sensors absent in the registry
+                fall back to the flat meas_sigma from FusionConfig.
+            delay_threshold_s: Minimum lag in seconds before a detection is
+                treated as delayed. Below this the normal update path is used.
+        """
         if association_method not in ("gnn", "hungarian"):
             raise ValueError(
                 f"association_method must be 'gnn' or 'hungarian', got {association_method!r}"
             )
         self._config = config or FusionConfig()
         self._association_method = association_method
+        self._use_sensor_models = use_sensor_models
+        self._use_delay_compensation = use_delay_compensation
+        self._sensor_registry: Dict[str, Tuple[str, Vec3]] = sensor_registry or {}
+        self._delay_threshold_s = delay_threshold_s
         self._entries: Dict[str, _TrackEntry] = {}
         self._id_counter = itertools.count(1)
         self._last_now: Optional[float] = None
@@ -459,11 +497,16 @@ class TrackManager:
         miss = 1.0
         for d in group:
             miss *= 1.0 - max(0.0, min(1.0, d.confidence))
+        keep_detections = (
+            self._use_sensor_models or self._use_delay_compensation
+        )
         return _Measurement(
             position=pos,
             velocity=vel,
             confidence=1.0 - miss,
             source_ids=[d.id for d in group],
+            timestamp=max(d.timestamp for d in group),
+            source_detections=list(group) if keep_detections else [],
         )
 
     def _advance_all(self, now: float) -> None:
@@ -471,6 +514,10 @@ class TrackManager:
         for entry in self._entries.values():
             dt = self._step_dt(entry.last_seen, now)
             entry.kalman.predict(dt)
+            if entry.compensator is not None:
+                entry.compensator.record(
+                    now, entry.kalman._state, entry.kalman._cov,
+                )
             self._sync_track(entry, now)
 
     def _step_dt(self, last_seen: float, now: float) -> float:
@@ -674,11 +721,40 @@ class TrackManager:
         Confirmation is decided later in _record_outcomes from the N-of-M window,
         so here we only fold the measurement, bump the lifetime hit count used as
         a merge tie-breaker, and raise confidence.
+
+        When use_sensor_models is True, a geometry-aware R matrix replaces the
+        flat sigma**2 * I. The effective scalar sigma is derived from the mean
+        diagonal of the blended R so confidence scaling is preserved.
+
+        When use_delay_compensation is True and the measurement timestamp lags
+        now by more than delay_threshold_s, the backward-forward compensator
+        rewinds the filter to the snapshot closest to the detection time, applies
+        the update there, and re-predicts to now.
         """
         for track_id, meas_index in matches:
             entry = self._entries[track_id]
             meas = measurements[meas_index]
-            entry.kalman.update(meas.position, self._meas_sigma(meas))
+            R = self._build_R(meas)
+            meas_sigma = float(np.sqrt(max(float(np.mean(np.diag(R))), 1e-9)))
+            delay = now - meas.timestamp
+            if (
+                self._use_delay_compensation
+                and entry.compensator is not None
+                and meas.timestamp > 0.0
+                and delay > self._delay_threshold_s
+            ):
+                meas_arr = np.array(meas.position, dtype=np.float64)
+                new_state, new_cov = entry.compensator.compensate(
+                    detection_time=meas.timestamp,
+                    current_time=now,
+                    measurement=meas_arr,
+                    R=R,
+                    filter=entry.kalman,
+                )
+                entry.kalman._state = new_state
+                entry.kalman._cov = new_cov
+            else:
+                entry.kalman.update(meas.position, meas_sigma)
             entry.hits += 1
             entry.last_seen = now
             self._record_source(entry, meas)
@@ -705,9 +781,14 @@ class TrackManager:
                 confidence=meas.confidence * self._config.confidence_gain,
                 source_detection_ids=list(meas.source_ids),
             )
+            compensator = (
+                DelayCompensator() if self._use_delay_compensation else None
+            )
+            if compensator is not None:
+                compensator.record(now, kalman._state, kalman._cov)
             entry = _TrackEntry(
                 track=track, kalman=kalman, hits=1, last_seen=now,
-                window=deque([True]),
+                window=deque([True]), compensator=compensator,
             )
             entry.history.append(meas.position)
             track.history = list(entry.history)
@@ -781,6 +862,72 @@ class TrackManager:
         """
         conf = max(0.05, min(1.0, meas.confidence))
         return self._config.meas_sigma_m / conf
+
+    def _build_R(self, meas: _Measurement) -> np.ndarray:
+        """Build the 3x3 measurement noise covariance R for this measurement.
+
+        When use_sensor_models is False or no source detections are available,
+        returns the flat sigma**2 * I derived from _meas_sigma. Otherwise,
+        computes a per-detection R via compute_R and returns the
+        confidence-weighted average across all source detections.
+        """
+        if not self._use_sensor_models or not meas.source_detections:
+            sigma = self._meas_sigma(meas)
+            return np.eye(3) * (sigma ** 2)
+        return self._blend_sensor_R(meas)
+
+    def _blend_sensor_R(self, meas: _Measurement) -> np.ndarray:
+        """Confidence-weighted average of per-sensor R matrices.
+
+        Each source detection is looked up in the sensor registry. Known sensors
+        get a geometry-aware R via compute_R; unknown sensors fall back to a
+        flat matrix at the configured meas_sigma. The matrices are then blended
+        by detection confidence so sharper sensors pull harder.
+        """
+        total_w = 0.0
+        r_sum = np.zeros((3, 3), dtype=np.float64)
+        sigma_fallback = self._meas_sigma(meas)
+        r_fallback = np.eye(3) * (sigma_fallback ** 2)
+        for det in meas.source_detections:
+            w = max(0.05, det.confidence)
+            r_det = self._sensor_R_for_detection(det, sigma_fallback, r_fallback)
+            r_sum += w * r_det
+            total_w += w
+        if total_w <= 0.0:
+            return r_fallback
+        return r_sum / total_w
+
+    def _sensor_R_for_detection(
+        self,
+        det: Detection,
+        sigma_fallback: float,
+        r_fallback: np.ndarray,
+    ) -> np.ndarray:
+        """Look up the sensor model for one detection and compute its R matrix.
+
+        Resolves sensor_kind by checking the registry for det.sensor_id. If the
+        id is absent, tries the uppercase prefix before the first dash or space.
+        Falls back to flat R when neither lookup succeeds or compute_R raises.
+        """
+        entry = self._sensor_registry.get(det.sensor_id)
+        if entry is None:
+            prefix = det.sensor_id.split("-")[0].split(" ")[0].upper()
+            entry = self._sensor_registry.get(prefix)
+        if entry is None:
+            return r_fallback
+        sensor_kind, sensor_pos = entry
+        try:
+            model = get_model(sensor_kind)
+        except KeyError:
+            return r_fallback
+        try:
+            return compute_R(model, sensor_pos, det.position)
+        except Exception:
+            logger.warning(
+                "compute_R failed for sensor %r; falling back to flat R",
+                det.sensor_id,
+            )
+            return r_fallback
 
     def classify_track(self, track_id: str, label: TrackClass) -> None:
         """Set the hostility classification on a track the threat layer owns.
