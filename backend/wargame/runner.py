@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 from typing import AsyncIterator, List, Optional
 
 from csontology import (
@@ -53,6 +54,7 @@ from wargame.frame import Frame, Metrics, assignment_lines
 from vision.heatmap import DetectionHeatmap
 from wargame.scenario import Scenario
 from wargame.world import WorldModel, build_sensor_specs, build_world
+from wargame.recorder import WargameRecorder
 
 logger = logging.getLogger("overwatch.wargame")
 
@@ -86,6 +88,7 @@ class WargameRunner:
         audit: Optional[AuditLog] = None,
         events_db: Optional[object] = None,
         source: Optional[SensorSource] = None,
+        record_path: Optional[Path] = None,
     ) -> None:
         self._scenario = scenario
         self._events_db = events_db
@@ -113,6 +116,9 @@ class WargameRunner:
         self._tick = 0
         self._engagements_made = 0
         self._heatmap = DetectionHeatmap()
+        self._recorder: Optional[WargameRecorder] = None
+        if record_path is not None:
+            self._recorder = WargameRecorder(record_path)
 
         # Optional Reynolds flocking adapter. When use_flocking is set on the
         # scenario, the adapter wraps the swarm and advance_all() replaces the
@@ -150,11 +156,15 @@ class WargameRunner:
         true it awaits the tick interval so a live consumer like the websocket
         sees real-time pacing. Set pace false for a fast batch run with no sleep.
         """
+        if self._recorder is not None:
+            self._recorder.start(self._scenario.name, self._tick * self._dt)
         await self._source.start()
         try:
             while self._tick < self._scenario.max_ticks:
                 detections = self._collect_tick()
                 frame = self._step(detections)
+                if self._recorder is not None:
+                    self._recorder.record_frame(frame.to_dict())
                 await self._flush_events()
                 yield frame
                 if frame.done:
@@ -165,6 +175,10 @@ class WargameRunner:
             await self._source.stop()
             if self._audit is not None:
                 self._audit.close()
+            if self._recorder is not None:
+                self._recorder.stop(self._tick * self._dt)
+                saved_path = self._recorder.save()
+                logger.info("Wargame recording saved: %s", saved_path)
 
     def _collect_tick(self) -> List[Detection]:
         """Advance the attacker, then sample one tick of detections.
