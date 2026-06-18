@@ -336,6 +336,33 @@ def _skirmish_80() -> Scenario:
     )
 
 
+def _combined_saturation_strike() -> Scenario:
+    """A 500-drone saturation strike with ground target cascade analysis.
+
+    Uses the same sensor ring and defender loadout as saturation_1000 but
+    binds the ground_strike_base vision scenario so every tick also runs the
+    visual cascade pipeline and produces an engagement order for ground targets.
+    This is the combined wargame: counter-swarm defense plus target prioritization
+    in a single run.
+    """
+    base = _saturation_1000()
+    return Scenario(
+        name="combined_saturation_strike",
+        swarm_intent=SwarmIntent.SATURATION,
+        swarm_count=500,
+        unit_cost=500.0,
+        sensors=_ring_sensors(count=4, range_m=3500.0, radius_m=600.0),
+        defenders=base.defenders,
+        site=SiteConfig(),
+        tick_hz=5.0,
+        max_ticks=600,
+        seed=42,
+        jam_resistant_fraction=0.35,
+        hardened_fraction=0.2,
+        target_scenario="ground_strike_base",
+    )
+
+
 # Built-in presets keyed by name. At least two ship, including the 1000-drone
 # saturation attack required by the design.
 PRESETS: Dict[str, "callable"] = {
@@ -344,6 +371,7 @@ PRESETS: Dict[str, "callable"] = {
     "decoy_300": _decoy_300,
     "contested_500": _contested_500,
     "skirmish_80": _skirmish_80,
+    "combined_saturation_strike": _combined_saturation_strike,
 }
 
 

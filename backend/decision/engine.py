@@ -39,9 +39,10 @@ class DecisionEngine:
                 personnel_impact=0,
                 cascade_depth=0,
             ))
+            tti = t.time_to_impact_s if t.time_to_impact_s is not None else 300.0
             rationale[t.id] = (
                 f"Defensive threat: score={t.score:.2f}, "
-                f"TTI={t.time_to_impact_s:.0f}s, intent={t.intent.value}"
+                f"TTI={tti:.0f}s, intent={t.intent.value}"
             )
 
         if cascade_results:
