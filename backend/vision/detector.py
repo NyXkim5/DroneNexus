@@ -46,6 +46,21 @@ _BB_SIZES = {
 }
 
 
+def _enu_to_pixel(
+    position_enu: tuple,
+    frame_width: int,
+    frame_height: int,
+    scene_scale: float,
+) -> tuple:
+    """Convert ENU world coordinates to pixel coordinates using the same
+    projection as SimFeedSource._render_scene."""
+    cx = frame_width // 2
+    cy = frame_height // 2
+    px = int(cx + position_enu[0] * scene_scale)
+    py = int(cy - position_enu[1] * scene_scale)
+    return px, py
+
+
 class SimDetector(Detector):
     def __init__(
         self,
@@ -53,6 +68,8 @@ class SimDetector(Detector):
         noise_sigma_m: float = 2.0,
         false_positive_rate: float = 0.02,
         seed: Optional[int] = None,
+        resolution: tuple = (1280, 720),
+        scene_scale: Optional[float] = None,
     ) -> None:
         self._placements = placements
         self._noise_sigma = noise_sigma_m
@@ -60,6 +77,8 @@ class SimDetector(Detector):
         self._rng = random.Random(seed)
         self._np_rng = np.random.default_rng(seed)
         self._fp_counter = 0
+        w, h = resolution
+        self._scene_scale = scene_scale if scene_scale is not None else min(w, h) / 2000.0
 
     def detect(self, frame: np.ndarray, timestamp: float) -> List[VisualTarget]:
         h, w = frame.shape[:2]
@@ -78,8 +97,12 @@ class SimDetector(Detector):
             confidence = max(0.5, 1.0 - (self._noise_sigma / 20.0)) if self._noise_sigma > 0 else 1.0
 
             bb_w, bb_h = _BB_SIZES.get(p.target_type, (48, 32))
-            bb_x = self._rng.randint(0, max(0, w - bb_w))
-            bb_y = self._rng.randint(0, max(0, h - bb_h))
+            cx, cy = w // 2, h // 2
+            scale = self._scene_scale
+            px = int(cx + pos[0] * scale)
+            py = int(cy - pos[1] * scale)
+            bb_x = max(0, min(px - bb_w // 2, w - bb_w))
+            bb_y = max(0, min(py - bb_h // 2, h - bb_h))
 
             occupancy = p.occupancy_override if p.occupancy_override is not None else defaults["default_occupancy"]
 
