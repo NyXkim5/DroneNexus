@@ -166,6 +166,132 @@ canvas#heatmap-canvas { position: fixed; inset: 0; z-index: 405; pointer-events:
   border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4);
   background: rgba(59,130,196,0.1);
 }
+
+/* --- C2 Command Panel --- */
+.c2-panel {
+  position: fixed; top: 60px; right: 12px; width: 220px; z-index: 500;
+  pointer-events: auto; background: var(--panel, #141820);
+  border: 1px solid var(--border, #252B35); border-radius: 4px;
+  font-family: var(--font-data, monospace); font-size: 11px;
+  display: flex; flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.45); user-select: none;
+}
+.c2-section-header {
+  padding: 8px 10px; font-family: var(--font-label, sans-serif);
+  font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899); border-bottom: 1px solid var(--border, #252B35);
+}
+.c2-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; }
+.c2-btn {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  height: 34px; border-radius: 3px; cursor: pointer;
+  font-family: var(--font-label, sans-serif); font-size: 10px; font-weight: 700;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s, opacity 0.12s; outline: none;
+}
+.c2-btn:active { transform: scale(0.96); }
+.c2-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.c2-btn--arm { background: transparent; border: 1.5px solid var(--green, #1E7A4A); color: var(--green, #1E7A4A); }
+.c2-btn--arm:hover:not(:disabled) { background: rgba(30,122,74,0.15); box-shadow: 0 0 8px rgba(30,122,74,0.3); }
+.c2-btn--disarm { background: transparent; border: 1px solid var(--border, #252B35); color: var(--text-dim, #7A8899); }
+.c2-btn--disarm:hover:not(:disabled) { background: rgba(122,136,153,0.1); border-color: var(--text-dim, #7A8899); }
+.c2-btn--launch { background: rgba(59,130,196,0.12); border: 1.5px solid var(--accent, #3B82C4); color: var(--accent, #3B82C4); }
+.c2-btn--launch:hover:not(:disabled) { background: rgba(59,130,196,0.25); box-shadow: 0 0 8px rgba(59,130,196,0.3); }
+.c2-btn--recover { background: transparent; border: 1px solid var(--border, #252B35); color: var(--text, #D4DAE0); }
+.c2-btn--recover:hover:not(:disabled) { background: rgba(212,218,224,0.08); border-color: var(--text-dim, #7A8899); }
+.c2-btn--rtl { background: transparent; border: 1.5px solid var(--amber, #B86E17); color: var(--amber, #B86E17); }
+.c2-btn--rtl:hover:not(:disabled) { background: rgba(184,110,23,0.15); box-shadow: 0 0 8px rgba(184,110,23,0.3); }
+.c2-btn--abort {
+  grid-column: 1 / -1; height: 38px; font-size: 12px; letter-spacing: 2px;
+  background: rgba(194,58,62,0.15); border: 2px solid var(--red, #C23A3E); color: var(--red, #C23A3E);
+}
+.c2-btn--abort:hover:not(:disabled) { background: rgba(194,58,62,0.35); box-shadow: 0 0 14px rgba(194,58,62,0.4); }
+.c2-btn--sent { animation: c2-flash 0.35s ease-out; }
+@keyframes c2-flash { 0% { filter: brightness(1.6); } 100% { filter: brightness(1); } }
+.c2-log-wrap { border-top: 1px solid var(--border, #252B35); max-height: 190px; overflow-y: auto; }
+.c2-log-wrap::-webkit-scrollbar { width: 4px; }
+.c2-log-wrap::-webkit-scrollbar-thumb { background: var(--border, #252B35); border-radius: 2px; }
+.c2-log-entry { display: flex; align-items: baseline; gap: 6px; padding: 4px 10px; border-bottom: 1px solid rgba(37,43,53,0.35); font-size: 9px; line-height: 1.4; }
+.c2-log-ts { color: var(--text-dim, #7A8899); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.c2-log-cmd { color: var(--text, #D4DAE0); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c2-log-result { flex-shrink: 0; font-weight: 700; letter-spacing: 0.5px; }
+.c2-log-result.ok { color: var(--green, #1E7A4A); }
+.c2-log-result.fail { color: var(--red, #C23A3E); }
+.c2-log-result.pending { color: var(--text-dim, #7A8899); }
+.c2-log-empty { padding: 12px 10px; color: var(--text-dim, #7A8899); font-size: 9px; text-align: center; letter-spacing: 1px; text-transform: uppercase; }
+
+/* --- C2 Formation Controls --- */
+.c2-formation-panel {
+  position: fixed; top: 60px; right: 244px; width: 200px; z-index: 500;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px; pointer-events: auto;
+  font-family: var(--font-data, monospace); font-size: 11px;
+}
+.c2-section { padding: 8px 10px; border-bottom: 1px solid var(--border, #252B35); }
+.c2-section:last-child { border-bottom: none; }
+.c2-section-label {
+  font-family: var(--font-label, sans-serif); font-size: 9px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899); margin-bottom: 8px;
+}
+.c2-formation-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.c2-fmt-btn {
+  background: var(--panel-elevated, #1A1F28); border: 1px solid var(--border, #252B35);
+  color: var(--text, #D4DAE0); font-family: var(--font-data, monospace);
+  font-size: 10px; letter-spacing: 1px; padding: 6px 0; border-radius: 3px;
+  cursor: pointer; text-align: center; text-transform: uppercase; transition: all 0.15s;
+}
+.c2-fmt-btn:hover { border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4); }
+.c2-fmt-btn.active { border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4); background: rgba(59,130,196,0.1); }
+.c2-slider-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.c2-slider-val { font-family: var(--font-data, monospace); font-size: 13px; font-weight: 700; color: var(--text, #D4DAE0); }
+.c2-slider {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+  border-radius: 3px; background: var(--panel-elevated, #1A1F28); outline: none;
+  border: 1px solid var(--border, #252B35);
+}
+.c2-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent, #3B82C4); cursor: pointer; border: none; box-shadow: 0 0 4px rgba(59,130,196,0.4); }
+.c2-slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent, #3B82C4); cursor: pointer; border: none; box-shadow: 0 0 4px rgba(59,130,196,0.4); }
+.c2-slider::-moz-range-track { height: 6px; border-radius: 3px; background: var(--panel-elevated, #1A1F28); border: 1px solid var(--border, #252B35); }
+
+/* --- C2 GOTO Handler --- */
+.goto-bar { position: fixed; bottom: 96px; right: 12px; z-index: 500; display: flex; gap: 4px; pointer-events: auto; }
+.goto-btn {
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  color: var(--text-dim, #7A8899); font-family: var(--font-data, monospace);
+  font-size: 9px; letter-spacing: 1px; padding: 4px 10px; border-radius: 3px;
+  cursor: pointer; text-transform: uppercase; transition: all 0.15s;
+  display: flex; align-items: center; gap: 5px;
+}
+.goto-btn .goto-crosshair { display: inline-block; width: 12px; height: 12px; position: relative; }
+.goto-btn .goto-crosshair::before, .goto-btn .goto-crosshair::after { content: ""; position: absolute; background: currentColor; }
+.goto-btn .goto-crosshair::before { width: 1px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
+.goto-btn .goto-crosshair::after { width: 100%; height: 1px; top: 50%; left: 0; transform: translateY(-50%); }
+.goto-btn.active { border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4); background: rgba(59,130,196,0.1); }
+.goto-coord-display {
+  position: fixed; bottom: 96px; left: 12px; z-index: 500;
+  font-family: var(--font-data, monospace); font-size: 10px;
+  color: var(--text-dim, #7A8899); background: var(--panel, #141820);
+  border: 1px solid var(--border, #252B35); border-radius: 3px;
+  padding: 3px 8px; pointer-events: none; opacity: 0; transition: opacity 0.15s;
+}
+.goto-coord-display.visible { opacity: 1; }
+@keyframes goto-pulse { 0% { transform: scale(1); opacity: 1; } 70% { transform: scale(2.5); opacity: 0.3; } 100% { transform: scale(3); opacity: 0; } }
+@keyframes goto-fade { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+.goto-marker-ring { width: 18px; height: 18px; border: 2px solid var(--accent, #3B82C4); border-radius: 50%; position: relative; }
+.goto-marker-ring::after { content: ""; position: absolute; inset: -2px; border: 2px solid var(--accent, #3B82C4); border-radius: 50%; animation: goto-pulse 1.2s ease-out infinite; }
+.goto-marker-container { animation: goto-fade 3s ease-out forwards; }
+.goto-toast {
+  position: fixed; z-index: 510; font-family: var(--font-data, monospace); font-size: 10px;
+  color: var(--accent, #3B82C4); background: var(--panel, #141820);
+  border: 1px solid var(--accent, #3B82C4); border-radius: 3px;
+  padding: 3px 8px; pointer-events: none; white-space: nowrap;
+  animation: goto-fade 3s ease-out forwards;
+}
+.goto-cursor-active { cursor: crosshair !important; }
+.goto-cursor-active .leaflet-container { cursor: crosshair !important; }
+.goto-cursor-active .leaflet-grab { cursor: crosshair !important; }
+.goto-cursor-active .leaflet-interactive { cursor: crosshair !important; }
 </style>
 </head>
 <body>
@@ -542,6 +668,7 @@ function connect() {
     let msg;
     try { msg = JSON.parse(ev.data); } catch (e) { return; }
     if (msg.type === "ERROR") { setDot("err"); return; }
+    if (msg.type === "ACK") { if (window._c2OnAck) window._c2OnAck(msg); return; }
     if (msg.type !== "WARGAME_FRAME") return;
     frame = msg;
     frameCount++;
@@ -663,13 +790,222 @@ wireToggle("toggle-confidence", "confidence");
 wireToggle("toggle-ranges", "ranges");
 wireToggle("toggle-clusters", "clusters");
 wireToggle("toggle-feed", "feed");
+
+// ---- C2 Command Panel ----
+(function () {
+  var MAX_LOG_ENTRIES = 8;
+  var _c2PendingId = 0;
+  window._c2CommandLog = [];
+
+  window.sendCommand = function sendCommand(command, params) {
+    if (typeof params === "undefined") params = {};
+    var id = ++_c2PendingId;
+    var d = new Date();
+    var ts = String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0") + ":" + String(d.getSeconds()).padStart(2,"0");
+    var entry = { id: id, command: command, params: params, ts: ts, result: null, success: null, message: "" };
+    window._c2CommandLog.push(entry);
+    _c2RenderLogEntry(entry);
+    _c2TrimLog();
+    if (!ws || ws.readyState !== 1) {
+      entry.result = "FAIL"; entry.success = false; entry.message = "WS not connected";
+      _c2UpdateLogEntry(entry);
+      return null;
+    }
+    try { ws.send(JSON.stringify({ type: "CMD", command: command, params: params })); }
+    catch (err) { entry.result = "FAIL"; entry.success = false; entry.message = "Send error"; _c2UpdateLogEntry(entry); return null; }
+    return id;
+  };
+
+  window._c2OnAck = function _c2OnAck(msg) {
+    if (!msg || msg.type !== "ACK") return;
+    var log = window._c2CommandLog;
+    for (var i = log.length - 1; i >= 0; i--) {
+      if (log[i].command === msg.command && log[i].result === null) {
+        log[i].result = msg.success ? "OK" : "FAIL";
+        log[i].success = msg.success;
+        log[i].message = msg.message || "";
+        _c2UpdateLogEntry(log[i]);
+        return;
+      }
+    }
+  };
+
+  var btnMap = [
+    { id: "c2-arm", command: "ARM", params: { droneId: "ALL" } },
+    { id: "c2-disarm", command: "DISARM", params: { droneId: "ALL" } },
+    { id: "c2-launch", command: "TAKEOFF", params: { altitude: 30 } },
+    { id: "c2-recover", command: "LAND", params: {} },
+    { id: "c2-rtl", command: "RTL", params: {} },
+    { id: "c2-abort", command: "EMERGENCY_STOP", params: {} }
+  ];
+  btnMap.forEach(function (item) {
+    var el = document.getElementById(item.id);
+    if (!el) return;
+    el.addEventListener("click", function () {
+      el.classList.remove("c2-btn--sent");
+      void el.offsetWidth;
+      el.classList.add("c2-btn--sent");
+      window.sendCommand(item.command, item.params);
+    });
+  });
+
+  function _c2RenderLogEntry(entry) {
+    var wrap = document.getElementById("c2-log");
+    if (!wrap) return;
+    var empty = wrap.querySelector(".c2-log-empty");
+    if (empty) empty.remove();
+    var row = document.createElement("div");
+    row.className = "c2-log-entry";
+    row.setAttribute("data-c2-id", String(entry.id));
+    row.innerHTML = '<span class="c2-log-ts">' + entry.ts + '</span>'
+      + '<span class="c2-log-cmd">' + entry.command + '</span>'
+      + '<span class="c2-log-result ' + (entry.result === null ? "pending" : (entry.success ? "ok" : "fail")) + '">'
+      + (entry.result || "...") + '</span>';
+    if (wrap.firstChild) wrap.insertBefore(row, wrap.firstChild);
+    else wrap.appendChild(row);
+  }
+
+  function _c2UpdateLogEntry(entry) {
+    var wrap = document.getElementById("c2-log");
+    if (!wrap) return;
+    var row = wrap.querySelector('[data-c2-id="' + entry.id + '"]');
+    if (!row) return;
+    var resSpan = row.querySelector(".c2-log-result");
+    if (!resSpan) return;
+    resSpan.className = "c2-log-result " + (entry.success ? "ok" : "fail");
+    resSpan.textContent = entry.result;
+    if (entry.message) resSpan.title = entry.message;
+  }
+
+  function _c2TrimLog() {
+    var wrap = document.getElementById("c2-log");
+    if (!wrap) return;
+    var entries = wrap.querySelectorAll(".c2-log-entry");
+    while (entries.length > MAX_LOG_ENTRIES) {
+      entries[entries.length - 1].parentNode.removeChild(entries[entries.length - 1]);
+      entries = wrap.querySelectorAll(".c2-log-entry");
+    }
+    if (window._c2CommandLog.length > MAX_LOG_ENTRIES) {
+      window._c2CommandLog = window._c2CommandLog.slice(window._c2CommandLog.length - MAX_LOG_ENTRIES);
+    }
+  }
+})();
+
+// ---- C2 Formation + Speed/Altitude Controls ----
+(function () {
+  function sendC2Command(command, params) {
+    if (typeof sendCommand === "function") { sendCommand(command, params); return; }
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "CMD", command: command, params: params }));
+  }
+  var formationBtns = document.querySelectorAll(".c2-fmt-btn");
+  formationBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      formationBtns.forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      sendC2Command("SET_FORMATION", { formation: btn.dataset.formation });
+    });
+  });
+  function debounce(fn, delay) {
+    var timer = null;
+    return function () { var args = arguments; var ctx = this; if (timer) clearTimeout(timer); timer = setTimeout(function () { fn.apply(ctx, args); }, delay); };
+  }
+  var speedSlider = document.getElementById("c2-speed-slider");
+  var speedVal = document.getElementById("c2-speed-val");
+  var sendSpeed = debounce(function (v) { sendC2Command("SET_SPEED", { speed: v }); }, 300);
+  speedSlider.addEventListener("input", function () { var v = parseInt(speedSlider.value, 10); speedVal.textContent = v; sendSpeed(v); });
+  var altSlider = document.getElementById("c2-alt-slider");
+  var altVal = document.getElementById("c2-alt-val");
+  var sendAlt = debounce(function (v) { sendC2Command("SET_ALTITUDE", { altitude: v }); }, 300);
+  altSlider.addEventListener("input", function () { var v = parseInt(altSlider.value, 10); altVal.textContent = v; sendAlt(v); });
+})();
+
+// ---- C2 GOTO Handler ----
+(function () {
+  var gotoActive = false;
+  var toggleBtn = document.getElementById("goto-toggle");
+  var coordDisplay = document.getElementById("goto-coord-display");
+  function formatCoord(lat, lng) {
+    return Math.abs(lat).toFixed(4) + (lat >= 0 ? "N" : "S") + " " + Math.abs(lng).toFixed(4) + (lng >= 0 ? "E" : "W");
+  }
+  function activateGoto() { gotoActive = true; toggleBtn.classList.add("active"); coordDisplay.classList.add("visible"); document.body.classList.add("goto-cursor-active"); }
+  function deactivateGoto() { gotoActive = false; toggleBtn.classList.remove("active"); coordDisplay.classList.remove("visible"); document.body.classList.remove("goto-cursor-active"); }
+  toggleBtn.addEventListener("click", function () { gotoActive ? deactivateGoto() : activateGoto(); });
+  map.on("click", function (e) {
+    if (!gotoActive) return;
+    var lat = e.latlng.lat, lng = e.latlng.lng;
+    if (typeof sendCommand === "function") sendCommand("GOTO", { lat: lat, lng: lng });
+    else if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "CMD", command: "GOTO", params: { lat: lat, lng: lng } }));
+    var icon = L.divIcon({ className: "", html: '<div class="goto-marker-container"><div class="goto-marker-ring"></div></div>', iconSize: [18,18], iconAnchor: [9,9] });
+    var marker = L.marker(e.latlng, { icon: icon, interactive: false }).addTo(map);
+    var toast = document.createElement("div"); toast.className = "goto-toast"; toast.textContent = "GOTO " + formatCoord(lat, lng);
+    document.body.appendChild(toast);
+    var pt = map.latLngToContainerPoint(e.latlng); toast.style.left = (pt.x + 14) + "px"; toast.style.top = (pt.y - 20) + "px";
+    setTimeout(function () { try { map.removeLayer(marker); } catch(_e) {} if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
+    deactivateGoto();
+  });
+  map.on("mousemove", function (e) { if (gotoActive) coordDisplay.textContent = formatCoord(e.latlng.lat, e.latlng.lng); });
+})();
 </script>
+
+<!-- C2 Command Panel -->
+<div class="c2-panel" id="c2-panel">
+  <div class="c2-section-header">Taskforce Controls</div>
+  <div class="c2-btn-grid">
+    <button class="c2-btn c2-btn--arm" id="c2-arm" title="Arm all assets">ARM ALL</button>
+    <button class="c2-btn c2-btn--disarm" id="c2-disarm" title="Disarm all assets">DISARM</button>
+    <button class="c2-btn c2-btn--launch" id="c2-launch" title="Launch all to 30m AGL">LAUNCH</button>
+    <button class="c2-btn c2-btn--recover" id="c2-recover" title="Land all assets">RECOVER</button>
+    <button class="c2-btn c2-btn--rtl" id="c2-rtl" title="Return to launch point">RTL</button>
+    <button class="c2-btn c2-btn--abort" id="c2-abort" title="Emergency stop all assets">ABORT</button>
+  </div>
+  <div class="c2-section-header">Command Log</div>
+  <div class="c2-log-wrap" id="c2-log">
+    <div class="c2-log-empty">No commands sent</div>
+  </div>
+</div>
+
+<!-- C2 Formation Controls -->
+<div class="c2-formation-panel" id="c2-formation-panel">
+  <div class="c2-section">
+    <div class="c2-section-label">Formation</div>
+    <div class="c2-formation-grid">
+      <button class="c2-fmt-btn active" data-formation="V_FORMATION">V</button>
+      <button class="c2-fmt-btn" data-formation="LINE_ABREAST">LINE</button>
+      <button class="c2-fmt-btn" data-formation="COLUMN">COL</button>
+      <button class="c2-fmt-btn" data-formation="DIAMOND">DIA</button>
+      <button class="c2-fmt-btn" data-formation="ORBIT">ORB</button>
+      <button class="c2-fmt-btn" data-formation="SCATTER">SCT</button>
+    </div>
+  </div>
+  <div class="c2-section">
+    <div class="c2-slider-row">
+      <div class="c2-section-label" style="margin-bottom:0">Speed (M/S)</div>
+      <div class="c2-slider-val" id="c2-speed-val">10</div>
+    </div>
+    <input type="range" class="c2-slider" id="c2-speed-slider" min="0" max="30" step="1" value="10" />
+  </div>
+  <div class="c2-section">
+    <div class="c2-slider-row">
+      <div class="c2-section-label" style="margin-bottom:0">Alt (M)</div>
+      <div class="c2-slider-val" id="c2-alt-val">30</div>
+    </div>
+    <input type="range" class="c2-slider" id="c2-alt-slider" min="10" max="120" step="5" value="30" />
+  </div>
+</div>
+
+<!-- GOTO toggle bar -->
+<div class="goto-bar">
+  <button class="goto-btn" id="goto-toggle"><span class="goto-crosshair"></span>GOTO</button>
+</div>
+
+<!-- Cursor coordinate readout -->
+<div class="goto-coord-display" id="goto-coord-display">--</div>
 
 <!-- Cascade targeting overlay canvas -->
 <canvas id="cascade-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:400;"></canvas>
 
 <!-- Engagement order panel -->
-<div id="engagement-panel" style="position:fixed;top:160px;right:12px;width:260px;max-height:60vh;overflow-y:auto;z-index:500;font-family:'JetBrains Mono',monospace;font-size:11px;"></div>
+<div id="engagement-panel" style="position:fixed;top:400px;right:12px;width:220px;max-height:40vh;overflow-y:auto;z-index:500;font-family:'JetBrains Mono',monospace;font-size:11px;"></div>
 
 <!-- Tactical mode toggle -->
 <button id="tactical-toggle" style="position:fixed;bottom:12px;right:12px;z-index:500;padding:6px 12px;background:#1a1a2e;color:#0f0;border:1px solid #0f0;font-family:'JetBrains Mono',monospace;cursor:pointer;">TACTICAL</button>
