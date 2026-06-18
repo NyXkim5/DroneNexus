@@ -39,6 +39,12 @@ from sensors.base import SensorSource
 from sensors.sim_source import SimSensorSource
 import threat as threat_module
 
+from vision.detector import SimDetector
+from vision.feed_source import SimFeedSource
+from vision.cascade import CascadeEngine, CascadeResult, DependencyEdge
+from decision.engine import DecisionEngine
+from decision.models import EngagementMode, EngagementOrder
+
 from wargame.audit import AuditLog
 from wargame.degradation import DegradationModel
 
@@ -105,6 +111,20 @@ class WargameRunner:
         self._tick = 0
         self._engagements_made = 0
 
+        self._vision_detector: Optional[SimDetector] = None
+        self._vision_feed: Optional[SimFeedSource] = None
+        self._cascade_dependencies: List[DependencyEdge] = []
+        self._decision_engine = DecisionEngine(mode=EngagementMode.AUTO)
+
+        if scenario.target_scenario:
+            from vision.scenarios import load_target_scenario
+            ts = load_target_scenario(scenario.target_scenario)
+            self._vision_detector = SimDetector(
+                placements=ts.placements, noise_sigma_m=2.0, false_positive_rate=0.02, seed=scenario.seed
+            )
+            self._vision_feed = SimFeedSource(placements=ts.placements, resolution=(1280, 720))
+            self._cascade_dependencies = ts.dependencies
+
     @property
     def world(self) -> WorldModel:
         """The live world model, exposed for inspection and tests."""
@@ -161,11 +181,22 @@ class WargameRunner:
             self._audit.link_tracks(self._tick, tracks)
         self._classify_hostiles()
         threats = threat_module.assess(tracks, self._world.site, t)
+        cascade_results = []
+        engagement_order = None
+        visual_targets = []
+        if self._vision_detector and self._vision_feed:
+            frame_img, frame_ts = self._vision_feed.next_frame()
+            visual_targets = self._vision_detector.detect(frame_img, frame_ts)
+            cascade_engine = CascadeEngine(targets=visual_targets, dependencies=self._cascade_dependencies)
+            cascade_results = cascade_engine.score_all()
+            engagement_order = self._decision_engine.merge(
+                threats=threats, cascade_results=cascade_results, now=t
+            )
         engagements = self._engage(threats, t)
         self._audit_tick(t, engagements, threats, tracks)
         self._queue_events(engagements, threats, tracks)
         self._cool_down()
-        return self._build_frame(tracks, threats, engagements)
+        return self._build_frame(tracks, threats, engagements, cascade_results, engagement_order, visual_targets)
 
     def _queue_events(
         self,
@@ -374,6 +405,9 @@ class WargameRunner:
         tracks: List[Track],
         threats: List[Threat],
         engagements: List[Engagement],
+        cascade_results: Optional[List[CascadeResult]] = None,
+        engagement_order: Optional[EngagementOrder] = None,
+        visual_targets: Optional[List] = None,
     ) -> Frame:
         """Compute metrics and bundle a renderable Frame for this tick."""
         metrics = self._compute_metrics(tracks)
@@ -387,6 +421,9 @@ class WargameRunner:
             site_enu=self._world.site.position,
             scenario_name=self._scenario.name,
             done=done,
+            cascade_results=cascade_results or [],
+            engagement_order=engagement_order,
+            visual_targets=[t.to_dict() for t in visual_targets] if visual_targets else [],
         )
 
     def _compute_metrics(self, tracks: List[Track]) -> Metrics:

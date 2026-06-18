@@ -148,6 +148,9 @@ class Frame:
     site_enu: Vec3 = (0.0, 0.0, 0.0)
     scenario_name: str = ""
     done: bool = False
+    cascade_results: List["CascadeResult"] = field(default_factory=list)
+    engagement_order: Optional["EngagementOrder"] = None
+    visual_targets: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, object]:
         """Serialize the whole frame to a JSON-ready dict for the websocket."""
@@ -157,7 +160,7 @@ class Frame:
             "type": "WARGAME_FRAME",
             "scenario": self.scenario_name,
             "done": self.done,
-            "metrics": self.metrics.to_dict(),
+            "metrics": self.metrics.to_dict() if self.metrics is not None else None,
             "site": {"enu": list(self.site_enu), "lat": slat, "lon": slon},
             "tracks": [
                 _track_to_dict(t, threat_by_track.get(t.id)) for t in self.tracks
@@ -167,6 +170,9 @@ class Frame:
                 {"defender_id": d, "track_id": t, "status": s}
                 for d, t, s in self.assignments
             ],
+            "cascade_results": [cr.to_dict() for cr in self.cascade_results],
+            "engagement_order": self.engagement_order.to_dict() if self.engagement_order else None,
+            "visual_targets": self.visual_targets,
         }
 
     def _threats_by_track(self) -> Dict[str, Threat]:

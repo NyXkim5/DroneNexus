@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import yaml
 
@@ -106,16 +106,25 @@ class Scenario:
     blackout_windows: List[Tuple[int, int]] = field(default_factory=list)
     jam_resistant_fraction: float = 0.0
     hardened_fraction: float = 0.0
+    target_scenario: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if not 10 <= self.swarm_count <= 1000:
+        # Pure vision-only scenarios use swarm_count=0, which is exempt from the
+        # active-swarm range check. All other scenarios must have a swarm in 10..1000.
+        is_pure_vision = bool(self.target_scenario) and self.swarm_count == 0
+        if not is_pure_vision and not 10 <= self.swarm_count <= 1000:
             raise ValueError(f"swarm_count must be in 10..1000, got {self.swarm_count}")
         if self.tick_hz <= 0:
             raise ValueError("tick_hz must be positive")
-        if not self.sensors:
-            raise ValueError("scenario needs at least one sensor")
-        if not self.defenders:
-            raise ValueError("scenario needs at least one defender")
+        # Pure vision-only scenarios (target_scenario set, no swarm) do not
+        # require a sensor or defender layout. Combined scenarios that use both
+        # a target_scenario and a live swarm (swarm_count > 0) must still
+        # provide sensors and defenders for the counter-swarm pipeline.
+        if not is_pure_vision:
+            if not self.sensors:
+                raise ValueError("scenario needs at least one sensor")
+            if not self.defenders:
+                raise ValueError("scenario needs at least one defender")
 
 
 def _ring_sensors(count: int, range_m: float, radius_m: float) -> List[SensorConfig]:
@@ -332,6 +341,33 @@ def _skirmish_80() -> Scenario:
     )
 
 
+def _combined_saturation_strike() -> Scenario:
+    """A 500-drone saturation strike with ground target cascade analysis.
+
+    Uses the same sensor ring and defender loadout as saturation_1000 but
+    binds the ground_strike_base vision scenario so every tick also runs the
+    visual cascade pipeline and produces an engagement order for ground targets.
+    This is the combined wargame: counter-swarm defense plus target prioritization
+    in a single run.
+    """
+    base = _saturation_1000()
+    return Scenario(
+        name="combined_saturation_strike",
+        swarm_intent=SwarmIntent.SATURATION,
+        swarm_count=500,
+        unit_cost=500.0,
+        sensors=_ring_sensors(count=4, range_m=3500.0, radius_m=600.0),
+        defenders=base.defenders,
+        site=SiteConfig(),
+        tick_hz=5.0,
+        max_ticks=600,
+        seed=42,
+        jam_resistant_fraction=0.35,
+        hardened_fraction=0.2,
+        target_scenario="ground_strike_base",
+    )
+
+
 # Built-in presets keyed by name. At least two ship, including the 1000-drone
 # saturation attack required by the design.
 PRESETS: Dict[str, "callable"] = {
@@ -340,6 +376,7 @@ PRESETS: Dict[str, "callable"] = {
     "decoy_300": _decoy_300,
     "contested_500": _contested_500,
     "skirmish_80": _skirmish_80,
+    "combined_saturation_strike": _combined_saturation_strike,
 }
 
 

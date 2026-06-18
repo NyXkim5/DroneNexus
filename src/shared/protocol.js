@@ -23,6 +23,10 @@ const MessageType = {
   HMD_STATE:     'HMD_STATE',       // HMD telemetry bridge data
   RECORD_CTRL:   'RECORD_CTRL',     // Recording control
   DEVICE_SCAN:   'DEVICE_SCAN',     // USB device detection results
+  VISUAL_TARGETS:   'VISUAL_TARGETS',   // Visual targeting data from ISR feed
+  CASCADE_SCORES:   'CASCADE_SCORES',   // Cascade damage scores for ground targets
+  ENGAGEMENT_ORDER: 'ENGAGEMENT_ORDER', // Merged threat + target priority order
+  ENGAGE_CONFIRM:   'ENGAGE_CONFIRM',   // Operator confirmation of engagement order
 };
 
 // ============================================================
