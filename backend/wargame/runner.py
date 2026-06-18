@@ -41,9 +41,9 @@ import threat as threat_module
 
 from vision.detector import SimDetector
 from vision.feed_source import SimFeedSource
-from vision.cascade import CascadeEngine, DependencyEdge
+from vision.cascade import CascadeEngine, CascadeResult, DependencyEdge
 from decision.engine import DecisionEngine
-from decision.models import EngagementMode
+from decision.models import EngagementMode, EngagementOrder
 
 from wargame.audit import AuditLog
 from wargame.degradation import DegradationModel
@@ -183,6 +183,7 @@ class WargameRunner:
         threats = threat_module.assess(tracks, self._world.site, t)
         cascade_results = []
         engagement_order = None
+        visual_targets = []
         if self._vision_detector and self._vision_feed:
             frame_img, frame_ts = self._vision_feed.next_frame()
             visual_targets = self._vision_detector.detect(frame_img, frame_ts)
@@ -195,7 +196,7 @@ class WargameRunner:
         self._audit_tick(t, engagements, threats, tracks)
         self._queue_events(engagements, threats, tracks)
         self._cool_down()
-        return self._build_frame(tracks, threats, engagements, cascade_results, engagement_order)
+        return self._build_frame(tracks, threats, engagements, cascade_results, engagement_order, visual_targets)
 
     def _queue_events(
         self,
@@ -404,8 +405,9 @@ class WargameRunner:
         tracks: List[Track],
         threats: List[Threat],
         engagements: List[Engagement],
-        cascade_results: Optional[list] = None,
-        engagement_order: Optional[object] = None,
+        cascade_results: Optional[List[CascadeResult]] = None,
+        engagement_order: Optional[EngagementOrder] = None,
+        visual_targets: Optional[List] = None,
     ) -> Frame:
         """Compute metrics and bundle a renderable Frame for this tick."""
         metrics = self._compute_metrics(tracks)
@@ -421,6 +423,7 @@ class WargameRunner:
             done=done,
             cascade_results=cascade_results or [],
             engagement_order=engagement_order,
+            visual_targets=[t.to_dict() for t in visual_targets] if visual_targets else [],
         )
 
     def _compute_metrics(self, tracks: List[Track]) -> Metrics:

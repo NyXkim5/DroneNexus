@@ -7,10 +7,11 @@ from decision.models import EngagementOrder
 
 class TestScenarioWithTargets:
     def test_scenario_accepts_target_scenario_name(self):
+        # Pure vision scenario: swarm_count=0 + target_scenario skips sensor/defender validation.
         s = Scenario(
-            name="test_combined",
+            name="test_vision_only",
             swarm_intent="SATURATION",
-            swarm_count=10,
+            swarm_count=0,
             target_scenario="ground_strike_convoy",
         )
         assert s.target_scenario == "ground_strike_convoy"

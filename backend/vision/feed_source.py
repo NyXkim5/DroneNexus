@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import time
 from abc import ABC, abstractmethod
 from typing import List, Tuple
@@ -104,9 +105,7 @@ class StreamFeedSource(FeedSource):
         if frame_bytes is None:
             arr = np.zeros((720, 1280, 3), dtype=np.uint8)
         else:
-            import io
-            from PIL import Image as _Image
-            img = _Image.open(io.BytesIO(frame_bytes))
+            img = Image.open(io.BytesIO(frame_bytes))
             arr = np.array(img)
         self._frame_count += 1
         return arr, time.monotonic()

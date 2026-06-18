@@ -65,7 +65,7 @@ TARGET_DEFAULTS: Dict[TargetType, Dict[str, Any]] = {
     TargetType.VEHICLE_APC:            {"base_value": 500_000,   "blast_radius_m": 20,  "default_occupancy": 8},
     TargetType.VEHICLE_FUEL_TANKER:    {"base_value": 200_000,   "blast_radius_m": 50,  "default_occupancy": 2},
     TargetType.PERSONNEL_INDIVIDUAL:   {"base_value": 0,         "blast_radius_m": 0,   "default_occupancy": 1},
-    TargetType.PERSONNEL_GROUP:        {"base_value": 0,         "blast_radius_m": 0,   "default_occupancy": 0},
+    TargetType.PERSONNEL_GROUP:        {"base_value": 0,         "blast_radius_m": 0,   "default_occupancy": 8},
     TargetType.INFRA_GENERATOR:        {"base_value": 150_000,   "blast_radius_m": 5,   "default_occupancy": 0},
     TargetType.INFRA_ANTENNA:          {"base_value": 100_000,   "blast_radius_m": 3,   "default_occupancy": 0},
     TargetType.INFRA_BRIDGE:           {"base_value": 2_000_000, "blast_radius_m": 0,   "default_occupancy": 0},

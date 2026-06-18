@@ -130,7 +130,7 @@ class CascadeEngine:
 
             for dep in self._dep_graph.get(node_id, []):
                 if dep.target_id not in visited:
-                    queue.append((dep.target_id, prob, False))
+                    queue.append((dep.target_id, prob * dep.impact_factor, False))
 
         # If BFS traversed secondaries, use the minimum path probability.
         # If all secondaries were pruned (chain length == 1) but there are

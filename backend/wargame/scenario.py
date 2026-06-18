@@ -109,13 +109,18 @@ class Scenario:
     target_scenario: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if not 10 <= self.swarm_count <= 1000:
+        # Pure vision-only scenarios use swarm_count=0, which is exempt from the
+        # active-swarm range check. All other scenarios must have a swarm in 10..1000.
+        is_pure_vision = bool(self.target_scenario) and self.swarm_count == 0
+        if not is_pure_vision and not 10 <= self.swarm_count <= 1000:
             raise ValueError(f"swarm_count must be in 10..1000, got {self.swarm_count}")
         if self.tick_hz <= 0:
             raise ValueError("tick_hz must be positive")
-        # Vision-only scenarios wire in a target_scenario instead of a sensor
-        # layout, so the sensor and defender lists may be empty in that case.
-        if not self.target_scenario:
+        # Pure vision-only scenarios (target_scenario set, no swarm) do not
+        # require a sensor or defender layout. Combined scenarios that use both
+        # a target_scenario and a live swarm (swarm_count > 0) must still
+        # provide sensors and defenders for the counter-swarm pipeline.
+        if not is_pure_vision:
             if not self.sensors:
                 raise ValueError("scenario needs at least one sensor")
             if not self.defenders:
