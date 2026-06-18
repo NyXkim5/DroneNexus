@@ -20,6 +20,7 @@ body {
   position: fixed; inset: 0; pointer-events: none; z-index: 400;
 }
 canvas#tactical { position: fixed; inset: 0; z-index: 410; pointer-events: none; }
+canvas#heatmap-canvas { position: fixed; inset: 0; z-index: 405; pointer-events: none; opacity: 0.55; }
 
 .topbar {
   position: fixed; top: 0; left: 0; right: 0; height: 46px; z-index: 500;
@@ -100,6 +101,7 @@ canvas#tactical { position: fixed; inset: 0; z-index: 410; pointer-events: none;
 </head>
 <body>
 <div id="map"></div>
+<canvas id="heatmap-canvas"></canvas>
 <canvas id="tactical"></canvas>
 
 <div class="topbar">
@@ -368,6 +370,10 @@ window._bulwarkGetWs = () => ws;
 <!-- Tactical mode toggle -->
 <button id="tactical-toggle" style="position:fixed;bottom:12px;right:12px;z-index:500;padding:6px 12px;background:#1a1a2e;color:#0f0;border:1px solid #0f0;font-family:'JetBrains Mono',monospace;cursor:pointer;">TACTICAL</button>
 
+<!-- Heatmap overlay toggle -->
+<button id="heatmap-toggle" style="position:fixed;bottom:12px;right:108px;z-index:500;padding:6px 12px;background:#1a1a2e;color:#f80;border:1px solid #f80;font-family:'JetBrains Mono',monospace;cursor:pointer;">HEATMAP</button>
+
+<script src="js/heatmapOverlay.js"></script>
 <script src="js/cascadeView.js"></script>
 <script src="js/engagementPanel.js"></script>
 <script>
@@ -376,6 +382,16 @@ window._bulwarkGetWs = () => ws;
 
   const cascadeCanvas = document.getElementById('cascade-overlay');
   const cascadeView = new CascadeView('cascade-overlay');
+  const heatmapOverlay = new HeatmapOverlay('heatmap-canvas');
+
+  document.getElementById('heatmap-toggle').addEventListener('click', function() {
+    heatmapOverlay.toggle();
+    const visible = heatmapOverlay._visible;
+    this.style.borderColor = visible ? '#f80' : '#555';
+    this.style.color = visible ? '#f80' : '#555';
+    this.textContent = visible ? 'HEATMAP ON' : 'HEATMAP OFF';
+  });
+
   const engPanel = new EngagementPanel('engagement-panel', function(targetId) {
     const ws = window._bulwarkGetWs ? window._bulwarkGetWs() : null;
     if (ws && ws.readyState === 1) {
@@ -409,11 +425,19 @@ window._bulwarkGetWs = () => ws;
     if (data.engagement_order) {
       engPanel.update(data.engagement_order);
     }
+    if (data.heatmap_data) {
+      heatmapOverlay.update(data.heatmap_data);
+    }
   };
 
   function resizeCanvas() {
     cascadeCanvas.width = window.innerWidth;
     cascadeCanvas.height = window.innerHeight;
+    const heatmapCanvas = document.getElementById('heatmap-canvas');
+    if (heatmapCanvas) {
+      heatmapCanvas.width = window.innerWidth;
+      heatmapCanvas.height = window.innerHeight;
+    }
   }
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
