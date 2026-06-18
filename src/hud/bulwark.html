@@ -349,10 +349,92 @@ function connect() {
     frame = msg;
     renderMetrics(msg.metrics, frame.tracks);
     draw();
+    if (window._bulwarkOnMessage) window._bulwarkOnMessage(msg);
   };
 }
 
 document.getElementById("start").addEventListener("click", connect);
+
+// Expose the WebSocket for cascade confirm uplink.
+window._bulwarkGetWs = () => ws;
 </script>
+
+<!-- Cascade targeting overlay canvas -->
+<canvas id="cascade-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:400;"></canvas>
+
+<!-- Engagement order panel -->
+<div id="engagement-panel" style="position:fixed;top:160px;right:12px;width:260px;max-height:60vh;overflow-y:auto;z-index:500;font-family:'JetBrains Mono',monospace;font-size:11px;"></div>
+
+<!-- Tactical mode toggle -->
+<button id="tactical-toggle" style="position:fixed;bottom:12px;right:12px;z-index:500;padding:6px 12px;background:#1a1a2e;color:#0f0;border:1px solid #0f0;font-family:'JetBrains Mono',monospace;cursor:pointer;">TACTICAL</button>
+
+<script src="js/cascadeView.js"></script>
+<script src="js/engagementPanel.js"></script>
+<script>
+(function() {
+  "use strict";
+
+  const cascadeCanvas = document.getElementById('cascade-overlay');
+  const cascadeView = new CascadeView('cascade-overlay');
+  const engPanel = new EngagementPanel('engagement-panel', function(targetId) {
+    const ws = window._bulwarkGetWs ? window._bulwarkGetWs() : null;
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({
+        type: 'ENGAGE_CONFIRM',
+        target_id: targetId,
+        timestamp: Date.now() / 1000
+      }));
+    }
+  });
+
+  cascadeCanvas.addEventListener('click', function(e) {
+    cascadeView.handleClick(e);
+  });
+
+  document.getElementById('tactical-toggle').addEventListener('click', function() {
+    const active = cascadeView.toggleTacticalMode();
+    this.style.borderColor = active ? '#ff3333' : '#0f0';
+    this.style.color = active ? '#ff3333' : '#0f0';
+    this.textContent = active ? 'TACTICAL ON' : 'TACTICAL';
+    cascadeCanvas.style.pointerEvents = active ? 'auto' : 'none';
+  });
+
+  window._bulwarkOnMessage = function(data) {
+    if (data.cascade_results) {
+      cascadeView.updateCascadeScores(data.cascade_results);
+    }
+    if (data.visual_targets) {
+      cascadeView.updateTargets(data.visual_targets);
+    }
+    if (data.engagement_order) {
+      engPanel.update(data.engagement_order);
+    }
+  };
+
+  function resizeCanvas() {
+    cascadeCanvas.width = window.innerWidth;
+    cascadeCanvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+})();
+</script>
+
+<style>
+  .ep-header { color: #0f0; font-weight: bold; padding: 8px; border-bottom: 1px solid #0f3; }
+  .ep-entry { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid #1a1a2e; }
+  .ep-urgent { background: #330000; }
+  .ep-moderate { background: #332200; }
+  .ep-low { background: #003300; }
+  .ep-rank { color: #888; width: 28px; }
+  .ep-source { font-size: 14px; }
+  .ep-id { flex: 1; color: #ccc; overflow: hidden; text-overflow: ellipsis; }
+  .ep-score { color: #0f0; width: 36px; text-align: right; }
+  .ep-personnel { color: #ff6; width: 28px; text-align: right; }
+  .ep-confirm { background: #0a0; color: #000; border: none; padding: 2px 8px; cursor: pointer; font-family: inherit; font-size: 10px; font-weight: bold; }
+  .ep-confirm:hover { background: #0f0; }
+  .ep-empty { color: #555; padding: 12px; text-align: center; }
+  #engagement-panel { background: #0a0a14ee; border: 1px solid #0f3; border-radius: 4px; }
+</style>
 </body>
 </html>
