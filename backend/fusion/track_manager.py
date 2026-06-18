@@ -42,6 +42,7 @@ from math import floor
 from typing import Deque, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
+from scipy.optimize import linear_sum_assignment
 
 from csontology import Detection, Track, TrackClass, Vec3
 from fusion.kalman import ConstantVelocityKalman
@@ -168,8 +169,17 @@ class TrackManager:
     SensorSource pump loop. All positions and velocities are ENU meters and m/s.
     """
 
-    def __init__(self, config: Optional[FusionConfig] = None) -> None:
+    def __init__(
+        self,
+        config: Optional[FusionConfig] = None,
+        association_method: str = "gnn",
+    ) -> None:
+        if association_method not in ("gnn", "hungarian"):
+            raise ValueError(
+                f"association_method must be 'gnn' or 'hungarian', got {association_method!r}"
+            )
         self._config = config or FusionConfig()
+        self._association_method = association_method
         self._entries: Dict[str, _TrackEntry] = {}
         self._id_counter = itertools.count(1)
         self._last_now: Optional[float] = None
@@ -474,17 +484,20 @@ class TrackManager:
     def _associate(
         self, measurements: List[_Measurement],
     ) -> Tuple[List[Tuple[str, int]], List[int]]:
-        """Match fused measurements to tracks by gated greedy nearest neighbor.
+        """Match fused measurements to tracks by the configured association method.
 
         Returns a list of (track_id, measurement_index) matches and the indices
-        of unmatched measurements. A spatial grid over track positions restricts
-        each measurement to nearby tracks so Mahalanobis scoring stays linear.
+        of unmatched measurements. Dispatches to either gated greedy nearest
+        neighbor (gnn) or globally optimal Hungarian assignment (hungarian)
+        depending on self._association_method.
         """
         if not measurements:
             return [], []
         entries = list(self._entries.values())
         if not entries:
             return [], list(range(len(measurements)))
+        if self._association_method == "hungarian":
+            return self._hungarian_associate(measurements, entries)
         candidates = self._gate_pairs(measurements, entries)
         return self._resolve_greedy(candidates, len(measurements))
 
@@ -596,6 +609,58 @@ class TrackManager:
             used_meas.add(meas_index)
             matches.append((track_id, meas_index))
         unmatched = [i for i in range(n_measurements) if i not in used_meas]
+        return matches, unmatched
+
+    def _hungarian_associate(
+        self,
+        measurements: List[_Measurement],
+        entries: List[_TrackEntry],
+    ) -> Tuple[List[Tuple[str, int]], List[int]]:
+        """Match measurements to tracks via globally optimal Hungarian assignment.
+
+        Builds a full (n_tracks x n_measurements) cost matrix of blended
+        Mahalanobis-plus-velocity cost. Entries that fail the chi-square gate are
+        set to a large sentinel (1e9) so the solver never selects them. After
+        linear_sum_assignment resolves the optimal permutation we discard any
+        assigned pair whose cost still equals the sentinel, which happens when a
+        track has no gated candidate at all. The return signature matches
+        _resolve_greedy: matched pairs and a list of unmatched measurement indices.
+        """
+        _SENTINEL = 1e9
+        gate_chi2 = self._config.gate_chi2
+        gate_sigma = self._config.meas_sigma_m
+        vel_w = self._config.velocity_cost_w
+
+        n_tracks = len(entries)
+        n_meas = len(measurements)
+
+        meas_pos = np.array([m.position for m in measurements], dtype=np.float64)
+        meas_vel = np.array([m.velocity for m in measurements], dtype=np.float64)
+
+        cost_matrix = np.full((n_tracks, n_meas), _SENTINEL, dtype=np.float64)
+
+        for ti, entry in enumerate(entries):
+            inv_cov = entry.kalman.gate_inverse(gate_sigma)
+            track_pos = np.array(entry.kalman.position, dtype=np.float64)
+            track_vel = np.array(entry.kalman.velocity, dtype=np.float64)
+            innov = meas_pos - track_pos
+            gate_cost = np.einsum("mi,ij,mj->m", innov, inv_cov, innov)
+            vel_err = np.sum((meas_vel - track_vel) ** 2, axis=1)
+            total_cost = gate_cost + vel_w * vel_err
+            mask = gate_cost <= gate_chi2
+            cost_matrix[ti, mask] = total_cost[mask]
+
+        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+        matches: List[Tuple[str, int]] = []
+        matched_meas: set[int] = set()
+        for ti, mi in zip(row_ind, col_ind):
+            if cost_matrix[ti, mi] >= _SENTINEL:
+                continue
+            matches.append((entries[ti].track.id, int(mi)))
+            matched_meas.add(int(mi))
+
+        unmatched = [i for i in range(n_meas) if i not in matched_meas]
         return matches, unmatched
 
     def _apply_matches(
