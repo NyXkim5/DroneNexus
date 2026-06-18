@@ -27,6 +27,7 @@ const MessageType = {
   CASCADE_SCORES:   'CASCADE_SCORES',   // Cascade damage scores for ground targets
   ENGAGEMENT_ORDER: 'ENGAGEMENT_ORDER', // Merged threat + target priority order
   ENGAGE_CONFIRM:   'ENGAGE_CONFIRM',   // Operator confirmation of engagement order
+  HEATMAP_UPDATE:   'HEATMAP_UPDATE',   // Detection heatmap frame (downlink, 1Hz)
 };
 
 // ============================================================
@@ -272,5 +273,6 @@ if (typeof module !== 'undefined' && module.exports) {
     createISRControlPacket,
     calculateLeaderScore,
     calculateCohesion,
+    HeatmapUpdate: MessageType.HEATMAP_UPDATE,
   };
 }
