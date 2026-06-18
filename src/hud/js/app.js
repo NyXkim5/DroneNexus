@@ -13,6 +13,7 @@ import { Sparkline } from './sparkline.js';
 import { DirectiveEngine, ObjectiveManager, PlatformLink, DebriefSystem, setDiagStateProvider } from './engine.js';
 import { initMap, createDroneIcon, updateMapMarker, updateFormationLines,
          updateFovCone } from './map.js';
+import { StalenessTracker, panToInstant } from './staleness.js';
 import { generateActivity, generateStateCorrelatedEvents, addEvent,
          renderActivityStream, setEventCallback } from './activity.js';
 import { updateAssetExplorer, selectDrone } from './assetExplorer.js';
@@ -115,6 +116,9 @@ const drones = assets; // local alias used throughout app.js
 state.assets = assets;
 state.drones = assets;
 // assets are available via state.assets (set above)
+
+// Staleness tracker — one shared instance for the session
+const stalenessTracker = new StalenessTracker();
 
 // Initialize map
 try {
@@ -460,6 +464,8 @@ function frame(now) {
     for (let i = 1; i < drones.length; i++) {
       drones[i].update(dtSec, leader.heading, leader.lat, leader.lng);
     }
+    // Mark all drones as freshly updated this simulation tick
+    drones.forEach(d => stalenessTracker.touch(d.id));
   }
 
   // Record replay frames
@@ -467,7 +473,7 @@ function frame(now) {
 
   // Update map markers and sensor FOV cones every frame (smooth movement)
   drones.forEach(d => {
-    updateMapMarker(d);
+    updateMapMarker(d, stalenessTracker.getOpacity(d.id), stalenessTracker.getColor(d.id));
     updateFovCone(d);
     // Update pulse ring position for selected drone
     if (d.id === state.selectedDroneId && state.mapMarkers[d.id] && state.mapMarkers[d.id]._pulseRing) {
@@ -475,10 +481,10 @@ function frame(now) {
     }
   });
 
-  // Camera lock — keep map centered on selected drone
+  // Camera lock — keep map centered on selected drone using instant pan
   if (state.cameraLock && state.selectedDroneId) {
     const lockDrone = drones.find(d => d.id === state.selectedDroneId);
-    if (lockDrone) state.map.panTo([lockDrone.lat, lockDrone.lng], { animate: false });
+    if (lockDrone) panToInstant(state.map, [lockDrone.lat, lockDrone.lng]);
   }
 
   updateFormationLines(drones);

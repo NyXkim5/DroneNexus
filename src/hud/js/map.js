@@ -125,22 +125,35 @@ function createDroneIcon(color, heading) {
   return icon;
 }
 
-function updateMapMarker(drone) {
+// opacity and color are supplied by StalenessTracker in app.js.
+// Defaults keep existing behavior when called without staleness args.
+function updateMapMarker(drone, opacity = 1.0, stalenessColor = null) {
   const marker = state.mapMarkers[drone.id];
   if (!marker) return;
   marker.setLatLng([drone.lat, drone.lng]);
-  marker.setIcon(createDroneIcon(drone.color, drone.heading));
 
-  // Update trail — 3 segments with fading opacity
+  // Use staleness-derived color when available, fall back to asset color
+  const iconColor = stalenessColor || drone.color;
+  marker.setIcon(createDroneIcon(iconColor, drone.heading));
+
+  // Apply staleness opacity to the marker element directly
+  const el = marker.getElement();
+  if (el) el.style.opacity = String(opacity);
+
+  // Update trail — 3 segments with fading opacity scaled by staleness
   const trailSegs = state.mapTrails[drone.id];
   if (trailSegs && drone.trail.length > 0) {
     const pts = drone.trail.map(p => [p.lat, p.lng]);
     const len = pts.length;
     const third = Math.floor(len / 3);
     // Oldest third (faintest), middle third, newest third (brightest)
+    // Multiply base opacities by staleness opacity so trails decay together
     trailSegs[0].setLatLngs(pts.slice(0, third + 1));
+    trailSegs[0].setStyle({ opacity: 0.15 * opacity });
     trailSegs[1].setLatLngs(pts.slice(third, third * 2 + 1));
+    trailSegs[1].setStyle({ opacity: 0.3 * opacity });
     trailSegs[2].setLatLngs(pts.slice(third * 2));
+    trailSegs[2].setStyle({ opacity: 0.5 * opacity });
   }
 }
 
