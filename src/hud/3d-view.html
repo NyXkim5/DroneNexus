@@ -3,663 +3,998 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OVERWATCH 3D Asset View</title>
+<title>OVERWATCH 3D SWARM VIEW</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospace; overflow: hidden; }
 
-#canvas3d { width: 100vw; height: 100vh; display: block; }
+body {
+  background: #0a0a14;
+  color: #c8d0da;
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+}
 
-/* HUD overlay */
-#overlay {
-    position: fixed; top: 0; left: 0; right: 0;
-    padding: 12px 20px;
-    display: flex; justify-content: space-between; align-items: center;
-    background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%);
-    pointer-events: none; z-index: 10;
+#canvas3d {
+  display: block;
+  width: 100vw;
+  height: 100vh;
 }
-#overlay > * { pointer-events: auto; }
-.overlay-title {
-    font-size: 14px; font-weight: bold; letter-spacing: 2px;
-    color: #00ff88; text-shadow: 0 0 10px rgba(0,255,136,0.5);
-}
-.overlay-stats {
-    display: flex; gap: 20px; font-size: 11px; color: #8892a0;
-}
-.stat-val { color: #00ccff; margin-left: 4px; }
 
-/* Controls panel */
-#controls {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 10px; z-index: 10;
+/* ── Top bar ── */
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  background: rgba(8, 10, 18, 0.92);
+  border-bottom: 1px solid #1e2530;
+  z-index: 100;
+  backdrop-filter: blur(4px);
 }
-.ctrl-btn {
-    background: rgba(20,25,35,0.9); border: 1px solid #2a3040;
-    color: #8892a0; padding: 8px 16px; font-family: inherit; font-size: 11px;
-    letter-spacing: 1px; cursor: pointer; border-radius: 4px;
-    transition: all 0.2s;
-}
-.ctrl-btn:hover { border-color: #00ff88; color: #00ff88; }
-.ctrl-btn.active { border-color: #00ff88; color: #00ff88; background: rgba(0,255,136,0.1); }
 
-/* Connection indicator */
-#conn-status {
-    position: fixed; top: 12px; right: 20px;
-    font-size: 11px; padding: 4px 12px; border-radius: 10px; z-index: 10;
+.brand {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #00ff88;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+  white-space: nowrap;
 }
-.conn-ok { background: rgba(0,255,136,0.15); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
-.conn-off { background: rgba(255,50,80,0.15); color: #ff3355; border: 1px solid rgba(255,50,80,0.3); }
 
-/* Drone info tooltip */
+.brand .sub {
+  color: #3a7a5a;
+  font-size: 9px;
+  letter-spacing: 2px;
+  margin-left: 8px;
+}
+
+.topbar select,
+.topbar input[type="text"] {
+  background: #0e1420;
+  border: 1px solid #1e2530;
+  color: #c8d0da;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  padding: 5px 8px;
+  border-radius: 3px;
+  outline: none;
+}
+
+.topbar select:focus,
+.topbar input[type="text"]:focus {
+  border-color: #00ff88;
+}
+
+.topbar input[type="text"] { width: 300px; }
+
+.topbar button {
+  background: #0d3a24;
+  border: 1px solid #00ff88;
+  color: #00ff88;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 5px 14px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.topbar button:hover { background: #164a30; }
+.topbar button.stop { background: #3a0d0d; border-color: #c23a3e; color: #c23a3e; }
+.topbar button.stop:hover { background: #4a1515; }
+
+.sep { flex: 1; }
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3a4455;
+  flex-shrink: 0;
+}
+.dot.live { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+.dot.err  { background: #c23a3e; box-shadow: 0 0 8px #c23a3e; }
+
+/* ── Bottom status bar ── */
+.statusbar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  background: rgba(8, 10, 18, 0.92);
+  border-top: 1px solid #1e2530;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+
+.stat {
+  padding: 0 18px;
+  border-right: 1px solid #1e2530;
+}
+
+.stat .k {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: #4a5568;
+  text-transform: uppercase;
+}
+
+.stat .v {
+  font-size: 15px;
+  font-weight: 700;
+  color: #c8d0da;
+  margin-top: 2px;
+}
+
+.stat .v.green  { color: #00ff88; }
+.stat .v.red    { color: #c23a3e; }
+.stat .v.amber  { color: #b86e17; }
+.stat .v.cyan   { color: #4888d8; }
+
+/* ── Legend ── */
+.legend {
+  position: fixed;
+  bottom: 56px;
+  right: 14px;
+  background: rgba(8, 10, 18, 0.92);
+  border: 1px solid #1e2530;
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-size: 10px;
+  z-index: 100;
+}
+
+.legend .title {
+  color: #4a5568;
+  letter-spacing: 1.5px;
+  font-size: 9px;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+
+.leg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  color: #8892a0;
+}
+
+.leg-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Tooltip ── */
 #tooltip {
-    position: fixed; display: none; background: rgba(10,15,25,0.95);
-    border: 1px solid #00ff88; border-radius: 6px; padding: 10px 14px;
-    font-size: 11px; z-index: 20; pointer-events: none;
-    min-width: 160px;
+  position: fixed;
+  display: none;
+  background: rgba(8, 10, 18, 0.96);
+  border: 1px solid #00ff88;
+  border-radius: 5px;
+  padding: 10px 14px;
+  font-size: 11px;
+  z-index: 200;
+  pointer-events: none;
+  min-width: 170px;
 }
-#tooltip .tt-id { color: #00ff88; font-weight: bold; font-size: 12px; margin-bottom: 6px; }
-#tooltip .tt-row { display: flex; justify-content: space-between; margin: 2px 0; }
-#tooltip .tt-label { color: #8892a0; }
-#tooltip .tt-val { color: #00ccff; }
 
-/* Legend */
-#legend {
-    position: fixed; bottom: 70px; right: 20px; z-index: 10;
-    background: rgba(10,15,25,0.9); border: 1px solid #1a2030;
-    border-radius: 6px; padding: 10px 14px; font-size: 10px;
+#tooltip .tt-id { color: #00ff88; font-weight: 700; font-size: 12px; margin-bottom: 7px; }
+#tooltip .tt-row { display: flex; justify-content: space-between; gap: 16px; margin: 3px 0; }
+#tooltip .tt-label { color: #4a5568; }
+#tooltip .tt-val { color: #4888d8; }
+
+/* ── View toggle buttons ── */
+.view-btns {
+  position: fixed;
+  bottom: 56px;
+  left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 100;
 }
-#legend .leg-title { color: #8892a0; margin-bottom: 6px; letter-spacing: 1px; }
-.leg-item { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
-.leg-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+.vbtn {
+  background: rgba(8, 10, 18, 0.9);
+  border: 1px solid #1e2530;
+  color: #4a5568;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 5px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vbtn:hover { border-color: #00ff88; color: #00ff88; }
+.vbtn.active { border-color: #00ff88; color: #00ff88; background: rgba(0, 255, 136, 0.08); }
 </style>
 </head>
 <body>
 
 <canvas id="canvas3d"></canvas>
 
-<div id="overlay">
-    <div class="overlay-title">OVERWATCH 3D ASSET VIEW</div>
-    <div class="overlay-stats">
-        <span>ASSETS: <span class="stat-val" id="stat-drones">0</span></span>
-        <span>FPS: <span class="stat-val" id="stat-fps">0</span></span>
-        <span>FORMATION: <span class="stat-val" id="stat-formation">—</span></span>
-    </div>
+<!-- Top bar -->
+<div class="topbar">
+  <div class="brand">OVERWATCH <span class="sub">3D SWARM VIEW</span></div>
+  <select id="scenario">
+    <option value="probe_120">probe_120</option>
+    <option value="decoy_300">decoy_300</option>
+    <option value="saturation_1000">saturation_1000</option>
+  </select>
+  <input id="wsurl" type="text" value="ws://localhost:8765/ws/v1/wargame" />
+  <button id="btn-connect">CONNECT</button>
+  <div class="sep"></div>
+  <span class="dot" id="dot"></span>
 </div>
 
-<div id="conn-status" class="conn-off">DISCONNECTED</div>
+<!-- Bottom status bar -->
+<div class="statusbar">
+  <div class="stat"><div class="k">Frame</div><div class="v" id="s-tick">0</div></div>
+  <div class="stat"><div class="k">Active Tracks</div><div class="v red" id="s-tracks">0</div></div>
+  <div class="stat"><div class="k">Defenders</div><div class="v cyan" id="s-defenders">0</div></div>
+  <div class="stat"><div class="k">Intercepts</div><div class="v green" id="s-intercepts">0</div></div>
+  <div class="stat"><div class="k">Leakers</div><div class="v amber" id="s-leakers">0</div></div>
+  <div class="stat"><div class="k">Engagements</div><div class="v" id="s-engagements">0</div></div>
+  <div class="stat"><div class="k">Render FPS</div><div class="v green" id="s-fps">0</div></div>
+</div>
 
+<!-- Tooltip -->
 <div id="tooltip">
-    <div class="tt-id"></div>
-    <div class="tt-row"><span class="tt-label">ALT</span><span class="tt-val tt-alt"></span></div>
-    <div class="tt-row"><span class="tt-label">SPD</span><span class="tt-val tt-spd"></span></div>
-    <div class="tt-row"><span class="tt-label">BAT</span><span class="tt-val tt-bat"></span></div>
-    <div class="tt-row"><span class="tt-label">STATUS</span><span class="tt-val tt-status"></span></div>
+  <div class="tt-id" id="tt-id"></div>
+  <div class="tt-row"><span class="tt-label">LAT</span><span class="tt-val" id="tt-lat"></span></div>
+  <div class="tt-row"><span class="tt-label">LON</span><span class="tt-val" id="tt-lon"></span></div>
+  <div class="tt-row"><span class="tt-label">ALT</span><span class="tt-val" id="tt-alt"></span></div>
+  <div class="tt-row"><span class="tt-label">INTENT</span><span class="tt-val" id="tt-intent"></span></div>
+  <div class="tt-row"><span class="tt-label">TTI</span><span class="tt-val" id="tt-tti"></span></div>
 </div>
 
-<div id="controls">
-    <button class="ctrl-btn active" data-cam="orbit">ORBIT</button>
-    <button class="ctrl-btn" data-cam="top">TOP DOWN</button>
-    <button class="ctrl-btn" data-cam="chase">CHASE</button>
-    <button class="ctrl-btn" data-cam="free">FREE CAM</button>
-    <button class="ctrl-btn" id="btn-trails">TRAILS ON</button>
-    <button class="ctrl-btn" id="btn-grid">GRID ON</button>
+<!-- View controls -->
+<div class="view-btns">
+  <button class="vbtn active" id="vbtn-trails">TRAILS ON</button>
+  <button class="vbtn active" id="vbtn-domes">DOMES ON</button>
+  <button class="vbtn active" id="vbtn-engage">ENGAGE LINES ON</button>
+  <button class="vbtn active" id="vbtn-grid">GRID ON</button>
 </div>
 
-<div id="legend">
-    <div class="leg-title">ASSET CLASSIFICATIONS</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#00ff88"></div>PRIMARY</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#3388ff"></div>ESCORT</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#ffaa00"></div>ISR</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#00ccff"></div>LOGISTICS</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#aa55ff"></div>OVERWATCH</div>
+<!-- Legend -->
+<div class="legend">
+  <div class="title">Track Classification</div>
+  <div class="leg-row"><div class="leg-swatch" style="background:#c23a3e"></div>Hostile</div>
+  <div class="leg-row"><div class="leg-swatch" style="background:#00ff88"></div>Friendly / Defender</div>
+  <div class="leg-row"><div class="leg-swatch" style="background:#b8b020"></div>Unknown</div>
+  <div class="leg-row"><div class="leg-swatch" style="background:#4888d8; opacity:0.5"></div>Effector dome</div>
+  <div class="leg-row"><div class="leg-swatch" style="background:#c23a3e; opacity:0.5"></div>Engagement line</div>
+  <div class="leg-row"><div class="leg-swatch" style="background:#e8ecf0"></div>Defended site</div>
 </div>
 
+<!-- Three.js via importmap -->
 <script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/" } }
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
 </script>
 
 <script type="module">
+"use strict";
+
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // ============================================================
-// CONFIG
+// CONSTANTS
 // ============================================================
-const WS_URL = 'ws://localhost:8765/telemetry/stream';
-const CENTER = { lat: 33.6405, lon: -117.8443 };
-const SCALE = 10000; // lat/lon degrees to 3D units
-const ALT_SCALE = 0.3; // altitude meters to 3D units
-const TRAIL_LENGTH = 200;
 
-const ROLE_COLORS = {
-    PRIMARY: 0x00ff88, ESCORT: 0x3388ff, ISR: 0xffaa00,
-    LOGISTICS: 0x00ccff, OVERWATCH: 0xaa55ff
+// Site origin — must match backend ORIGIN_LAT / ORIGIN_LON.
+const ORIGIN = { lat: 33.6405, lon: -117.8443 };
+
+// 1 unit = 1 meter.
+// Approximate meters per degree at this latitude:
+const M_PER_LAT = 111_320;          // ~meters per degree latitude
+const M_PER_LON = 111_320 * Math.cos(ORIGIN.lat * Math.PI / 180);
+
+const TRAIL_MAX = 100;              // positions kept per track
+
+// Classification colours (hex integers for Three.js).
+const COLOR = {
+  HOSTILE:  0xc23a3e,
+  FRIENDLY: 0x00ff88,
+  UNKNOWN:  0xb8b020,
+  DEFENDER: 0x00ff88,
+  SITE:     0xe8ecf0,
+  ENGAGE:   0xc23a3e,
+  DOME:     0x4888d8,
+  GRID:     0x0d2818,
+  GRID_SEC: 0x061410,
 };
-const STATUS_EMISSIVE = {
-    NOMINAL: 0x000000, DEGRADED: 0xff8800, COMMS_DEGRADED: 0xffff00,
-    RTB: 0xff3355, OFFLINE: 0xff0000, GROUNDED: 0x444444
-};
 
-// ============================================================
-// THREE.JS SETUP
-// ============================================================
-const canvas = document.getElementById('canvas3d');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// Intent -> classification bucket for colour selection.
+const HOSTILE_INTENTS = new Set(['SATURATION', 'WAVES', 'DECOY', 'PROBE']);
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0a12);
-scene.fog = new THREE.FogExp2(0x0a0a12, 0.003);
-
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(40, 60, 80);
-
-const controls = new OrbitControls(camera, canvas);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.target.set(0, 15, 0);
-controls.maxPolarAngle = Math.PI * 0.48;
-
-// ============================================================
-// LIGHTING
-// ============================================================
-const ambient = new THREE.AmbientLight(0x1a2040, 0.6);
-scene.add(ambient);
-
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(50, 100, 50);
-dirLight.castShadow = true;
-dirLight.shadow.mapSize.set(2048, 2048);
-dirLight.shadow.camera.near = 1;
-dirLight.shadow.camera.far = 300;
-dirLight.shadow.camera.left = -100;
-dirLight.shadow.camera.right = 100;
-dirLight.shadow.camera.top = 100;
-dirLight.shadow.camera.bottom = -100;
-scene.add(dirLight);
-
-const hemi = new THREE.HemisphereLight(0x00ff88, 0x0a0a12, 0.15);
-scene.add(hemi);
-
-// ============================================================
-// GROUND + GRID
-// ============================================================
-const groundGeo = new THREE.PlaneGeometry(500, 500);
-const groundMat = new THREE.MeshStandardMaterial({
-    color: 0x0d1117, roughness: 0.95, metalness: 0.0
-});
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
-
-const gridHelper = new THREE.GridHelper(400, 80, 0x1a2530, 0x0f1520);
-scene.add(gridHelper);
-
-// Geofence boundary visualization
-const fenceVerts = [
-    [33.6450, -117.8500], [33.6450, -117.8380],
-    [33.6360, -117.8380], [33.6360, -117.8500]
-];
-const fencePoints = fenceVerts.map(([lat, lon]) =>
-    new THREE.Vector3((lon - CENTER.lon) * SCALE, 0.2, -(lat - CENTER.lat) * SCALE)
-);
-fencePoints.push(fencePoints[0].clone());
-const fenceGeo = new THREE.BufferGeometry().setFromPoints(fencePoints);
-const fenceMat = new THREE.LineBasicMaterial({ color: 0xff3355, opacity: 0.4, transparent: true });
-const fenceLine = new THREE.Line(fenceGeo, fenceMat);
-scene.add(fenceLine);
-
-// Fence posts
-fenceVerts.forEach(([lat, lon]) => {
-    const postGeo = new THREE.CylinderGeometry(0.15, 0.15, 2, 6);
-    const postMat = new THREE.MeshStandardMaterial({ color: 0xff3355, emissive: 0xff1133, emissiveIntensity: 0.3 });
-    const post = new THREE.Mesh(postGeo, postMat);
-    post.position.set((lon - CENTER.lon) * SCALE, 1, -(lat - CENTER.lat) * SCALE);
-    scene.add(post);
-});
-
-// ============================================================
-// DRONE MODEL
-// ============================================================
-function createDroneModel(color) {
-    const group = new THREE.Group();
-
-    // Body — sleek hexagonal fuselage
-    const bodyGeo = new THREE.CylinderGeometry(0.8, 1.0, 0.4, 6);
-    const bodyMat = new THREE.MeshStandardMaterial({
-        color: 0x1a2030, roughness: 0.3, metalness: 0.8
-    });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.castShadow = true;
-    group.add(body);
-
-    // Top dome
-    const domeGeo = new THREE.SphereGeometry(0.5, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2);
-    const domeMat = new THREE.MeshStandardMaterial({
-        color: 0x2a3545, roughness: 0.2, metalness: 0.9
-    });
-    const dome = new THREE.Mesh(domeGeo, domeMat);
-    dome.position.y = 0.2;
-    group.add(dome);
-
-    // Arms (4)
-    for (let i = 0; i < 4; i++) {
-        const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
-        const armGeo = new THREE.BoxGeometry(2.5, 0.12, 0.15);
-        const armMat = new THREE.MeshStandardMaterial({ color: 0x2a3545, metalness: 0.7 });
-        const arm = new THREE.Mesh(armGeo, armMat);
-        arm.position.set(Math.cos(angle) * 1.2, 0, Math.sin(angle) * 1.2);
-        arm.rotation.y = -angle;
-        arm.castShadow = true;
-        group.add(arm);
-
-        // Motor housing
-        const motorGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.25, 8);
-        const motorMat = new THREE.MeshStandardMaterial({ color: 0x333d4d, metalness: 0.9 });
-        const motor = new THREE.Mesh(motorGeo, motorMat);
-        motor.position.set(Math.cos(angle) * 2.3, 0.15, Math.sin(angle) * 2.3);
-        group.add(motor);
-
-        // Rotor disc (spinning)
-        const rotorGeo = new THREE.CircleGeometry(0.9, 16);
-        const rotorMat = new THREE.MeshBasicMaterial({
-            color: color, opacity: 0.15, transparent: true, side: THREE.DoubleSide
-        });
-        const rotor = new THREE.Mesh(rotorGeo, rotorMat);
-        rotor.position.set(Math.cos(angle) * 2.3, 0.35, Math.sin(angle) * 2.3);
-        rotor.rotation.x = -Math.PI / 2;
-        rotor.userData.isRotor = true;
-        rotor.userData.rotorSpeed = 0.3 + Math.random() * 0.1;
-        group.add(rotor);
-    }
-
-    // LED indicator
-    const ledGeo = new THREE.SphereGeometry(0.15, 8, 8);
-    const ledMat = new THREE.MeshBasicMaterial({ color });
-    const led = new THREE.Mesh(ledGeo, ledMat);
-    led.position.set(0, 0.45, -0.5);
-    led.userData.isLED = true;
-    group.add(led);
-
-    // Direction indicator (front arrow)
-    const arrowGeo = new THREE.ConeGeometry(0.2, 0.6, 4);
-    const arrowMat = new THREE.MeshBasicMaterial({ color });
-    const arrow = new THREE.Mesh(arrowGeo, arrowMat);
-    arrow.rotation.x = Math.PI / 2;
-    arrow.position.set(0, 0.1, -1.3);
-    group.add(arrow);
-
-    // Label sprite
-    group.userData.labelSprite = null;
-
-    return group;
+function trackColor(track) {
+  if (!track.intent || track.intent === 'UNKNOWN') return COLOR.UNKNOWN;
+  if (HOSTILE_INTENTS.has(track.intent)) return COLOR.HOSTILE;
+  return COLOR.FRIENDLY;
 }
 
 // ============================================================
-// DRONE STATE MANAGEMENT
+// COORDINATE HELPERS
 // ============================================================
-const drones = {}; // drone_id -> { model, trail, data, trailPoints }
-let showTrails = true;
-let showGrid = true;
 
-function getDrone(id, role) {
-    if (drones[id]) return drones[id];
-
-    const color = ROLE_COLORS[role] || 0x3388ff;
-    const model = createDroneModel(color);
-    scene.add(model);
-
-    // Trail
-    const trailMax = TRAIL_LENGTH;
-    const trailGeo = new THREE.BufferGeometry();
-    const positions = new Float32Array(trailMax * 3);
-    trailGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    trailGeo.setDrawRange(0, 0);
-
-    const trailMat = new THREE.LineBasicMaterial({
-        color, opacity: 0.5, transparent: true
-    });
-    const trail = new THREE.Line(trailGeo, trailMat);
-    scene.add(trail);
-
-    // ID label
-    const labelCanvas = document.createElement('canvas');
-    labelCanvas.width = 128;
-    labelCanvas.height = 32;
-    const ctx = labelCanvas.getContext('2d');
-    ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
-    ctx.font = 'bold 18px Courier New';
-    ctx.textAlign = 'center';
-    ctx.fillText(id, 64, 22);
-    const labelTex = new THREE.CanvasTexture(labelCanvas);
-    const labelMat = new THREE.SpriteMaterial({ map: labelTex, transparent: true, opacity: 0.8 });
-    const label = new THREE.Sprite(labelMat);
-    label.scale.set(4, 1, 1);
-    scene.add(label);
-
-    const entry = {
-        model, trail, label, data: null,
-        trailPoints: [], trailIndex: 0,
-        color
-    };
-    drones[id] = entry;
-    return entry;
+function latLonToXZ(lat, lon) {
+  const x = (lon - ORIGIN.lon) * M_PER_LON;
+  const z = -(lat - ORIGIN.lat) * M_PER_LAT;
+  return { x, z };
 }
 
-function updateDrone(packet) {
-    const d = getDrone(packet.drone_id, packet.formation?.role || 'WINGMAN');
-    d.data = packet;
+// ============================================================
+// SwarmView3D
+// ============================================================
 
-    const x = (packet.position.lon - CENTER.lon) * SCALE;
-    const z = -(packet.position.lat - CENTER.lat) * SCALE;
-    const y = (packet.position.alt_agl || 30) * ALT_SCALE;
+class SwarmView3D {
+  constructor(canvas) {
+    this._canvas = canvas;
+    this._tracks = new Map();       // id -> { mesh, trail, trailPts, lastPos }
+    this._defenders = new Map();    // id -> { mesh, dome }
+    this._engageLines = [];         // THREE.Line[]
+    this._siteMesh = null;
+    this._sitePulse = 0;
+    this._showTrails = true;
+    this._showDomes = true;
+    this._showEngagements = true;
+    this._showGrid = true;
+    this._hoveredTrack = null;
 
-    // Smooth position update
-    d.model.position.lerp(new THREE.Vector3(x, y, z), 0.15);
+    this._setupRenderer();
+    this._setupScene();
+    this._setupCamera();
+    this._setupControls();
+    this._setupLights();
+    this._setupGround();
+    this._setupSiteMarker();
+    this._setupRaycaster();
+    this._startLoop();
+  }
 
-    // Rotation from heading
-    const headingRad = THREE.MathUtils.degToRad(-(packet.velocity?.heading || 0) + 90);
-    d.model.rotation.y = THREE.MathUtils.lerp(
-        d.model.rotation.y, headingRad, 0.1
+  // ── Renderer ──────────────────────────────────────────────
+
+  _setupRenderer() {
+    this._renderer = new THREE.WebGLRenderer({
+      canvas: this._canvas,
+      antialias: true,
+    });
+    this._renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this._renderer.setSize(window.innerWidth, window.innerHeight);
+    this._renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this._renderer.toneMappingExposure = 1.0;
+
+    window.addEventListener('resize', () => {
+      this._camera.aspect = window.innerWidth / window.innerHeight;
+      this._camera.updateProjectionMatrix();
+      this._renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  }
+
+  // ── Scene ─────────────────────────────────────────────────
+
+  _setupScene() {
+    this._scene = new THREE.Scene();
+    this._scene.background = new THREE.Color(0x0a0a14);
+    this._scene.fog = new THREE.FogExp2(0x0a0a14, 0.000_08);
+  }
+
+  // ── Camera ────────────────────────────────────────────────
+
+  _setupCamera() {
+    this._camera = new THREE.PerspectiveCamera(
+      55,
+      window.innerWidth / window.innerHeight,
+      1,
+      50_000
     );
+    // Default: ~2 km altitude looking slightly toward origin.
+    this._camera.position.set(0, 2000, 800);
+    this._camera.lookAt(0, 0, 0);
+  }
 
-    // Attitude (subtle tilt)
-    const roll = THREE.MathUtils.degToRad(packet.attitude?.roll || 0) * 0.3;
-    const pitch = THREE.MathUtils.degToRad(packet.attitude?.pitch || 0) * 0.3;
-    d.model.rotation.z = THREE.MathUtils.lerp(d.model.rotation.z, roll, 0.1);
-    d.model.rotation.x = THREE.MathUtils.lerp(d.model.rotation.x, pitch, 0.1);
+  // ── Orbit controls ────────────────────────────────────────
 
-    // Label position
-    d.label.position.set(d.model.position.x, d.model.position.y + 3, d.model.position.z);
+  _setupControls() {
+    this._controls = new OrbitControls(this._camera, this._canvas);
+    this._controls.enableDamping = true;
+    this._controls.dampingFactor = 0.06;
+    this._controls.screenSpacePanning = false;
+    this._controls.minDistance = 50;
+    this._controls.maxDistance = 30_000;
+    this._controls.maxPolarAngle = Math.PI / 2 - 0.01; // never below ground
+    this._controls.target.set(0, 0, 0);
+  }
 
-    // Status emissive
-    const emissive = STATUS_EMISSIVE[packet.status] || 0x000000;
-    d.model.children.forEach(child => {
-        if (child.userData.isLED && child.material) {
-            child.material.color.setHex(emissive || d.color);
-        }
+  // ── Lighting ──────────────────────────────────────────────
+
+  _setupLights() {
+    const ambient = new THREE.AmbientLight(0x1a2540, 1.2);
+    this._scene.add(ambient);
+
+    const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+    dir.position.set(500, 2000, 800);
+    this._scene.add(dir);
+
+    // Subtle green hemisphere to mimic NOD aesthetic.
+    const hemi = new THREE.HemisphereLight(0x004422, 0x0a0a14, 0.3);
+    this._scene.add(hemi);
+  }
+
+  // ── Ground + grid ─────────────────────────────────────────
+
+  _setupGround() {
+    // Ground plane — 10 km x 10 km.
+    const groundGeo = new THREE.PlaneGeometry(10_000, 10_000);
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x060c0a,
+      roughness: 1,
+      metalness: 0,
     });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.5;
+    this._scene.add(ground);
 
-    // Trail
-    if (showTrails) {
-        d.trailPoints.push(new THREE.Vector3(
-            d.model.position.x, d.model.position.y, d.model.position.z
-        ));
-        if (d.trailPoints.length > TRAIL_LENGTH) d.trailPoints.shift();
+    // Primary grid — 10 km span, 100 m divisions (100 cells).
+    this._grid = this._createGroundGrid(10_000, 100, COLOR.GRID, COLOR.GRID_SEC);
+    this._scene.add(this._grid);
+  }
 
-        const posAttr = d.trail.geometry.getAttribute('position');
-        for (let i = 0; i < d.trailPoints.length; i++) {
-            posAttr.setXYZ(i, d.trailPoints[i].x, d.trailPoints[i].y, d.trailPoints[i].z);
-        }
-        posAttr.needsUpdate = true;
-        d.trail.geometry.setDrawRange(0, d.trailPoints.length);
-    }
-    d.trail.visible = showTrails;
-}
+  _createGroundGrid(size, divisions, colorCenter, colorGrid) {
+    const grid = new THREE.GridHelper(size, divisions, colorCenter, colorGrid);
+    grid.position.y = 0;
+    return grid;
+  }
 
-// ============================================================
-// FORMATION LINES
-// ============================================================
-let formationLines = null;
-function updateFormationLines() {
-    if (formationLines) { scene.remove(formationLines); formationLines.geometry.dispose(); }
+  // ── Site marker (pulsing ring on ground) ──────────────────
 
-    const leaderDrone = drones['ALPHA-1'];
-    if (!leaderDrone) return;
-
-    const points = [];
-    for (const [id, d] of Object.entries(drones)) {
-        if (id === 'ALPHA-1' || !d.data) continue;
-        points.push(leaderDrone.model.position.clone());
-        points.push(d.model.position.clone());
-    }
-
-    if (points.length === 0) return;
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    const mat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.15, transparent: true });
-    formationLines = new THREE.LineSegments(geo, mat);
-    scene.add(formationLines);
-}
-
-// ============================================================
-// CAMERA MODES
-// ============================================================
-let cameraMode = 'orbit';
-let chaseDroneId = 'ALPHA-1';
-
-function updateCamera() {
-    if (cameraMode === 'orbit') {
-        controls.enabled = true;
-        // Auto-rotate gently
-        controls.autoRotate = true;
-        controls.autoRotateSpeed = 0.5;
-    } else if (cameraMode === 'top') {
-        controls.enabled = false;
-        camera.position.set(0, 120, 0.1);
-        camera.lookAt(0, 0, 0);
-    } else if (cameraMode === 'chase') {
-        controls.enabled = false;
-        const target = drones[chaseDroneId];
-        if (target) {
-            const pos = target.model.position;
-            const heading = target.model.rotation.y;
-            const dist = 15;
-            camera.position.lerp(new THREE.Vector3(
-                pos.x - Math.sin(heading) * dist,
-                pos.y + 8,
-                pos.z - Math.cos(heading) * dist
-            ), 0.05);
-            camera.lookAt(pos.x, pos.y, pos.z);
-        }
-    } else if (cameraMode === 'free') {
-        controls.enabled = true;
-        controls.autoRotate = false;
-    }
-}
-
-// ============================================================
-// WEBSOCKET
-// ============================================================
-let ws = null;
-let reconnectTimer = null;
-
-function connect() {
-    ws = new WebSocket(WS_URL);
-
-    ws.onopen = () => {
-        document.getElementById('conn-status').className = 'conn-ok';
-        document.getElementById('conn-status').textContent = 'CONNECTED';
-        if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
-    };
-
-    ws.onmessage = (e) => {
-        try {
-            const data = JSON.parse(e.data);
-            if (Array.isArray(data)) {
-                data.forEach(updateDrone);
-                document.getElementById('stat-drones').textContent = data.length;
-                if (data[0]?.formation?.role) {
-                    // Try to detect formation from cohesion patterns
-                }
-            } else if (data.type === 'STATE_SYNC') {
-                if (data.drones) data.drones.forEach(updateDrone);
-                if (data.formation) {
-                    document.getElementById('stat-formation').textContent = data.formation;
-                }
-            } else if (data.type === 'ALERT') {
-                // Could visualize alerts on drones
-            }
-        } catch (err) { /* ignore parse errors */ }
-    };
-
-    ws.onclose = () => {
-        document.getElementById('conn-status').className = 'conn-off';
-        document.getElementById('conn-status').textContent = 'DISCONNECTED';
-        if (!reconnectTimer) {
-            reconnectTimer = setInterval(() => {
-                if (!ws || ws.readyState === WebSocket.CLOSED) connect();
-            }, 3000);
-        }
-    };
-
-    ws.onerror = () => ws.close();
-}
-
-// ============================================================
-// RAYCASTER (hover tooltips)
-// ============================================================
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const tooltip = document.getElementById('tooltip');
-
-canvas.addEventListener('mousemove', (e) => {
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-
-    let hoveredDrone = null;
-    for (const [id, d] of Object.entries(drones)) {
-        const intersects = raycaster.intersectObject(d.model, true);
-        if (intersects.length > 0) {
-            hoveredDrone = d;
-            break;
-        }
-    }
-
-    if (hoveredDrone && hoveredDrone.data) {
-        const p = hoveredDrone.data;
-        tooltip.style.display = 'block';
-        tooltip.style.left = (e.clientX + 15) + 'px';
-        tooltip.style.top = (e.clientY - 10) + 'px';
-        tooltip.querySelector('.tt-id').textContent = p.drone_id;
-        tooltip.querySelector('.tt-alt').textContent = (p.position.alt_agl || 0).toFixed(1) + 'm';
-        tooltip.querySelector('.tt-spd').textContent = (p.velocity?.ground_speed || 0).toFixed(1) + ' m/s';
-        tooltip.querySelector('.tt-bat').textContent = (p.battery?.remaining_pct || 0).toFixed(0) + '%';
-        tooltip.querySelector('.tt-status').textContent = p.status || '—';
-    } else {
-        tooltip.style.display = 'none';
-    }
-});
-
-// Click to select chase target
-canvas.addEventListener('click', (e) => {
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-
-    for (const [id, d] of Object.entries(drones)) {
-        if (raycaster.intersectObject(d.model, true).length > 0) {
-            chaseDroneId = id;
-            break;
-        }
-    }
-});
-
-// ============================================================
-// UI CONTROLS
-// ============================================================
-document.querySelectorAll('[data-cam]').forEach(btn => {
-    btn.addEventListener('click', () => {
-        cameraMode = btn.dataset.cam;
-        document.querySelectorAll('[data-cam]').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        if (cameraMode !== 'orbit') {
-            controls.autoRotate = false;
-        }
+  _setupSiteMarker() {
+    // Outer static ring.
+    const ringGeo = new THREE.RingGeometry(28, 32, 64);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: COLOR.SITE,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.7,
     });
-});
+    this._siteRing = new THREE.Mesh(ringGeo, ringMat);
+    this._siteRing.rotation.x = -Math.PI / 2;
+    this._siteRing.visible = false;
+    this._scene.add(this._siteRing);
 
-document.getElementById('btn-trails').addEventListener('click', function() {
-    showTrails = !showTrails;
-    this.textContent = showTrails ? 'TRAILS ON' : 'TRAILS OFF';
-    this.classList.toggle('active', showTrails);
-});
+    // Inner pulsing disc.
+    const pulseGeo = new THREE.CircleGeometry(20, 64);
+    const pulseMat = new THREE.MeshBasicMaterial({
+      color: COLOR.SITE,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.12,
+    });
+    this._sitePulseDisc = new THREE.Mesh(pulseGeo, pulseMat);
+    this._sitePulseDisc.rotation.x = -Math.PI / 2;
+    this._sitePulseDisc.position.y = 0.2;
+    this._sitePulseDisc.visible = false;
+    this._scene.add(this._sitePulseDisc);
+  }
 
-document.getElementById('btn-grid').addEventListener('click', function() {
-    showGrid = !showGrid;
-    gridHelper.visible = showGrid;
-    this.textContent = showGrid ? 'GRID ON' : 'GRID OFF';
-    this.classList.toggle('active', showGrid);
-});
+  _updateSite(site) {
+    if (!site) return;
+    const { x, z } = latLonToXZ(site.lat, site.lon);
+    this._siteRing.position.set(x, 1, z);
+    this._sitePulseDisc.position.set(x, 0.2, z);
+    this._siteRing.visible = true;
+    this._sitePulseDisc.visible = true;
+  }
 
-// ============================================================
-// PARTICLES (ambient dust)
-// ============================================================
-const particleCount = 500;
-const particleGeo = new THREE.BufferGeometry();
-const particlePositions = new Float32Array(particleCount * 3);
-for (let i = 0; i < particleCount; i++) {
-    particlePositions[i * 3] = (Math.random() - 0.5) * 300;
-    particlePositions[i * 3 + 1] = Math.random() * 80;
-    particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 300;
-}
-particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-const particleMat = new THREE.PointsMaterial({
-    color: 0x334455, size: 0.3, transparent: true, opacity: 0.4
-});
-const particles = new THREE.Points(particleGeo, particleMat);
-scene.add(particles);
+  // ── Track (hostile/unknown) mesh: cone pointing up ────────
 
-// ============================================================
-// RENDER LOOP
-// ============================================================
-let frameCount = 0;
-let lastFpsTime = performance.now();
+  _createDroneMesh(color) {
+    // Cone: apex up = direction of travel hint. Small enough to read at 2km alt.
+    const geo = new THREE.ConeGeometry(8, 20, 5);
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 0.45,
+      roughness: 0.4,
+      metalness: 0.3,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    // Offset so base sits at altitude y, apex points up.
+    mesh.rotation.x = Math.PI; // flip: apex down by default in Three.js cone
+    return mesh;
+  }
 
-function animate() {
-    requestAnimationFrame(animate);
+  // ── Defender mesh: box ────────────────────────────────────
 
-    const now = performance.now();
-    frameCount++;
-    if (now - lastFpsTime > 1000) {
-        document.getElementById('stat-fps').textContent = frameCount;
-        frameCount = 0;
-        lastFpsTime = now;
-    }
+  _createDefenderMesh() {
+    const geo = new THREE.BoxGeometry(14, 14, 14);
+    const mat = new THREE.MeshStandardMaterial({
+      color: COLOR.DEFENDER,
+      emissive: COLOR.DEFENDER,
+      emissiveIntensity: 0.3,
+      roughness: 0.5,
+      metalness: 0.4,
+    });
+    return new THREE.Mesh(geo, mat);
+  }
 
-    // Spin rotors
-    for (const d of Object.values(drones)) {
-        d.model.children.forEach(child => {
-            if (child.userData.isRotor) {
-                child.rotation.z += child.userData.rotorSpeed;
-            }
-        });
-    }
+  // ── Effector dome ─────────────────────────────────────────
 
-    // Formation lines update (every 30 frames)
-    if (frameCount % 30 === 0) updateFormationLines();
+  _createEffectorDome(range_m) {
+    const geo = new THREE.SphereGeometry(range_m, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({
+      color: COLOR.DOME,
+      transparent: true,
+      opacity: 0.06,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const dome = new THREE.Mesh(geo, mat);
+    // Wireframe rim on top.
+    const rimGeo = new THREE.EdgesGeometry(geo);
+    const rimMat = new THREE.LineBasicMaterial({
+      color: COLOR.DOME,
+      transparent: true,
+      opacity: 0.18,
+    });
+    const rim = new THREE.LineSegments(rimGeo, rimMat);
+    const group = new THREE.Group();
+    group.add(dome);
+    group.add(rim);
+    return group;
+  }
 
-    // Particle drift
-    const posAttr = particles.geometry.getAttribute('position');
-    for (let i = 0; i < particleCount; i++) {
-        posAttr.array[i * 3 + 1] += 0.01;
-        if (posAttr.array[i * 3 + 1] > 80) posAttr.array[i * 3 + 1] = 0;
+  // ── Trail ─────────────────────────────────────────────────
+
+  _createTrail(color) {
+    const positions = new Float32Array(TRAIL_MAX * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setDrawRange(0, 0);
+    const mat = new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.4,
+    });
+    return new THREE.Line(geo, mat);
+  }
+
+  _updateTrail(entry, pos) {
+    entry.trailPts.push(pos.clone());
+    if (entry.trailPts.length > TRAIL_MAX) entry.trailPts.shift();
+    const posAttr = entry.trail.geometry.getAttribute('position');
+    for (let i = 0; i < entry.trailPts.length; i++) {
+      posAttr.setXYZ(i, entry.trailPts[i].x, entry.trailPts[i].y, entry.trailPts[i].z);
     }
     posAttr.needsUpdate = true;
+    entry.trail.geometry.setDrawRange(0, entry.trailPts.length);
+    entry.trail.visible = this._showTrails;
+  }
 
-    updateCamera();
-    controls.update();
-    renderer.render(scene, camera);
+  // ── Engagement line ───────────────────────────────────────
+
+  _createEngagementLine(from, to) {
+    const pts = [from.clone(), to.clone()];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({
+      color: COLOR.ENGAGE,
+      transparent: true,
+      opacity: 0.65,
+    });
+    return new THREE.Line(geo, mat);
+  }
+
+  // ── Clear engagement lines ────────────────────────────────
+
+  _clearEngagementLines() {
+    for (const line of this._engageLines) {
+      this._scene.remove(line);
+      line.geometry.dispose();
+      line.material.dispose();
+    }
+    this._engageLines = [];
+  }
+
+  // ── Main update from frame ────────────────────────────────
+
+  updateFromFrame(frameData) {
+    const tracks    = frameData.tracks    || [];
+    const defenders = frameData.defenders || [];
+    const assignments = frameData.assignments || [];
+
+    // Build lookup maps for quick access.
+    const trackById   = new Map(tracks.map(t => [t.id, t]));
+    const defById     = new Map(defenders.map(d => [d.id, d]));
+
+    // Update / create track meshes.
+    const seenTracks = new Set();
+    for (const t of tracks) {
+      seenTracks.add(t.id);
+      this._upsertTrack(t);
+    }
+
+    // Remove stale tracks.
+    for (const [id, entry] of this._tracks) {
+      if (!seenTracks.has(id)) {
+        this._scene.remove(entry.mesh);
+        this._scene.remove(entry.trail);
+        entry.mesh.geometry.dispose();
+        entry.mesh.material.dispose();
+        entry.trail.geometry.dispose();
+        entry.trail.material.dispose();
+        this._tracks.delete(id);
+      }
+    }
+
+    // Update / create defender meshes and domes.
+    const seenDefs = new Set();
+    for (const d of defenders) {
+      seenDefs.add(d.id);
+      this._upsertDefender(d);
+    }
+
+    // Remove stale defenders.
+    for (const [id, entry] of this._defenders) {
+      if (!seenDefs.has(id)) {
+        this._scene.remove(entry.mesh);
+        if (entry.dome) this._scene.remove(entry.dome);
+        entry.mesh.geometry.dispose();
+        entry.mesh.material.dispose();
+        this._defenders.delete(id);
+      }
+    }
+
+    // Rebuild engagement lines.
+    this._clearEngagementLines();
+    if (this._showEngagements) {
+      for (const a of assignments) {
+        const def   = defById.get(a.defender_id);
+        const track = trackById.get(a.track_id);
+        if (!def || !track) continue;
+        const defPos   = this._defenderPos(def);
+        const trackPos = this._trackPos(track);
+        const line = this._createEngagementLine(defPos, trackPos);
+        this._scene.add(line);
+        this._engageLines.push(line);
+      }
+    }
+
+    // Site marker.
+    if (frameData.site) this._updateSite(frameData.site);
+
+    // Toggle dome visibility.
+    for (const entry of this._defenders.values()) {
+      if (entry.dome) entry.dome.visible = this._showDomes;
+    }
+  }
+
+  _trackPos(t) {
+    const { x, z } = latLonToXZ(t.lat, t.lon);
+    const y = typeof t.alt_m === 'number' ? t.alt_m : 200;
+    return new THREE.Vector3(x, y, z);
+  }
+
+  _defenderPos(d) {
+    const { x, z } = latLonToXZ(d.lat, d.lon);
+    return new THREE.Vector3(x, 5, z);
+  }
+
+  _upsertTrack(t) {
+    const pos = this._trackPos(t);
+    const color = trackColor(t);
+
+    if (this._tracks.has(t.id)) {
+      const entry = this._tracks.get(t.id);
+      entry.mesh.position.copy(pos);
+      // Update color if intent changed.
+      entry.mesh.material.color.setHex(color);
+      entry.mesh.material.emissive.setHex(color);
+      this._updateTrail(entry, pos);
+      entry.lastTrack = t;
+    } else {
+      const mesh = this._createDroneMesh(color);
+      mesh.position.copy(pos);
+      mesh.userData.trackId = t.id;
+      this._scene.add(mesh);
+
+      const trail = this._createTrail(color);
+      this._scene.add(trail);
+
+      const entry = { mesh, trail, trailPts: [], lastTrack: t };
+      this._updateTrail(entry, pos);
+      this._tracks.set(t.id, entry);
+    }
+  }
+
+  _upsertDefender(d) {
+    const pos = this._defenderPos(d);
+    // Effector range — use field if present, else default 1500 m.
+    const range = typeof d.range_m === 'number' ? d.range_m : 1500;
+
+    if (this._defenders.has(d.id)) {
+      const entry = this._defenders.get(d.id);
+      entry.mesh.position.copy(pos);
+      if (entry.dome) entry.dome.position.copy(pos);
+      // Dim if depleted.
+      const depleted = d.status === 'DEPLETED';
+      entry.mesh.material.emissiveIntensity = depleted ? 0 : 0.3;
+      entry.mesh.material.opacity = depleted ? 0.4 : 1;
+    } else {
+      const mesh = this._createDefenderMesh();
+      mesh.position.copy(pos);
+      mesh.userData.defenderId = d.id;
+      this._scene.add(mesh);
+
+      const dome = this._createEffectorDome(range);
+      dome.position.copy(pos);
+      dome.visible = this._showDomes;
+      this._scene.add(dome);
+
+      this._defenders.set(d.id, { mesh, dome });
+    }
+  }
+
+  // ── Raycaster for hover tooltips ──────────────────────────
+
+  _setupRaycaster() {
+    this._raycaster = new THREE.Raycaster();
+    this._mouse = new THREE.Vector2(-9999, -9999);
+    this._tooltip = document.getElementById('tooltip');
+
+    this._canvas.addEventListener('mousemove', (e) => {
+      this._mouse.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+      this._mouse.y = -(e.clientY / window.innerHeight)  * 2 + 1;
+      this._lastMouseEvent = e;
+    });
+
+    this._canvas.addEventListener('mouseleave', () => {
+      this._tooltip.style.display = 'none';
+    });
+  }
+
+  _updateTooltip() {
+    this._raycaster.setFromCamera(this._mouse, this._camera);
+
+    const meshes = Array.from(this._tracks.values()).map(e => e.mesh);
+    const hits = this._raycaster.intersectObjects(meshes, false);
+
+    if (hits.length > 0) {
+      const hit = hits[0].object;
+      const trackId = hit.userData.trackId;
+      const entry = this._tracks.get(trackId);
+      if (entry) {
+        const t = entry.lastTrack;
+        const e = this._lastMouseEvent;
+        const tt = this._tooltip;
+        tt.style.display = 'block';
+        tt.style.left = (e.clientX + 16) + 'px';
+        tt.style.top  = (e.clientY - 10) + 'px';
+        document.getElementById('tt-id').textContent     = t.id;
+        document.getElementById('tt-lat').textContent    = t.lat.toFixed(5);
+        document.getElementById('tt-lon').textContent    = t.lon.toFixed(5);
+        document.getElementById('tt-alt').textContent    = typeof t.alt_m === 'number' ? t.alt_m.toFixed(0) + ' m' : 'n/a';
+        document.getElementById('tt-intent').textContent = t.intent || 'UNKNOWN';
+        document.getElementById('tt-tti').textContent    = typeof t.time_to_impact_s === 'number'
+          ? t.time_to_impact_s.toFixed(1) + ' s'
+          : '—';
+        return;
+      }
+    }
+
+    this._tooltip.style.display = 'none';
+  }
+
+  // ── Toggle helpers ────────────────────────────────────────
+
+  setShowTrails(v) {
+    this._showTrails = v;
+    for (const e of this._tracks.values()) e.trail.visible = v;
+  }
+
+  setShowDomes(v) {
+    this._showDomes = v;
+    for (const e of this._defenders.values()) {
+      if (e.dome) e.dome.visible = v;
+    }
+  }
+
+  setShowEngagements(v) {
+    this._showEngagements = v;
+    for (const line of this._engageLines) line.visible = v;
+  }
+
+  setShowGrid(v) {
+    this._showGrid = v;
+    this._grid.visible = v;
+  }
+
+  // ── Render loop ───────────────────────────────────────────
+
+  _startLoop() {
+    this._frameCount = 0;
+    this._lastFpsTime = performance.now();
+
+    const loop = () => {
+      requestAnimationFrame(loop);
+      this._controls.update();
+
+      // Pulse site disc.
+      this._sitePulse += 0.04;
+      if (this._sitePulseDisc.visible) {
+        this._sitePulseDisc.material.opacity = 0.05 + 0.10 * Math.abs(Math.sin(this._sitePulse));
+        const scale = 1 + 0.06 * Math.sin(this._sitePulse * 0.7);
+        this._sitePulseDisc.scale.set(scale, scale, scale);
+      }
+
+      // Tooltip hit-test each frame.
+      this._updateTooltip();
+
+      this._renderer.render(this._scene, this._camera);
+
+      // FPS counter.
+      this._frameCount++;
+      const now = performance.now();
+      if (now - this._lastFpsTime >= 1000) {
+        document.getElementById('s-fps').textContent = this._frameCount;
+        this._frameCount = 0;
+        this._lastFpsTime = now;
+      }
+    };
+
+    loop();
+  }
 }
 
 // ============================================================
-// INIT
+// WEBSOCKET MANAGER
 // ============================================================
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+
+class WargameSocket {
+  constructor(onFrame) {
+    this._onFrame = onFrame;
+    this._ws = null;
+  }
+
+  connect(baseUrl, scenario) {
+    if (this._ws) {
+      this._ws.onclose = null;
+      this._ws.close();
+      this._ws = null;
+    }
+
+    const url = baseUrl.replace(/\/$/, '') + '/' + scenario;
+    this._ws = new WebSocket(url);
+
+    setDot('');
+
+    this._ws.onopen  = () => setDot('live');
+    this._ws.onerror = () => setDot('err');
+    this._ws.onclose = () => setDot('');
+
+    this._ws.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch (_) { return; }
+      if (msg.type === 'ERROR') { setDot('err'); return; }
+      if (msg.type !== 'WARGAME_FRAME') return;
+      this._onFrame(msg);
+    };
+  }
+
+  disconnect() {
+    if (this._ws) {
+      this._ws.onclose = null;
+      this._ws.close();
+      this._ws = null;
+    }
+    setDot('');
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function setDot(cls) {
+  const dot = document.getElementById('dot');
+  dot.className = 'dot' + (cls ? ' ' + cls : '');
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function renderMetrics(m) {
+  m = m || {};
+  const n = (v, fb) => (typeof v === 'number' && isFinite(v) ? v : fb);
+  setText('s-tick',        n(m.tick, 0));
+  setText('s-tracks',      n(m.active_hostiles, 0));
+  setText('s-defenders',   n(m.defenders_active, 0));
+  setText('s-intercepts',  n(m.intercepts, 0));
+  setText('s-leakers',     n(m.leakers, 0));
+  setText('s-engagements', n(m.engagements_made, 0));
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+
+const canvas = document.getElementById('canvas3d');
+const view = new SwarmView3D(canvas);
+
+const socket = new WargameSocket((frame) => {
+  view.updateFromFrame(frame);
+  renderMetrics(frame.metrics);
+  // Fallback: derive defender count from frame if metric missing.
+  if (frame.defenders && typeof frame.metrics?.defenders_active !== 'number') {
+    setText('s-defenders', frame.defenders.length);
+  }
+  if (frame.tracks && typeof frame.metrics?.active_hostiles !== 'number') {
+    setText('s-tracks', frame.tracks.length);
+  }
 });
 
-connect();
-animate();
+// Connect button.
+const btnConnect = document.getElementById('btn-connect');
+let connected = false;
 
+btnConnect.addEventListener('click', () => {
+  if (connected) {
+    socket.disconnect();
+    connected = false;
+    btnConnect.textContent = 'CONNECT';
+    btnConnect.classList.remove('stop');
+  } else {
+    const base = document.getElementById('wsurl').value;
+    const scenario = document.getElementById('scenario').value;
+    socket.connect(base, scenario);
+    connected = true;
+    btnConnect.textContent = 'DISCONNECT';
+    btnConnect.classList.add('stop');
+  }
+});
+
+// View toggle buttons.
+document.getElementById('vbtn-trails').addEventListener('click', function() {
+  const on = this.classList.toggle('active');
+  this.textContent = on ? 'TRAILS ON' : 'TRAILS OFF';
+  view.setShowTrails(on);
+});
+
+document.getElementById('vbtn-domes').addEventListener('click', function() {
+  const on = this.classList.toggle('active');
+  this.textContent = on ? 'DOMES ON' : 'DOMES OFF';
+  view.setShowDomes(on);
+});
+
+document.getElementById('vbtn-engage').addEventListener('click', function() {
+  const on = this.classList.toggle('active');
+  this.textContent = on ? 'ENGAGE LINES ON' : 'ENGAGE LINES OFF';
+  view.setShowEngagements(on);
+});
+
+document.getElementById('vbtn-grid').addEventListener('click', function() {
+  const on = this.classList.toggle('active');
+  this.textContent = on ? 'GRID ON' : 'GRID OFF';
+  view.setShowGrid(on);
+});
 </script>
 </body>
 </html>
