@@ -1,0 +1,356 @@
+<!-- BULWARK HUD: System Health / Performance Monitoring Panel -->
+<!-- Include after bulwark.html main script. Hooks via window._perfOnFrame(frame). -->
+
+<style>
+.perf-panel {
+  position: fixed; top: 60px; left: 12px; width: 200px; z-index: 500;
+  pointer-events: auto;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px; font-family: var(--font-data, monospace); font-size: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.45); user-select: none;
+}
+.perf-header {
+  padding: 8px 10px; font-family: var(--font-label, sans-serif);
+  font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899); border-bottom: 1px solid var(--border, #252B35);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.perf-header .perf-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-tertiary, #6B7785);
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.perf-header .perf-dot.ok { background: var(--green, #1E7A4A); box-shadow: 0 0 6px var(--green, #1E7A4A); }
+.perf-header .perf-dot.warn { background: var(--amber, #B86E17); box-shadow: 0 0 6px var(--amber, #B86E17); }
+.perf-header .perf-dot.crit { background: var(--red, #C23A3E); box-shadow: 0 0 6px var(--red, #C23A3E); }
+
+.perf-row {
+  padding: 4px 10px; border-bottom: 1px solid rgba(37,43,53,0.4);
+  display: flex; align-items: center; gap: 6px;
+}
+.perf-row:last-child { border-bottom: none; }
+.perf-label {
+  flex: 1; font-family: var(--font-label, sans-serif);
+  font-size: 8px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899); white-space: nowrap;
+}
+.perf-val {
+  font-family: var(--font-data, monospace); font-size: 11px;
+  font-weight: 700; min-width: 42px; text-align: right;
+  color: var(--text-bright, #E8ECF0); font-variant-numeric: tabular-nums;
+}
+.perf-val.green { color: var(--green, #1E7A4A); }
+.perf-val.amber { color: var(--amber, #B86E17); }
+.perf-val.red   { color: var(--red, #C23A3E); }
+
+.perf-spark {
+  width: 60px; height: 16px; flex-shrink: 0;
+}
+</style>
+
+<div class="perf-panel" id="perf-panel">
+  <div class="perf-header">
+    <span>System Health</span>
+    <span class="perf-dot" id="perf-dot"></span>
+  </div>
+  <div class="perf-row" title="">
+    <span class="perf-label">FPS</span>
+    <canvas class="perf-spark" id="perf-spark-fps" width="60" height="16"></canvas>
+    <span class="perf-val" id="perf-val-fps">--</span>
+  </div>
+  <div class="perf-row" title="">
+    <span class="perf-label">Latency</span>
+    <canvas class="perf-spark" id="perf-spark-latency" width="60" height="16"></canvas>
+    <span class="perf-val" id="perf-val-latency">--</span>
+  </div>
+  <div class="perf-row" title="">
+    <span class="perf-label">WS Tput</span>
+    <canvas class="perf-spark" id="perf-spark-throughput" width="60" height="16"></canvas>
+    <span class="perf-val" id="perf-val-throughput">--</span>
+  </div>
+  <div class="perf-row" title="">
+    <span class="perf-label">Proc ms</span>
+    <canvas class="perf-spark" id="perf-spark-proc" width="60" height="16"></canvas>
+    <span class="perf-val" id="perf-val-proc">--</span>
+  </div>
+  <div class="perf-row" title="">
+    <span class="perf-label">Tracks</span>
+    <canvas class="perf-spark" id="perf-spark-tracks" width="60" height="16"></canvas>
+    <span class="perf-val" id="perf-val-tracks">--</span>
+  </div>
+  <div class="perf-row" title="">
+    <span class="perf-label">Payload</span>
+    <canvas class="perf-spark" id="perf-spark-payload" width="60" height="16"></canvas>
+    <span class="perf-val" id="perf-val-payload">--</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var WINDOW = 30;
+
+  // Rolling buffer for each metric.
+  var buffers = {
+    fps:        [],
+    latency:    [],
+    throughput: [],
+    proc:       [],
+    tracks:     [],
+    payload:    []
+  };
+
+  // Timestamp tracking for FPS computation.
+  var frameTimes = [];
+
+  // Byte tracking for throughput computation.
+  var byteLog = [];
+
+  // Threshold definitions: [greenBelow, amberBelow] for ascending-good metrics,
+  // or custom functions.
+  var thresholds = {
+    fps:        function (v) { return v > 4 ? "green" : v > 2 ? "amber" : "red"; },
+    latency:    function (v) { return v < 100 ? "green" : v < 500 ? "amber" : "red"; },
+    throughput: function ()  { return "green"; },
+    proc:       function (v) { return v < 50 ? "green" : v < 200 ? "amber" : "red"; },
+    tracks:     function ()  { return "green"; },
+    payload:    function (v) { return v < 65536 ? "green" : v < 262144 ? "amber" : "red"; }
+  };
+
+  // Canvas references.
+  var canvases = {};
+  var valEls = {};
+  var rowEls = {};
+  var metricKeys = ["fps", "latency", "throughput", "proc", "tracks", "payload"];
+
+  metricKeys.forEach(function (key) {
+    canvases[key] = document.getElementById("perf-spark-" + key);
+    valEls[key]   = document.getElementById("perf-val-" + key);
+    rowEls[key]   = canvases[key] ? canvases[key].closest(".perf-row") : null;
+  });
+
+  var dotEl = document.getElementById("perf-dot");
+
+  // Color constants matching CSS vars.
+  var COLORS = {
+    green: "#1E7A4A",
+    amber: "#B86E17",
+    red:   "#C23A3E"
+  };
+
+  function push(buf, val) {
+    buf.push(val);
+    if (buf.length > WINDOW) buf.shift();
+  }
+
+  function stats(buf) {
+    if (buf.length === 0) return { min: 0, max: 0, avg: 0 };
+    var min = buf[0], max = buf[0], sum = 0;
+    for (var i = 0; i < buf.length; i++) {
+      if (buf[i] < min) min = buf[i];
+      if (buf[i] > max) max = buf[i];
+      sum += buf[i];
+    }
+    return { min: min, max: max, avg: sum / buf.length };
+  }
+
+  function drawSparkline(canvas, buf, color) {
+    if (!canvas) return;
+    var ctx = canvas.getContext("2d");
+    var w = canvas.width;
+    var h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    if (buf.length < 2) return;
+
+    var min = buf[0], max = buf[0];
+    for (var i = 0; i < buf.length; i++) {
+      if (buf[i] < min) min = buf[i];
+      if (buf[i] > max) max = buf[i];
+    }
+    var range = max - min;
+    if (range < 0.001) range = 1;
+
+    var pad = 1;
+    var drawH = h - pad * 2;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (var j = 0; j < buf.length; j++) {
+      var x = (j / (WINDOW - 1)) * w;
+      var y = pad + drawH - ((buf[j] - min) / range) * drawH;
+      if (j === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  function formatVal(key, val) {
+    if (val === null || val === undefined || isNaN(val)) return "--";
+    switch (key) {
+      case "fps":
+        return val.toFixed(1);
+      case "latency":
+        return Math.round(val) + "ms";
+      case "throughput":
+        if (val >= 1048576) return (val / 1048576).toFixed(1) + "M";
+        if (val >= 1024) return (val / 1024).toFixed(0) + "K";
+        return Math.round(val) + "B";
+      case "proc":
+        return val.toFixed(0) + "ms";
+      case "tracks":
+        return String(Math.round(val));
+      case "payload":
+        if (val >= 1024) return (val / 1024).toFixed(1) + "K";
+        return Math.round(val) + "B";
+      default:
+        return String(Math.round(val));
+    }
+  }
+
+  function tooltipText(key, buf) {
+    var s = stats(buf);
+    var unit = "";
+    if (key === "latency" || key === "proc") unit = "ms";
+    else if (key === "throughput" || key === "payload") unit = "B";
+    return "min: " + Math.round(s.min) + unit
+      + "  avg: " + Math.round(s.avg) + unit
+      + "  max: " + Math.round(s.max) + unit;
+  }
+
+  function updateMetric(key, val) {
+    push(buffers[key], val);
+    var level = thresholds[key](val);
+    var color = COLORS[level] || COLORS.green;
+
+    // Update value display.
+    var el = valEls[key];
+    if (el) {
+      el.textContent = formatVal(key, val);
+      el.className = "perf-val " + level;
+    }
+
+    // Update sparkline.
+    drawSparkline(canvases[key], buffers[key], color);
+
+    // Update tooltip.
+    var row = rowEls[key];
+    if (row) row.title = tooltipText(key, buffers[key]);
+  }
+
+  // Determine overall health from worst metric status.
+  function updateOverallDot() {
+    var worst = "ok";
+    var critKeys = ["fps", "latency"];
+    var allKeys = ["fps", "latency", "proc", "payload"];
+
+    for (var i = 0; i < allKeys.length; i++) {
+      var buf = buffers[allKeys[i]];
+      if (buf.length === 0) continue;
+      var val = buf[buf.length - 1];
+      var level = thresholds[allKeys[i]](val);
+      if (level === "red") { worst = "crit"; break; }
+      if (level === "amber" && worst !== "crit") worst = "warn";
+    }
+
+    if (dotEl) dotEl.className = "perf-dot " + worst;
+  }
+
+  // Compute FPS from frame arrival times.
+  function computeFps(now) {
+    frameTimes.push(now);
+    // Keep only the last 2 seconds of timestamps.
+    var cutoff = now - 2000;
+    while (frameTimes.length > 0 && frameTimes[0] < cutoff) {
+      frameTimes.shift();
+    }
+    if (frameTimes.length < 2) return 0;
+    var elapsed = (frameTimes[frameTimes.length - 1] - frameTimes[0]) / 1000;
+    if (elapsed <= 0) return 0;
+    return (frameTimes.length - 1) / elapsed;
+  }
+
+  // Track bytes for throughput.
+  function recordBytes(size, now) {
+    byteLog.push({ t: now, b: size });
+    var cutoff = now - 1000;
+    while (byteLog.length > 0 && byteLog[0].t < cutoff) {
+      byteLog.shift();
+    }
+    var total = 0;
+    for (var i = 0; i < byteLog.length; i++) total += byteLog[i].b;
+    return total;
+  }
+
+  // Main callback. Called for each WARGAME_FRAME.
+  function perfOnFrame(frame, rawSize) {
+    var now = performance.now();
+    var receiveTime = Date.now();
+
+    // FPS.
+    var fps = computeFps(now);
+    updateMetric("fps", fps);
+
+    // Latency: frame.timestamp (epoch seconds or ms) vs local clock.
+    var latency = 0;
+    if (frame && typeof frame.timestamp === "number") {
+      // Detect seconds vs milliseconds. If timestamp < 1e12, treat as seconds.
+      var frameMs = frame.timestamp < 1e12 ? frame.timestamp * 1000 : frame.timestamp;
+      latency = Math.max(0, receiveTime - frameMs);
+      // Clamp unreasonable values (clock skew with simulated timestamps).
+      if (latency > 60000) latency = 0;
+    }
+    updateMetric("latency", latency);
+
+    // WS throughput: bytes/sec over last 1s window.
+    var payloadSize = rawSize || 0;
+    if (!payloadSize && frame) {
+      // Estimate from serialized size.
+      try { payloadSize = JSON.stringify(frame).length; } catch (e) { payloadSize = 0; }
+    }
+    var bps = recordBytes(payloadSize, now);
+    updateMetric("throughput", bps);
+
+    // Frame processing / inference time from engine.
+    var procMs = 0;
+    if (frame && frame.metrics && typeof frame.metrics.inference_ms === "number") {
+      procMs = frame.metrics.inference_ms;
+    } else if (frame && typeof frame.inference_ms === "number") {
+      procMs = frame.inference_ms;
+    } else if (frame && frame.metrics && typeof frame.metrics.tick_ms === "number") {
+      procMs = frame.metrics.tick_ms;
+    }
+    updateMetric("proc", procMs);
+
+    // Active tracks count.
+    var trackCount = 0;
+    if (frame && Array.isArray(frame.tracks)) {
+      trackCount = frame.tracks.length;
+    } else if (frame && frame.metrics && typeof frame.metrics.tracks_held === "number") {
+      trackCount = frame.metrics.tracks_held;
+    }
+    updateMetric("tracks", trackCount);
+
+    // Payload size (per-frame).
+    updateMetric("payload", payloadSize);
+
+    // Overall health dot.
+    updateOverallDot();
+  }
+
+  // Expose the callback globally.
+  window._perfOnFrame = perfOnFrame;
+
+  // Auto-hook into _bulwarkOnMessage if it exists.
+  // Chain with any existing callback to avoid clobbering.
+  var _origOnMessage = window._bulwarkOnMessage || null;
+  window._bulwarkOnMessage = function (msg) {
+    if (_origOnMessage) _origOnMessage(msg);
+    if (msg && msg.type === "WARGAME_FRAME") {
+      perfOnFrame(msg);
+    }
+  };
+
+})();
+</script>

@@ -687,6 +687,7 @@ function connect() {
     renderEngagementFeed();
     draw();
     if (window._roeOnFrame) window._roeOnFrame(msg);
+    if (window._alertOnFrame) window._alertOnFrame(msg);
     if (window._bulwarkOnMessage) window._bulwarkOnMessage(msg);
   };
 }
@@ -1519,6 +1520,37 @@ wireToggle("toggle-feed", "feed");
     if (dets.length > 8) html += '<div style="color:#7A8899">+' + (dets.length - 8) + ' more</div>';
     detsEl.innerHTML = html;
   }
+})();
+</script>
+
+<!-- C2 Alert Notification System (snippet) -->
+<script>
+"use strict";
+(function(){
+  var x=new XMLHttpRequest();
+  x.open("GET","_c2_alerts.html",true);
+  x.onload=function(){
+    if(x.status===200){
+      var d=document.createElement("div");
+      d.innerHTML=x.responseText;
+      var styles=d.querySelectorAll("style");
+      var scripts=d.querySelectorAll("script");
+      for(var i=0;i<styles.length;i++) document.head.appendChild(styles[i].cloneNode(true));
+      var els=d.children;
+      var frag=document.createDocumentFragment();
+      var nonScript=[];
+      for(var j=0;j<els.length;j++){
+        if(els[j].tagName!=="STYLE"&&els[j].tagName!=="SCRIPT") nonScript.push(els[j]);
+      }
+      nonScript.forEach(function(n){document.body.appendChild(n.cloneNode(true));});
+      for(var k=0;k<scripts.length;k++){
+        var s=document.createElement("script");
+        s.textContent=scripts[k].textContent;
+        document.body.appendChild(s);
+      }
+    }
+  };
+  x.send();
 })();
 </script>
 </body>

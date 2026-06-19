@@ -1,0 +1,553 @@
+<!--
+  BULWARK HUD snippet: Geofence Visualization and Editor
+  Renders the defense perimeter polygon on the Leaflet map,
+  shows a geofence info panel, and supports drag-edit of vertices.
+  Expects global: map (Leaflet), ORIGIN
+-->
+
+<style>
+/* --- Geofence Info Panel --- */
+.gf-panel {
+  position: fixed; bottom: 64px; left: 12px; width: 240px; z-index: 500;
+  pointer-events: auto;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px;
+  font-family: var(--font-data, monospace); font-size: 11px;
+  display: flex; flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.45); user-select: none;
+  overflow: hidden;
+}
+.gf-header {
+  padding: 8px 10px;
+  font-family: var(--font-label, sans-serif);
+  font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899);
+  border-bottom: 1px solid var(--border, #252B35);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.gf-header-actions {
+  display: flex; gap: 4px; align-items: center;
+}
+.gf-btn {
+  background: var(--panel-elevated, #1A1F28);
+  border: 1px solid var(--border, #252B35);
+  color: var(--text-dim, #7A8899);
+  font-family: var(--font-data, monospace);
+  font-size: 8px; letter-spacing: 0.8px; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 3px; cursor: pointer;
+  transition: all 0.15s;
+}
+.gf-btn:hover {
+  border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4);
+}
+.gf-btn.active {
+  border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4);
+  background: rgba(59,130,196,0.1);
+}
+.gf-btn--save {
+  border-color: var(--green, #1E7A4A); color: var(--green, #1E7A4A);
+}
+.gf-btn--save:hover {
+  background: rgba(30,122,74,0.15); box-shadow: 0 0 6px rgba(30,122,74,0.3);
+}
+.gf-btn--cancel {
+  border-color: var(--red, #C23A3E); color: var(--red, #C23A3E);
+}
+.gf-btn--cancel:hover {
+  background: rgba(194,58,62,0.15);
+}
+.gf-body {
+  padding: 8px 10px;
+}
+.gf-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 3px 0;
+}
+.gf-row-label {
+  font-family: var(--font-label, sans-serif);
+  font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899);
+}
+.gf-row-value {
+  font-family: var(--font-data, monospace);
+  font-size: 12px; font-weight: 700;
+  color: var(--text-bright, #E8ECF0);
+}
+.gf-row-value.accent {
+  color: var(--accent, #3B82C4);
+}
+.gf-divider {
+  border: none; border-top: 1px solid var(--border, #252B35);
+  margin: 4px 0;
+}
+.gf-status-bar {
+  padding: 4px 10px;
+  border-top: 1px solid var(--border, #252B35);
+  font-size: 8px; letter-spacing: 1px; text-transform: uppercase;
+  text-align: center;
+}
+.gf-status-bar.editing {
+  color: var(--amber, #B86E17);
+  background: rgba(184,110,23,0.08);
+}
+.gf-status-bar.visible {
+  color: var(--green, #1E7A4A);
+}
+.gf-status-bar.hidden {
+  color: var(--text-dim, #7A8899);
+}
+</style>
+
+<!-- Geofence Info Panel -->
+<div class="gf-panel" id="gf-panel">
+  <div class="gf-header">
+    <span>GEOFENCE</span>
+    <div class="gf-header-actions" id="gf-actions">
+      <button class="gf-btn" id="gf-btn-toggle" title="Show/hide geofence on map">HIDE</button>
+      <button class="gf-btn" id="gf-btn-edit" title="Edit geofence vertices">EDIT</button>
+    </div>
+  </div>
+  <div class="gf-body" id="gf-body">
+    <div class="gf-row">
+      <span class="gf-row-label">Perimeter</span>
+      <span class="gf-row-value" id="gf-perimeter">0 m</span>
+    </div>
+    <div class="gf-row">
+      <span class="gf-row-label">Area</span>
+      <span class="gf-row-value" id="gf-area">0 sq m</span>
+    </div>
+    <hr class="gf-divider">
+    <div class="gf-row">
+      <span class="gf-row-label">Max Altitude</span>
+      <span class="gf-row-value accent" id="gf-alt-ceil">120 m</span>
+    </div>
+    <div class="gf-row">
+      <span class="gf-row-label">Vertices</span>
+      <span class="gf-row-value" id="gf-vert-count">4</span>
+    </div>
+  </div>
+  <div class="gf-status-bar visible" id="gf-status">ACTIVE</div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Constants
+  // ---------------------------------------------------------------
+
+  var EARTH_R = 6371000.0;
+  var MAX_ALT_M = 120;
+  var ACCENT = "#3B82C4";
+  var VERTEX_RADIUS = 6;
+  var VERTEX_FILL = "#141820";
+  var VERTEX_STROKE = ACCENT;
+  var SITE_COLOR = "#E8ECF0";
+
+  // Default geofence vertices from OverwatchSettings
+  var DEFAULT_VERTICES = [
+    [33.6450, -117.8500],
+    [33.6450, -117.8380],
+    [33.6360, -117.8380],
+    [33.6360, -117.8500]
+  ];
+
+  // ---------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------
+
+  var vertices = DEFAULT_VERTICES.map(function(v) { return [v[0], v[1]]; });
+  var savedVertices = null;
+  var polygon = null;
+  var vertexMarkers = [];
+  var siteMarker = null;
+  var isVisible = true;
+  var isEditing = false;
+
+  // ---------------------------------------------------------------
+  // Geodesic helpers
+  // ---------------------------------------------------------------
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLon = (lon2 - lon1) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return EARTH_R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function computePerimeter(verts) {
+    var total = 0;
+    for (var i = 0; i < verts.length; i++) {
+      var j = (i + 1) % verts.length;
+      total += haversine(verts[i][0], verts[i][1], verts[j][0], verts[j][1]);
+    }
+    return total;
+  }
+
+  function computeArea(verts) {
+    // Shoelace formula on meter-projected coordinates
+    if (verts.length < 3) return 0;
+    var cLat = 0;
+    var cLon = 0;
+    for (var k = 0; k < verts.length; k++) {
+      cLat += verts[k][0];
+      cLon += verts[k][1];
+    }
+    cLat /= verts.length;
+    cLon /= verts.length;
+
+    var mPerDegLat = (Math.PI / 180) * EARTH_R;
+    var mPerDegLon = (Math.PI / 180) * EARTH_R * Math.cos(cLat * Math.PI / 180);
+
+    var projected = verts.map(function(v) {
+      return [
+        (v[1] - cLon) * mPerDegLon,
+        (v[0] - cLat) * mPerDegLat
+      ];
+    });
+
+    var area = 0;
+    for (var i = 0; i < projected.length; i++) {
+      var j = (i + 1) % projected.length;
+      area += projected[i][0] * projected[j][1];
+      area -= projected[j][0] * projected[i][1];
+    }
+    return Math.abs(area / 2);
+  }
+
+  function computeCentroid(verts) {
+    var lat = 0;
+    var lon = 0;
+    for (var i = 0; i < verts.length; i++) {
+      lat += verts[i][0];
+      lon += verts[i][1];
+    }
+    return [lat / verts.length, lon / verts.length];
+  }
+
+  function formatDistance(m) {
+    if (m >= 1000) return (m / 1000).toFixed(2) + " km";
+    return Math.round(m) + " m";
+  }
+
+  function formatArea(sqm) {
+    if (sqm >= 1000000) return (sqm / 1000000).toFixed(3) + " sq km";
+    return Math.round(sqm).toLocaleString() + " sq m";
+  }
+
+  // ---------------------------------------------------------------
+  // UI references
+  // ---------------------------------------------------------------
+
+  var elPerimeter = document.getElementById("gf-perimeter");
+  var elArea = document.getElementById("gf-area");
+  var elAltCeil = document.getElementById("gf-alt-ceil");
+  var elVertCount = document.getElementById("gf-vert-count");
+  var elStatus = document.getElementById("gf-status");
+  var btnToggle = document.getElementById("gf-btn-toggle");
+  var btnEdit = document.getElementById("gf-btn-edit");
+  var elActions = document.getElementById("gf-actions");
+
+  // ---------------------------------------------------------------
+  // Leaflet layers
+  // ---------------------------------------------------------------
+
+  function createPolygon() {
+    if (polygon) {
+      map.removeLayer(polygon);
+    }
+    polygon = L.polygon(vertices, {
+      color: ACCENT,
+      weight: 2,
+      dashArray: "8, 6",
+      dashOffset: "0",
+      fillColor: ACCENT,
+      fillOpacity: 0.10,
+      interactive: false
+    }).addTo(map);
+  }
+
+  function createVertexMarkers() {
+    clearVertexMarkers();
+    vertices.forEach(function(v, idx) {
+      var marker = L.circleMarker(v, {
+        radius: VERTEX_RADIUS,
+        color: VERTEX_STROKE,
+        weight: 2,
+        fillColor: VERTEX_FILL,
+        fillOpacity: 1,
+        interactive: false
+      }).addTo(map);
+      marker._gfIndex = idx;
+      vertexMarkers.push(marker);
+    });
+  }
+
+  function clearVertexMarkers() {
+    vertexMarkers.forEach(function(m) { map.removeLayer(m); });
+    vertexMarkers = [];
+  }
+
+  function createSiteMarker() {
+    if (siteMarker) {
+      map.removeLayer(siteMarker);
+    }
+    var center = computeCentroid(vertices);
+    siteMarker = L.circleMarker(center, {
+      radius: 5,
+      color: SITE_COLOR,
+      weight: 2,
+      fillColor: SITE_COLOR,
+      fillOpacity: 0.6,
+      interactive: false
+    }).addTo(map);
+
+    // Add a pulsing ring around the defended site
+    var pulseRing = L.circleMarker(center, {
+      radius: 12,
+      color: SITE_COLOR,
+      weight: 1,
+      fillColor: "transparent",
+      fillOpacity: 0,
+      opacity: 0.35,
+      interactive: false
+    }).addTo(map);
+
+    siteMarker._pulseRing = pulseRing;
+  }
+
+  function removeSiteMarker() {
+    if (siteMarker) {
+      if (siteMarker._pulseRing) map.removeLayer(siteMarker._pulseRing);
+      map.removeLayer(siteMarker);
+      siteMarker = null;
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Update panel stats
+  // ---------------------------------------------------------------
+
+  function updateStats() {
+    var perim = computePerimeter(vertices);
+    var area = computeArea(vertices);
+
+    elPerimeter.textContent = formatDistance(perim);
+    elArea.textContent = formatArea(area);
+    elAltCeil.textContent = MAX_ALT_M + " m";
+    elVertCount.textContent = String(vertices.length);
+  }
+
+  // ---------------------------------------------------------------
+  // Visibility toggle
+  // ---------------------------------------------------------------
+
+  function showGeofence() {
+    isVisible = true;
+    createPolygon();
+    createVertexMarkers();
+    createSiteMarker();
+    btnToggle.textContent = "HIDE";
+    elStatus.className = "gf-status-bar visible";
+    elStatus.textContent = "ACTIVE";
+  }
+
+  function hideGeofence() {
+    isVisible = false;
+    if (polygon) { map.removeLayer(polygon); polygon = null; }
+    clearVertexMarkers();
+    removeSiteMarker();
+    btnToggle.textContent = "SHOW";
+    elStatus.className = "gf-status-bar hidden";
+    elStatus.textContent = "HIDDEN";
+
+    if (isEditing) {
+      exitEditMode(true);
+    }
+  }
+
+  function toggleVisibility() {
+    if (isVisible) {
+      hideGeofence();
+    } else {
+      showGeofence();
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Edit mode
+  // ---------------------------------------------------------------
+
+  var editSaveBtn = null;
+  var editCancelBtn = null;
+
+  function enterEditMode() {
+    if (!isVisible) return;
+    if (isEditing) return;
+
+    isEditing = true;
+    savedVertices = vertices.map(function(v) { return [v[0], v[1]]; });
+
+    // Update polygon fill for edit feedback
+    if (polygon) {
+      polygon.setStyle({ fillOpacity: 0.18 });
+    }
+
+    // Make vertex markers draggable
+    clearVertexMarkers();
+    vertices.forEach(function(v, idx) {
+      var marker = L.marker(v, {
+        draggable: true,
+        icon: L.divIcon({
+          className: "gf-vertex-drag",
+          html: '<div style="' +
+            "width: 14px; height: 14px; border-radius: 50%;" +
+            "background: " + VERTEX_FILL + ";" +
+            "border: 2px solid " + ACCENT + ";" +
+            "box-shadow: 0 0 6px rgba(59,130,196,0.5);" +
+            "cursor: grab;" +
+            '"></div>',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        })
+      }).addTo(map);
+
+      marker._gfIndex = idx;
+
+      marker.on("drag", function(e) {
+        var latlng = e.target.getLatLng();
+        vertices[idx] = [latlng.lat, latlng.lng];
+        polygon.setLatLngs(vertices);
+        updateStats();
+
+        // Update site marker position to new centroid
+        var center = computeCentroid(vertices);
+        if (siteMarker) {
+          siteMarker.setLatLng(center);
+          if (siteMarker._pulseRing) {
+            siteMarker._pulseRing.setLatLng(center);
+          }
+        }
+      });
+
+      vertexMarkers.push(marker);
+    });
+
+    // Replace EDIT button with SAVE + CANCEL
+    btnEdit.style.display = "none";
+    btnToggle.style.display = "none";
+
+    editSaveBtn = document.createElement("button");
+    editSaveBtn.className = "gf-btn gf-btn--save";
+    editSaveBtn.textContent = "SAVE";
+    editSaveBtn.addEventListener("click", function() { exitEditMode(false); });
+
+    editCancelBtn = document.createElement("button");
+    editCancelBtn.className = "gf-btn gf-btn--cancel";
+    editCancelBtn.textContent = "CANCEL";
+    editCancelBtn.addEventListener("click", function() { exitEditMode(true); });
+
+    elActions.appendChild(editCancelBtn);
+    elActions.appendChild(editSaveBtn);
+
+    elStatus.className = "gf-status-bar editing";
+    elStatus.textContent = "EDITING - DRAG VERTICES";
+  }
+
+  function exitEditMode(revert) {
+    if (!isEditing) return;
+    isEditing = false;
+
+    if (revert && savedVertices) {
+      vertices = savedVertices;
+    }
+    savedVertices = null;
+
+    // Remove edit buttons
+    if (editSaveBtn && editSaveBtn.parentNode) {
+      editSaveBtn.parentNode.removeChild(editSaveBtn);
+    }
+    if (editCancelBtn && editCancelBtn.parentNode) {
+      editCancelBtn.parentNode.removeChild(editCancelBtn);
+    }
+    editSaveBtn = null;
+    editCancelBtn = null;
+
+    // Restore original buttons
+    btnEdit.style.display = "";
+    btnToggle.style.display = "";
+
+    // Rebuild non-draggable layers
+    createPolygon();
+    createVertexMarkers();
+    createSiteMarker();
+    updateStats();
+
+    elStatus.className = "gf-status-bar visible";
+    elStatus.textContent = "ACTIVE";
+
+    // If save was requested, attempt to push to backend
+    if (!revert) {
+      saveToBackend();
+    }
+  }
+
+  function saveToBackend() {
+    var payload = {
+      geofence_vertices: vertices.map(function(v) {
+        return [v[0], v[1]];
+      }),
+      max_altitude_m: MAX_ALT_M
+    };
+
+    // Attempt REST update. Fail silently if endpoint does not exist.
+    var baseUrl = window.location.origin;
+    fetch(baseUrl + "/api/v1/geofence", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function(resp) {
+      if (resp.ok) {
+        flashStatus("SAVED", "visible");
+      } else {
+        flashStatus("SAVE FAILED (" + resp.status + ")", "editing");
+      }
+    }).catch(function() {
+      // Endpoint may not exist yet. Apply locally only.
+      flashStatus("LOCAL ONLY", "visible");
+    });
+  }
+
+  function flashStatus(text, cls) {
+    elStatus.className = "gf-status-bar " + cls;
+    elStatus.textContent = text;
+    setTimeout(function() {
+      if (!isEditing && isVisible) {
+        elStatus.className = "gf-status-bar visible";
+        elStatus.textContent = "ACTIVE";
+      }
+    }, 2500);
+  }
+
+  // ---------------------------------------------------------------
+  // Event binding
+  // ---------------------------------------------------------------
+
+  btnToggle.addEventListener("click", toggleVisibility);
+  btnEdit.addEventListener("click", enterEditMode);
+
+  // ---------------------------------------------------------------
+  // Initialize
+  // ---------------------------------------------------------------
+
+  createPolygon();
+  createVertexMarkers();
+  createSiteMarker();
+  updateStats();
+
+})();
+</script>

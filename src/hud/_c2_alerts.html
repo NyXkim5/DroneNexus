@@ -1,0 +1,546 @@
+<!-- ============================================================ -->
+<!-- C2 Alert Notification System                                 -->
+<!-- Surfaces critical wargame events as operator toasts + history -->
+<!-- z-index: 550 (above panels, below status bar)                -->
+<!-- ============================================================ -->
+<style>
+/* --- Alert Toast Container --- */
+.c2a-toast-area {
+  position: fixed; top: 52px; right: 12px; width: 340px; z-index: 550;
+  display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+}
+.c2a-toast {
+  pointer-events: auto;
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 10px; border-radius: 4px;
+  font-family: var(--font-data, monospace); font-size: 11px;
+  color: var(--text, #D4DAE0);
+  background: var(--panel, #141820);
+  border: 1px solid var(--border, #252B35);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  opacity: 0; transform: translateX(40px);
+  animation: c2a-slide-in 0.25s ease-out forwards;
+  position: relative; overflow: hidden;
+}
+.c2a-toast.dismissing {
+  animation: c2a-slide-out 0.2s ease-in forwards;
+}
+@keyframes c2a-slide-in {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes c2a-slide-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(40px); }
+}
+.c2a-toast.CRITICAL { border-color: var(--red, #C23A3E); }
+.c2a-toast.WARNING  { border-color: var(--amber, #B86E17); }
+.c2a-toast.INFO     { border-color: var(--accent, #3B82C4); }
+
+/* Severity left stripe */
+.c2a-toast::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+}
+.c2a-toast.CRITICAL::before { background: var(--red, #C23A3E); }
+.c2a-toast.WARNING::before  { background: var(--amber, #B86E17); }
+.c2a-toast.INFO::before     { background: var(--accent, #3B82C4); }
+
+/* Progress bar for auto-dismiss countdown */
+.c2a-toast-progress {
+  position: absolute; bottom: 0; left: 0; height: 2px;
+  animation: c2a-progress linear forwards;
+}
+.c2a-toast.CRITICAL .c2a-toast-progress { background: var(--red, #C23A3E); }
+.c2a-toast.WARNING  .c2a-toast-progress { background: var(--amber, #B86E17); }
+.c2a-toast.INFO     .c2a-toast-progress { background: var(--accent, #3B82C4); }
+@keyframes c2a-progress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+.c2a-toast-icon {
+  flex-shrink: 0; width: 18px; height: 18px; line-height: 18px;
+  text-align: center; font-size: 12px; border-radius: 50%;
+  font-weight: 700;
+}
+.c2a-toast.CRITICAL .c2a-toast-icon { background: rgba(194,58,62,0.25); color: var(--red, #C23A3E); }
+.c2a-toast.WARNING  .c2a-toast-icon { background: rgba(184,110,23,0.25); color: var(--amber, #B86E17); }
+.c2a-toast.INFO     .c2a-toast-icon { background: rgba(59,130,196,0.25); color: var(--accent, #3B82C4); }
+
+.c2a-toast-body { flex: 1; min-width: 0; }
+.c2a-toast-type {
+  font-size: 8px; letter-spacing: 1.5px; text-transform: uppercase;
+  font-weight: 700; margin-bottom: 2px;
+}
+.c2a-toast.CRITICAL .c2a-toast-type { color: var(--red, #C23A3E); }
+.c2a-toast.WARNING  .c2a-toast-type { color: var(--amber, #B86E17); }
+.c2a-toast.INFO     .c2a-toast-type { color: var(--accent, #3B82C4); }
+
+.c2a-toast-msg {
+  color: var(--text, #D4DAE0); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.c2a-toast-time {
+  font-size: 9px; color: var(--text-dim, #7A8899); margin-top: 2px;
+}
+.c2a-toast-dismiss {
+  flex-shrink: 0; background: none; border: none; cursor: pointer;
+  color: var(--text-dim, #7A8899); font-size: 14px; line-height: 1;
+  padding: 0 2px; font-family: var(--font-data, monospace);
+}
+.c2a-toast-dismiss:hover { color: var(--text, #D4DAE0); }
+
+/* --- Mute Button --- */
+.c2a-mute-btn {
+  position: fixed; top: 52px; right: 358px; z-index: 550;
+  pointer-events: auto; width: 28px; height: 28px;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  font-size: 13px; color: var(--text-dim, #7A8899);
+  transition: border-color 0.15s, color 0.15s;
+}
+.c2a-mute-btn:hover { border-color: var(--text-dim, #7A8899); color: var(--text, #D4DAE0); }
+.c2a-mute-btn.muted { color: var(--red, #C23A3E); border-color: var(--red, #C23A3E); }
+
+/* --- Alert History Panel --- */
+.c2a-history-toggle {
+  position: fixed; top: 52px; right: 392px; z-index: 550;
+  pointer-events: auto; height: 28px; padding: 0 10px;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px; cursor: pointer; display: flex;
+  align-items: center; gap: 6px;
+  font-family: var(--font-label, sans-serif); font-size: 9px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899); transition: border-color 0.15s, color 0.15s;
+}
+.c2a-history-toggle:hover { border-color: var(--text-dim, #7A8899); color: var(--text, #D4DAE0); }
+.c2a-history-toggle.active { border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4); }
+.c2a-history-badge {
+  min-width: 16px; height: 16px; line-height: 16px; text-align: center;
+  border-radius: 8px; font-size: 9px; font-weight: 700;
+  font-family: var(--font-data, monospace);
+  background: var(--red, #C23A3E); color: #fff; padding: 0 4px;
+}
+.c2a-history-badge.zero { background: var(--border, #252B35); color: var(--text-dim, #7A8899); }
+
+.c2a-history-panel {
+  position: fixed; top: 86px; right: 12px; width: 380px; max-height: 420px;
+  z-index: 550; pointer-events: auto; display: none;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px; box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+  font-family: var(--font-data, monospace); font-size: 10px;
+  flex-direction: column; overflow: hidden;
+}
+.c2a-history-panel.open { display: flex; }
+
+.c2a-history-header {
+  padding: 8px 10px; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899); border-bottom: 1px solid var(--border, #252B35);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.c2a-history-filters {
+  display: flex; gap: 4px; padding: 6px 10px; border-bottom: 1px solid var(--border, #252B35);
+  flex-shrink: 0;
+}
+.c2a-filter-btn {
+  background: none; border: 1px solid var(--border, #252B35); border-radius: 3px;
+  color: var(--text-dim, #7A8899); font-family: var(--font-data, monospace);
+  font-size: 8px; letter-spacing: 1px; padding: 2px 8px; cursor: pointer;
+  text-transform: uppercase; transition: all 0.12s;
+}
+.c2a-filter-btn.active { border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4); background: rgba(59,130,196,0.1); }
+.c2a-filter-btn:hover { border-color: var(--text-dim, #7A8899); }
+
+.c2a-history-list {
+  flex: 1; overflow-y: auto; padding: 4px 0;
+}
+.c2a-history-entry {
+  padding: 5px 10px; border-bottom: 1px solid rgba(37,43,53,0.3);
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.c2a-history-entry:last-child { border-bottom: none; }
+.c2a-he-sev {
+  flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; margin-top: 4px;
+}
+.c2a-he-sev.CRITICAL { background: var(--red, #C23A3E); box-shadow: 0 0 6px var(--red, #C23A3E); }
+.c2a-he-sev.WARNING  { background: var(--amber, #B86E17); }
+.c2a-he-sev.INFO     { background: var(--accent, #3B82C4); }
+
+.c2a-he-body { flex: 1; min-width: 0; }
+.c2a-he-top {
+  display: flex; align-items: center; gap: 6px;
+}
+.c2a-he-type {
+  font-size: 8px; letter-spacing: 1px; font-weight: 700; text-transform: uppercase;
+}
+.c2a-he-type.CRITICAL { color: var(--red, #C23A3E); }
+.c2a-he-type.WARNING  { color: var(--amber, #B86E17); }
+.c2a-he-type.INFO     { color: var(--accent, #3B82C4); }
+
+.c2a-he-msg {
+  color: var(--text-secondary, #8A96A3); font-size: 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.c2a-he-time {
+  flex-shrink: 0; font-size: 9px; color: var(--text-dim, #7A8899);
+}
+.c2a-history-empty {
+  padding: 20px 10px; text-align: center; color: var(--text-dim, #7A8899);
+  font-size: 10px; letter-spacing: 0.5px;
+}
+</style>
+
+<!-- Toast area -->
+<div class="c2a-toast-area" id="c2a-toast-area"></div>
+
+<!-- Mute toggle -->
+<button class="c2a-mute-btn" id="c2a-mute-btn" title="Mute alert sounds">&#x1F50A;</button>
+
+<!-- History toggle + panel -->
+<button class="c2a-history-toggle" id="c2a-history-toggle">
+  Alerts <span class="c2a-history-badge zero" id="c2a-history-badge">0</span>
+</button>
+<div class="c2a-history-panel" id="c2a-history-panel">
+  <div class="c2a-history-header">
+    <span>Alert History</span>
+    <span id="c2a-history-total">0 alerts</span>
+  </div>
+  <div class="c2a-history-filters">
+    <button class="c2a-filter-btn active" data-filter="ALL">All</button>
+    <button class="c2a-filter-btn" data-filter="CRITICAL">Critical</button>
+    <button class="c2a-filter-btn" data-filter="WARNING">Warning</button>
+    <button class="c2a-filter-btn" data-filter="INFO">Info</button>
+  </div>
+  <div class="c2a-history-list" id="c2a-history-list">
+    <div class="c2a-history-empty">No alerts recorded</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function () {
+  // ---- Constants ----
+  var MAX_VISIBLE_TOASTS = 5;
+  var MAX_HISTORY = 20;
+  var DEDUP_WINDOW_MS = 5000;
+  var SEVERITY_DURATION = { CRITICAL: 10000, WARNING: 5000, INFO: 3000 };
+  var SEVERITY_ICONS = { CRITICAL: "!", WARNING: "\u26A0", INFO: "\u2139" };
+
+  // ---- State ----
+  var toasts = [];         // active toast objects
+  var history = [];        // last MAX_HISTORY alert records
+  var dedupMap = {};       // key -> timestamp for deduplication
+  var muted = false;
+  var activeFilter = "ALL";
+  var audioCtx = null;     // lazy Web Audio API context
+
+  // ---- DOM refs ----
+  var toastArea = document.getElementById("c2a-toast-area");
+  var muteBtn = document.getElementById("c2a-mute-btn");
+  var historyToggle = document.getElementById("c2a-history-toggle");
+  var historyPanel = document.getElementById("c2a-history-panel");
+  var historyBadge = document.getElementById("c2a-history-badge");
+  var historyTotal = document.getElementById("c2a-history-total");
+  var historyList = document.getElementById("c2a-history-list");
+  var filterBtns = historyPanel.querySelectorAll(".c2a-filter-btn");
+
+  // ---- Audio ----
+  function playBeep() {
+    if (muted) return;
+    try {
+      if (!audioCtx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        audioCtx = new AC();
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 440;
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.2);
+    } catch (_) {
+      // Web Audio not available
+    }
+  }
+
+  // ---- Mute button ----
+  muteBtn.addEventListener("click", function () {
+    muted = !muted;
+    muteBtn.innerHTML = muted ? "&#x1F507;" : "&#x1F50A;";
+    muteBtn.classList.toggle("muted", muted);
+  });
+
+  // ---- History toggle ----
+  historyToggle.addEventListener("click", function () {
+    var open = historyPanel.classList.toggle("open");
+    historyToggle.classList.toggle("active", open);
+  });
+
+  // ---- Filter buttons ----
+  Array.prototype.forEach.call(filterBtns, function (btn) {
+    btn.addEventListener("click", function () {
+      activeFilter = btn.getAttribute("data-filter");
+      Array.prototype.forEach.call(filterBtns, function (b) {
+        b.classList.toggle("active", b.getAttribute("data-filter") === activeFilter);
+      });
+      renderHistory();
+    });
+  });
+
+  // ---- Utility ----
+  function esc(t) {
+    var d = document.createElement("div");
+    d.appendChild(document.createTextNode(t || ""));
+    return d.innerHTML;
+  }
+
+  function formatTime(ts) {
+    if (!ts) return "--:--:--";
+    try {
+      var d = new Date(ts);
+      if (isNaN(d.getTime())) return ts;
+      return d.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    } catch (_) {
+      return ts;
+    }
+  }
+
+  function nowISO() {
+    return new Date().toISOString();
+  }
+
+  // ---- Deduplication ----
+  function dedupKey(alertType, entityId) {
+    return alertType + "|" + (entityId || "global");
+  }
+
+  function isDuplicate(key) {
+    var last = dedupMap[key];
+    if (!last) return false;
+    return (Date.now() - last) < DEDUP_WINDOW_MS;
+  }
+
+  function markSeen(key) {
+    dedupMap[key] = Date.now();
+  }
+
+  // ---- Toast lifecycle ----
+  function createToast(alert) {
+    var duration = SEVERITY_DURATION[alert.severity] || 5000;
+    var el = document.createElement("div");
+    el.className = "c2a-toast " + alert.severity;
+    el.innerHTML =
+      '<div class="c2a-toast-icon">' + esc(SEVERITY_ICONS[alert.severity] || "?") + '</div>' +
+      '<div class="c2a-toast-body">' +
+        '<div class="c2a-toast-type">' + esc(alert.alertType) + '</div>' +
+        '<div class="c2a-toast-msg" title="' + esc(alert.message) + '">' + esc(alert.message) + '</div>' +
+        '<div class="c2a-toast-time">' + formatTime(alert.timestamp) + '</div>' +
+      '</div>' +
+      '<button class="c2a-toast-dismiss">&times;</button>' +
+      '<div class="c2a-toast-progress" style="animation-duration:' + duration + 'ms"></div>';
+
+    var toast = { el: el, timer: null };
+
+    var dismissBtn = el.querySelector(".c2a-toast-dismiss");
+    dismissBtn.addEventListener("click", function () { dismissToast(toast); });
+
+    toast.timer = setTimeout(function () { dismissToast(toast); }, duration);
+
+    toasts.push(toast);
+    toastArea.appendChild(el);
+
+    // Enforce max visible toasts
+    while (toasts.length > MAX_VISIBLE_TOASTS) {
+      dismissToast(toasts[0]);
+    }
+  }
+
+  function dismissToast(toast) {
+    if (!toast || !toast.el) return;
+    if (toast.timer) { clearTimeout(toast.timer); toast.timer = null; }
+    toast.el.classList.add("dismissing");
+    var el = toast.el;
+    setTimeout(function () {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 200);
+    var idx = toasts.indexOf(toast);
+    if (idx !== -1) toasts.splice(idx, 1);
+  }
+
+  // ---- History management ----
+  function addToHistory(alert) {
+    history.unshift(alert);
+    if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+    updateBadge();
+    renderHistory();
+  }
+
+  function updateBadge() {
+    var count = history.length;
+    historyBadge.textContent = count > 99 ? "99+" : String(count);
+    historyBadge.classList.toggle("zero", count === 0);
+    historyTotal.textContent = count + " alert" + (count !== 1 ? "s" : "");
+  }
+
+  function renderHistory() {
+    var filtered = activeFilter === "ALL"
+      ? history
+      : history.filter(function (a) { return a.severity === activeFilter; });
+
+    if (!filtered.length) {
+      historyList.innerHTML = '<div class="c2a-history-empty">No ' +
+        (activeFilter === "ALL" ? "" : activeFilter.toLowerCase() + " ") + 'alerts recorded</div>';
+      return;
+    }
+
+    var html = "";
+    filtered.forEach(function (a) {
+      html +=
+        '<div class="c2a-history-entry">' +
+          '<div class="c2a-he-sev ' + a.severity + '"></div>' +
+          '<div class="c2a-he-body">' +
+            '<div class="c2a-he-top">' +
+              '<span class="c2a-he-type ' + a.severity + '">' + esc(a.alertType) + '</span>' +
+            '</div>' +
+            '<div class="c2a-he-msg" title="' + esc(a.message) + '">' + esc(a.message) + '</div>' +
+          '</div>' +
+          '<div class="c2a-he-time">' + formatTime(a.timestamp) + '</div>' +
+        '</div>';
+    });
+    historyList.innerHTML = html;
+  }
+
+  // ---- Core alert dispatch ----
+  function fireAlert(severity, alertType, message, entityId) {
+    var key = dedupKey(alertType, entityId);
+    if (isDuplicate(key)) return;
+    markSeen(key);
+
+    var alert = {
+      severity: severity,
+      alertType: alertType,
+      message: message,
+      entityId: entityId || null,
+      timestamp: nowISO(),
+    };
+
+    createToast(alert);
+    addToHistory(alert);
+
+    if (severity === "CRITICAL") {
+      playBeep();
+    }
+  }
+
+  // ---- Frame analysis ----
+
+  // Track which defenders were depleted in previous frames to detect transitions
+  var prevDepletedSet = {};
+  // Track previous leaker count for swarm breach detection
+  var prevLeakers = 0;
+
+  function analyzeFrame(frame) {
+    if (!frame) return;
+
+    var tracks = frame.tracks || [];
+    var defenders = frame.defenders || [];
+    var assignments = frame.assignments || [];
+    var roeEvals = frame.roe_evaluations || [];
+    var metrics = frame.metrics || {};
+
+    // 1. LEAKER_WARNING: track with TTI < 10s and no defender assigned
+    var assignedTrackIds = {};
+    assignments.forEach(function (a) {
+      if (a.status === "PENDING" || a.status === "HIT") {
+        assignedTrackIds[a.track_id] = true;
+      }
+    });
+    tracks.forEach(function (t) {
+      if (t.time_to_impact_s !== null && t.time_to_impact_s !== undefined &&
+          t.time_to_impact_s < 10 && t.time_to_impact_s > 0 &&
+          !assignedTrackIds[t.id]) {
+        fireAlert(
+          "CRITICAL",
+          "LEAKER_WARNING",
+          "Track " + t.id.substring(0, 8) + " TTI " + t.time_to_impact_s.toFixed(1) + "s -- no defender assigned",
+          t.id
+        );
+      }
+    });
+
+    // 2. DEFENDER_DEPLETED: defender status transitions to DEPLETED
+    var currentDepleted = {};
+    defenders.forEach(function (d) {
+      if (d.status === "DEPLETED") {
+        currentDepleted[d.id] = true;
+        if (!prevDepletedSet[d.id]) {
+          fireAlert(
+            "WARNING",
+            "DEFENDER_DEPLETED",
+            d.id + " (" + d.kind + ") ammo exhausted -- capacity 0/" + d.capacity,
+            d.id
+          );
+        }
+      }
+    });
+    prevDepletedSet = currentDepleted;
+
+    // 3. ROE_DENIAL: roe_evaluations with authorized === false
+    roeEvals.forEach(function (ev) {
+      if (ev.authorized === false) {
+        var targetShort = (ev.target_id || "?");
+        if (targetShort.length > 10) targetShort = targetShort.substring(0, 8) + "..";
+        fireAlert(
+          "INFO",
+          "ROE_DENIAL",
+          "Engagement on " + targetShort + " denied: " + (ev.reason || ev.rule_name || "ROE hold"),
+          ev.target_id
+        );
+      }
+    });
+
+    // 4. SWARM_BREACH: 3+ new leakers in same tick
+    var currentLeakers = metrics.leakers || 0;
+    var newLeakers = currentLeakers - prevLeakers;
+    if (newLeakers >= 3) {
+      fireAlert(
+        "CRITICAL",
+        "SWARM_BREACH",
+        newLeakers + " simultaneous leakers -- perimeter breached (total: " + currentLeakers + ")",
+        "swarm_breach_" + metrics.tick
+      );
+    }
+    prevLeakers = currentLeakers;
+
+    // 5. ENGAGEMENT_HIT: HIT status in assignments
+    assignments.forEach(function (a) {
+      if (a.status === "HIT") {
+        fireAlert(
+          "INFO",
+          "ENGAGEMENT_HIT",
+          a.defender_id + " neutralized " + (a.track_id ? a.track_id.substring(0, 8) : "target"),
+          a.defender_id + "|" + a.track_id
+        );
+      }
+    });
+  }
+
+  // ---- Public API ----
+  window._alertOnFrame = function (frame) {
+    analyzeFrame(frame);
+  };
+
+  // Initialize
+  updateBadge();
+  renderHistory();
+})();
+</script>
