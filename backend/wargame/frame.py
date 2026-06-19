@@ -157,6 +157,10 @@ class Frame:
     heatmap_data: Optional[dict] = None
     # Raw engagements for this tick, kept for CoT bridge integration.
     engagements: List[Engagement] = field(default_factory=list)
+    # Camera-RF fusion correlation results from the visual correlator.
+    visual_correlations: List[dict] = field(default_factory=list)
+    # ROE evaluation results for engagements this tick.
+    roe_evaluations: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, object]:
         """Serialize the whole frame to a JSON-ready dict for the websocket."""
@@ -180,6 +184,8 @@ class Frame:
             "engagement_order": self.engagement_order.to_dict() if self.engagement_order else None,
             "visual_targets": self.visual_targets,
             "heatmap_data": self.heatmap_data,
+            "visual_correlations": self.visual_correlations,
+            "roe_evaluations": self.roe_evaluations,
         }
 
     def _threats_by_track(self) -> Dict[str, Threat]:

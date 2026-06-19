@@ -28,3 +28,4 @@ certs/
 backend/yolo11n.pt
 *.pt
 backend/runs/
+backend/datasets/

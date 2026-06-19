@@ -47,6 +47,18 @@ from decision.engine import DecisionEngine
 from decision.models import EngagementMode, EngagementOrder
 
 from attacker.swarm_adapter import FlockingSwarmAdapter
+from decision.roe import ROEEngine, ROEEvaluation
+from fusion.visual_correlator import (
+    CameraDetection,
+    CameraModel,
+    CorrelationResult,
+    VisualCorrelator,
+)
+from fusion.rf_visual_linker import (
+    RFVisualLinker,
+    RFTrackInfo,
+    VisualTrackInfo,
+)
 from wargame.audit import AuditLog
 from wargame.degradation import DegradationModel
 
@@ -77,6 +89,75 @@ def _resistance(kind: DefenderKind, drone) -> float:
     if kind is DefenderKind.HPM and drone.hardened:
         return 0.15
     return 1.0
+
+
+def _visual_targets_to_camera_dets(
+    visual_targets: List,
+) -> List[CameraDetection]:
+    """Convert VisualTarget objects to CameraDetection for the correlator.
+
+    Each VisualTarget has a bounding_box with (x, y, width, height). The
+    correlator expects (x1, y1, x2, y2) pixel bbox format.
+    """
+    dets: List[CameraDetection] = []
+    for vt in visual_targets:
+        bb = vt.bounding_box
+        bbox = (float(bb.x), float(bb.y), float(bb.x + bb.width), float(bb.y + bb.height))
+        dets.append(CameraDetection(
+            id=vt.id,
+            bbox=bbox,
+            confidence=vt.confidence,
+            class_name=vt.target_type.value,
+        ))
+    return dets
+
+
+def _correlation_to_dict(cr: CorrelationResult) -> dict:
+    """Serialize a CorrelationResult to a plain dict for the Frame."""
+    return {
+        "camera_det_id": cr.camera_det_id,
+        "track_id": cr.track_id,
+        "score": round(cr.score, 4),
+        "range_m": round(cr.range_m, 1),
+        "bearing_deg": round(cr.bearing_deg, 1),
+    }
+
+
+def _roe_evaluation_to_dict(evaluation: "ROEEvaluation") -> dict:
+    """Serialize an ROEEvaluation to a plain dict for the Frame."""
+    return {
+        "target_id": evaluation.target_id,
+        "rule_name": evaluation.rule_name,
+        "authorized": evaluation.authorized,
+        "reason": evaluation.reason,
+        "timestamp": evaluation.timestamp,
+        "authorization_level": evaluation.authorization_level,
+        "conditions_met": {
+            cond.value: met
+            for cond, met in evaluation.conditions_met.items()
+        },
+    }
+
+
+def _default_camera_model() -> CameraModel:
+    """Build a default simulated camera for wargame visual correlation.
+
+    North-looking camera at the site origin with a 60-degree horizontal FOV.
+    The rotation maps camera z-axis to North, x-axis to East, y-axis to Up.
+    """
+    import numpy as np
+    rotation = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 1.0, 0.0],
+    ], dtype=np.float64)
+    return CameraModel(
+        focal_length_px=1108.5,
+        principal_point=(640.0, 360.0),
+        position=(0.0, 0.0, 0.0),
+        rotation=rotation,
+        image_size=(1280, 720),
+    )
 
 
 class WargameRunner:
@@ -135,6 +216,10 @@ class WargameRunner:
         self._cascade_dependencies: List[DependencyEdge] = []
         self._decision_engine = DecisionEngine(mode=EngagementMode.AUTO)
 
+        self._visual_correlator: Optional[VisualCorrelator] = None
+        self._rf_visual_linker: Optional[RFVisualLinker] = None
+        self._roe_engine = ROEEngine()
+
         if scenario.target_scenario:
             from vision.scenarios import load_target_scenario
             ts = load_target_scenario(scenario.target_scenario)
@@ -143,6 +228,14 @@ class WargameRunner:
             )
             self._vision_feed = SimFeedSource(placements=ts.placements, resolution=(1280, 720))
             self._cascade_dependencies = ts.dependencies
+            self._visual_correlator = VisualCorrelator(
+                camera_model=_default_camera_model(),
+                gate_distance_m=15.0,
+                confidence_boost=0.15,
+            )
+            self._rf_visual_linker = RFVisualLinker(
+                camera_enu=(0.0, 0.0, 0.0),
+            )
 
     @property
     def world(self) -> WorldModel:
@@ -220,6 +313,7 @@ class WargameRunner:
         cascade_results = []
         engagement_order = None
         visual_targets = []
+        visual_correlations: List[dict] = []
         if self._vision_detector and self._vision_feed:
             frame_img, frame_ts = self._vision_feed.next_frame()
             visual_targets = self._vision_detector.detect(frame_img, frame_ts)
@@ -228,12 +322,20 @@ class WargameRunner:
             engagement_order = self._decision_engine.merge(
                 threats=threats, cascade_results=cascade_results, now=t
             )
+            visual_correlations = self._run_visual_correlation(
+                visual_targets, tracks, t,
+            )
         engagements = self._engage(threats, t)
+        roe_evaluations = self._run_roe_evaluations(engagements, threats, tracks, t)
         self._audit_tick(t, engagements, threats, tracks)
         self._queue_events(engagements, threats, tracks)
         self._cool_down()
         heatmap_data = self._heatmap.to_dict() if self._tick % 5 == 0 else None
-        return self._build_frame(tracks, threats, engagements, cascade_results, engagement_order, visual_targets, heatmap_data)
+        return self._build_frame(
+            tracks, threats, engagements, cascade_results,
+            engagement_order, visual_targets, heatmap_data,
+            visual_correlations, roe_evaluations,
+        )
 
     def _queue_events(
         self,
@@ -464,6 +566,73 @@ class WargameRunner:
         self._heatmap.add_detections(hostile_positions)
         self._heatmap.tick()
 
+    def _run_visual_correlation(
+        self,
+        visual_targets: List,
+        tracks: List[Track],
+        t: float,
+    ) -> List[dict]:
+        """Create simulated camera detections and correlate with RF tracks.
+
+        Converts each VisualTarget to a CameraDetection, runs the stateful
+        VisualCorrelator to match them against RF tracks, then serializes
+        the CorrelationResult list into dicts for the Frame.
+        """
+        if self._visual_correlator is None:
+            return []
+        camera_dets = _visual_targets_to_camera_dets(visual_targets)
+        if not camera_dets:
+            return []
+        correlations = self._visual_correlator.update(camera_dets, tracks, t)
+        return [_correlation_to_dict(cr) for cr in correlations]
+
+    def _run_roe_evaluations(
+        self,
+        engagements: List[Engagement],
+        threats: List[Threat],
+        tracks: List[Track],
+        t: float,
+    ) -> List[dict]:
+        """Evaluate ROE for each engagement and return serialized results.
+
+        Uses a default corridor centered on the site position with a generous
+        radius so the defensive ROE gate focuses on confidence and threat
+        imminence rather than geography in simulation.
+        """
+        if not engagements:
+            return []
+        from decision.models import EngagementPriority
+        threat_map = {th.id: th for th in threats}
+        track_map = {tr.id: tr for tr in tracks}
+        corridor = [(self._world.site.position, 5000.0)]
+        results: List[dict] = []
+        for eng in engagements:
+            threat = threat_map.get(eng.target_threat_id)
+            if threat is None:
+                continue
+            track = track_map.get(threat.track_id) if threat.track_id else None
+            confidence = track.confidence if track else 0.5
+            position = track.position if track else (0.0, 0.0, 50.0)
+            priority = EngagementPriority(
+                target_id=eng.target_threat_id,
+                source="bulwark",
+                normalized_score=threat.score,
+                time_sensitivity=threat.time_to_impact_s or 300.0,
+                personnel_impact=0,
+                cascade_depth=0,
+            )
+            evaluation = self._roe_engine.evaluate(
+                target_id=eng.target_threat_id,
+                engagement_priority=priority,
+                track_confidence=confidence,
+                target_position=position,
+                personnel_at_risk=0,
+                corridors=corridor,
+                timestamp=t,
+            )
+            results.append(_roe_evaluation_to_dict(evaluation))
+        return results
+
     def _build_frame(
         self,
         tracks: List[Track],
@@ -473,6 +642,8 @@ class WargameRunner:
         engagement_order: Optional[EngagementOrder] = None,
         visual_targets: Optional[List] = None,
         heatmap_data: Optional[dict] = None,
+        visual_correlations: Optional[List[dict]] = None,
+        roe_evaluations: Optional[List[dict]] = None,
     ) -> Frame:
         """Compute metrics and bundle a renderable Frame for this tick."""
         metrics = self._compute_metrics(tracks)
@@ -491,6 +662,8 @@ class WargameRunner:
             visual_targets=[t.to_dict() for t in visual_targets] if visual_targets else [],
             heatmap_data=heatmap_data,
             engagements=engagements,
+            visual_correlations=visual_correlations or [],
+            roe_evaluations=roe_evaluations or [],
         )
 
     def _compute_metrics(self, tracks: List[Track]) -> Metrics:
