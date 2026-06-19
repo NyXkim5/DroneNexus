@@ -1,0 +1,494 @@
+<!-- ============================================================ -->
+<!-- C2 Natural Language Command Input                            -->
+<!-- Text-based command bar for typing tactical commands           -->
+<!-- z-index: 550 (above panels, below status bar)                -->
+<!-- ============================================================ -->
+<style>
+/* --- Command Input Bar --- */
+.ci-bar {
+  position: fixed; bottom: 58px; left: 50%; transform: translateX(-50%);
+  z-index: 550; pointer-events: auto;
+  display: flex; align-items: center; gap: 0;
+  background: var(--panel, #141820);
+  border: 1px solid var(--border, #252B35);
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  overflow: visible; position: relative;
+  /* re-declare fixed after relative for the dropdown anchor */
+}
+.ci-bar {
+  position: fixed;
+}
+
+.ci-prefix {
+  padding: 0 8px 0 10px;
+  font-family: var(--font-data, monospace); font-size: 12px;
+  color: var(--accent, #3B82C4); font-weight: 700;
+  user-select: none; flex-shrink: 0;
+}
+
+.ci-input {
+  width: 400px; height: 34px;
+  background: transparent; border: none; outline: none;
+  color: var(--text, #D4DAE0);
+  font-family: var(--font-data, monospace); font-size: 12px;
+  padding: 0 8px 0 0;
+  caret-color: var(--accent, #3B82C4);
+}
+.ci-input::placeholder {
+  color: var(--text-dim, #7A8899); font-size: 11px;
+}
+
+.ci-hint {
+  padding: 0 10px 0 4px;
+  font-family: var(--font-data, monospace); font-size: 9px;
+  color: var(--text-dim, #7A8899); letter-spacing: 0.5px;
+  user-select: none; flex-shrink: 0; white-space: nowrap;
+}
+.ci-hint kbd {
+  display: inline-block; padding: 1px 4px;
+  background: var(--panel-elevated, #1A1F28);
+  border: 1px solid var(--border, #252B35);
+  border-radius: 2px; font-size: 9px;
+  color: var(--text-secondary, #8A96A3);
+  font-family: var(--font-data, monospace);
+}
+
+/* --- Suggestions Dropdown --- */
+.ci-suggestions {
+  position: absolute; bottom: 100%; left: 0; right: 0;
+  margin-bottom: 4px;
+  background: var(--panel, #141820);
+  border: 1px solid var(--border, #252B35);
+  border-radius: 4px;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
+  display: none; flex-direction: column;
+  overflow: hidden;
+  max-height: 200px;
+}
+.ci-suggestions.visible {
+  display: flex;
+}
+.ci-sug-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  font-family: var(--font-data, monospace); font-size: 11px;
+  color: var(--text, #D4DAE0);
+  cursor: pointer; transition: background 0.08s;
+  border-bottom: 1px solid rgba(37,43,53,0.4);
+}
+.ci-sug-item:last-child { border-bottom: none; }
+.ci-sug-item:hover,
+.ci-sug-item.active {
+  background: rgba(59,130,196,0.12);
+}
+.ci-sug-cmd {
+  font-weight: 700; color: var(--accent, #3B82C4);
+  white-space: nowrap; flex-shrink: 0;
+}
+.ci-sug-desc {
+  color: var(--text-dim, #7A8899); font-size: 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* --- Feedback flash on the input bar --- */
+.ci-bar.ci-ok {
+  border-color: var(--green, #1E7A4A);
+  box-shadow: 0 0 10px rgba(30,122,74,0.3);
+}
+.ci-bar.ci-err {
+  border-color: var(--red, #C23A3E);
+  box-shadow: 0 0 10px rgba(194,58,62,0.3);
+}
+</style>
+
+<div class="ci-bar" id="ci-bar">
+  <span class="ci-prefix">&gt;</span>
+  <input class="ci-input" id="ci-input"
+    type="text" autocomplete="off" spellcheck="false"
+    placeholder="Type command... (e.g., 'arm all drones', 'set formation diamond')" />
+  <span class="ci-hint"><kbd>/</kbd> focus</span>
+  <div class="ci-suggestions" id="ci-suggestions"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var MAX_HISTORY = 20;
+  var MAX_SUGGESTIONS = 5;
+
+  var bar = document.getElementById("ci-bar");
+  var input = document.getElementById("ci-input");
+  var sugBox = document.getElementById("ci-suggestions");
+  var history = [];
+  var historyIdx = -1;
+  var activeSugIdx = -1;
+  var currentSuggestions = [];
+
+  // ---------------------------------------------------------------
+  // Command definitions: pattern, action, label, description
+  // ---------------------------------------------------------------
+  var COMMANDS = [
+    {
+      patterns: [/^arm\s*(all)?$/i],
+      action: function () { sendCommand("ARM", { droneId: "ALL" }); },
+      label: "arm all",
+      desc: "Arm all assets"
+    },
+    {
+      patterns: [/^disarm\s*(all)?$/i],
+      action: function () { sendCommand("DISARM", { droneId: "ALL" }); },
+      label: "disarm",
+      desc: "Disarm all assets"
+    },
+    {
+      patterns: [/^(?:launch|takeoff|take\s+off)$/i],
+      action: function () { sendCommand("TAKEOFF", { altitude: 30 }); },
+      label: "launch / takeoff",
+      desc: "Launch all to 30m AGL"
+    },
+    {
+      patterns: [/^(?:land|recover)$/i],
+      action: function () { sendCommand("LAND", {}); },
+      label: "land / recover",
+      desc: "Land all assets"
+    },
+    {
+      patterns: [/^(?:abort|emergency|stop)$/i],
+      action: function () { sendCommand("EMERGENCY_STOP", {}); },
+      label: "abort / emergency",
+      desc: "Emergency stop all assets"
+    },
+    {
+      patterns: [/^(?:rtl|return|return\s+to\s+base)$/i],
+      action: function () { sendCommand("RTL", {}); },
+      label: "rtl / return",
+      desc: "Return to launch point"
+    },
+    {
+      patterns: [
+        /^(?:formation|set\s+formation)\s+(v|v_formation|diamond|line|line_abreast|column|col|orbit|orb|scatter|sct)$/i
+      ],
+      action: function (m) {
+        var raw = m[1].toUpperCase();
+        var map = {
+          V: "V_FORMATION", V_FORMATION: "V_FORMATION",
+          DIAMOND: "DIAMOND", DIA: "DIAMOND",
+          LINE: "LINE_ABREAST", LINE_ABREAST: "LINE_ABREAST",
+          COLUMN: "COLUMN", COL: "COLUMN",
+          ORBIT: "ORBIT", ORB: "ORBIT",
+          SCATTER: "SCATTER", SCT: "SCATTER"
+        };
+        var formation = map[raw] || raw;
+        sendCommand("SET_FORMATION", { formation: formation });
+      },
+      label: "formation <type>",
+      desc: "Set formation: v, diamond, line, column, orbit, scatter"
+    },
+    {
+      patterns: [/^(?:speed|set\s+speed)\s+(\d+(?:\.\d+)?)$/i],
+      action: function (m) {
+        sendCommand("SET_SPEED", { speed: parseFloat(m[1]) });
+      },
+      label: "speed <N>",
+      desc: "Set speed in m/s"
+    },
+    {
+      patterns: [
+        /^(?:altitude|alt|set\s+alt(?:itude)?)\s+(\d+(?:\.\d+)?)$/i
+      ],
+      action: function (m) {
+        sendCommand("SET_ALTITUDE", { altitude: parseFloat(m[1]) });
+      },
+      label: "altitude <N>",
+      desc: "Set altitude in meters"
+    },
+    {
+      patterns: [
+        /^goto\s+(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)$/i
+      ],
+      action: function (m) {
+        sendCommand("GOTO", {
+          lat: parseFloat(m[1]),
+          lng: parseFloat(m[2])
+        });
+      },
+      label: "goto <lat> <lng>",
+      desc: "Navigate to coordinates"
+    }
+  ];
+
+  // ---------------------------------------------------------------
+  // Command execution
+  // ---------------------------------------------------------------
+  function execCommand(text) {
+    text = text.trim();
+    if (!text) return;
+
+    pushHistory(text);
+
+    for (var i = 0; i < COMMANDS.length; i++) {
+      var cmd = COMMANDS[i];
+      for (var j = 0; j < cmd.patterns.length; j++) {
+        var m = text.match(cmd.patterns[j]);
+        if (m) {
+          cmd.action(m);
+          flashBar("ci-ok");
+          return;
+        }
+      }
+    }
+
+    flashBar("ci-err");
+  }
+
+  function flashBar(cls) {
+    bar.classList.remove("ci-ok", "ci-err");
+    void bar.offsetWidth;
+    bar.classList.add(cls);
+    setTimeout(function () { bar.classList.remove(cls); }, 600);
+  }
+
+  // ---------------------------------------------------------------
+  // Command history
+  // ---------------------------------------------------------------
+  function pushHistory(text) {
+    if (history.length > 0 && history[history.length - 1] === text) {
+      historyIdx = -1;
+      return;
+    }
+    history.push(text);
+    if (history.length > MAX_HISTORY) {
+      history.shift();
+    }
+    historyIdx = -1;
+  }
+
+  function recallHistory(direction) {
+    if (history.length === 0) return;
+    if (direction === "up") {
+      if (historyIdx === -1) {
+        historyIdx = history.length - 1;
+      } else if (historyIdx > 0) {
+        historyIdx--;
+      }
+    } else {
+      if (historyIdx === -1) return;
+      if (historyIdx < history.length - 1) {
+        historyIdx++;
+      } else {
+        historyIdx = -1;
+        input.value = "";
+        updateSuggestions();
+        return;
+      }
+    }
+    input.value = history[historyIdx];
+    updateSuggestions();
+  }
+
+  // ---------------------------------------------------------------
+  // Suggestions
+  // ---------------------------------------------------------------
+  function updateSuggestions() {
+    var text = input.value.trim().toLowerCase();
+    activeSugIdx = -1;
+
+    if (!text) {
+      hideSuggestions();
+      return;
+    }
+
+    currentSuggestions = [];
+    for (var i = 0; i < COMMANDS.length; i++) {
+      var cmd = COMMANDS[i];
+      if (cmd.label.toLowerCase().indexOf(text) !== -1 ||
+          cmd.desc.toLowerCase().indexOf(text) !== -1 ||
+          matchesPartial(text, cmd)) {
+        currentSuggestions.push(cmd);
+      }
+      if (currentSuggestions.length >= MAX_SUGGESTIONS) break;
+    }
+
+    if (currentSuggestions.length === 0) {
+      hideSuggestions();
+      return;
+    }
+
+    renderSuggestions();
+  }
+
+  function matchesPartial(text, cmd) {
+    for (var j = 0; j < cmd.patterns.length; j++) {
+      var src = cmd.patterns[j].source;
+      var keywords = src.replace(/[\\^$.*+?()[\]{}|]/g, " ")
+        .toLowerCase().split(/\s+/)
+        .filter(function (w) { return w.length > 2; });
+      for (var k = 0; k < keywords.length; k++) {
+        if (keywords[k].indexOf(text) === 0 || text.indexOf(keywords[k]) === 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function renderSuggestions() {
+    var html = "";
+    for (var i = 0; i < currentSuggestions.length; i++) {
+      var cmd = currentSuggestions[i];
+      var cls = i === activeSugIdx ? "ci-sug-item active" : "ci-sug-item";
+      html += '<div class="' + cls + '" data-ci-idx="' + i + '">'
+        + '<span class="ci-sug-cmd">' + escapeHtml(cmd.label) + '</span>'
+        + '<span class="ci-sug-desc">' + escapeHtml(cmd.desc) + '</span>'
+        + '</div>';
+    }
+    sugBox.innerHTML = html;
+    sugBox.classList.add("visible");
+
+    var items = sugBox.querySelectorAll(".ci-sug-item");
+    for (var j = 0; j < items.length; j++) {
+      (function (idx) {
+        items[idx].addEventListener("mousedown", function (e) {
+          e.preventDefault();
+          selectSuggestion(idx);
+        });
+      })(j);
+    }
+  }
+
+  function hideSuggestions() {
+    sugBox.classList.remove("visible");
+    sugBox.innerHTML = "";
+    currentSuggestions = [];
+    activeSugIdx = -1;
+  }
+
+  function selectSuggestion(idx) {
+    if (idx < 0 || idx >= currentSuggestions.length) return;
+    var label = currentSuggestions[idx].label;
+    var fillText = label.replace(/ <[^>]+>$/, "");
+    input.value = fillText + " ";
+    hideSuggestions();
+    input.focus();
+  }
+
+  function navigateSuggestions(direction) {
+    if (currentSuggestions.length === 0) return false;
+
+    if (direction === "down") {
+      activeSugIdx = activeSugIdx < currentSuggestions.length - 1
+        ? activeSugIdx + 1 : 0;
+    } else {
+      activeSugIdx = activeSugIdx > 0
+        ? activeSugIdx - 1 : currentSuggestions.length - 1;
+    }
+
+    var items = sugBox.querySelectorAll(".ci-sug-item");
+    for (var i = 0; i < items.length; i++) {
+      items[i].classList.toggle("active", i === activeSugIdx);
+    }
+    return true;
+  }
+
+  // ---------------------------------------------------------------
+  // Event handling
+  // ---------------------------------------------------------------
+  input.addEventListener("keydown", function (e) {
+    var sugVisible = sugBox.classList.contains("visible");
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (sugVisible && activeSugIdx >= 0) {
+        selectSuggestion(activeSugIdx);
+      } else {
+        execCommand(input.value);
+        input.value = "";
+        hideSuggestions();
+      }
+      return;
+    }
+
+    if (e.key === "Tab") {
+      if (sugVisible && currentSuggestions.length > 0) {
+        e.preventDefault();
+        var idx = activeSugIdx >= 0 ? activeSugIdx : 0;
+        selectSuggestion(idx);
+      }
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (sugVisible && currentSuggestions.length > 0) {
+        navigateSuggestions("up");
+      } else {
+        recallHistory("up");
+      }
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (sugVisible && currentSuggestions.length > 0) {
+        navigateSuggestions("down");
+      } else {
+        recallHistory("down");
+      }
+      return;
+    }
+
+    if (e.key === "Escape") {
+      if (sugVisible) {
+        hideSuggestions();
+      } else {
+        input.blur();
+      }
+      e.preventDefault();
+      return;
+    }
+  });
+
+  input.addEventListener("input", function () {
+    historyIdx = -1;
+    updateSuggestions();
+  });
+
+  input.addEventListener("blur", function () {
+    setTimeout(function () { hideSuggestions(); }, 150);
+  });
+
+  input.addEventListener("focus", function () {
+    if (input.value.trim()) updateSuggestions();
+  });
+
+  // Global '/' hotkey to focus the command input.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "/") return;
+    var tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+    if (e.target.isContentEditable) return;
+
+    e.preventDefault();
+    input.focus();
+  });
+
+  // Prevent map interactions while the input is focused.
+  input.addEventListener("focus", function () {
+    bar.style.borderColor = "var(--accent, #3B82C4)";
+  });
+  input.addEventListener("blur", function () {
+    bar.style.borderColor = "";
+  });
+
+  // ---------------------------------------------------------------
+  // Utility
+  // ---------------------------------------------------------------
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+})();
+</script>

@@ -1,0 +1,550 @@
+<!--
+  BULWARK HUD snippet: Drone Health Monitoring Panel
+  Shows per-asset telemetry cards when connected to the main OVERWATCH backend.
+  Hidden in wargame mode. Expects global CSS variables from styles.css.
+  Exposes: window._healthOnTelemetry(assets)
+-->
+
+<style>
+/* --- Drone Health Panel --- */
+.dh-panel {
+  position: fixed; top: 60px; left: 12px; width: 240px; z-index: 500;
+  pointer-events: auto;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px;
+  font-family: var(--font-data, monospace); font-size: 11px;
+  display: none; flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.45); user-select: none;
+  overflow: hidden;
+}
+.dh-panel.visible {
+  display: flex;
+}
+.dh-header {
+  padding: 8px 10px;
+  font-family: var(--font-label, sans-serif);
+  font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim, #7A8899);
+  border-bottom: 1px solid var(--border, #252B35);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.dh-count-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 16px; padding: 0 4px;
+  border-radius: 8px; font-size: 9px; font-weight: 700;
+  background: rgba(59,130,196,0.2); color: var(--accent, #3B82C4);
+  font-family: var(--font-data, monospace);
+}
+.dh-scroll {
+  max-height: calc(6 * 94px);
+  overflow-y: auto;
+}
+.dh-scroll::-webkit-scrollbar { width: 4px; }
+.dh-scroll::-webkit-scrollbar-thumb { background: var(--border, #252B35); border-radius: 2px; }
+
+/* --- Per-drone card --- */
+.dh-card {
+  padding: 6px 10px; border-bottom: 1px solid rgba(37,43,53,0.5);
+  transition: border-color 0.3s ease;
+}
+.dh-card.alert-flash {
+  animation: dh-alert-flash 1s ease-in-out infinite;
+}
+.dh-card.degraded-pulse {
+  animation: dh-degraded-pulse 2s ease-in-out infinite;
+}
+@keyframes dh-alert-flash {
+  0%, 100% { border-left: 3px solid transparent; }
+  50% { border-left: 3px solid var(--red, #C23A3E); }
+}
+@keyframes dh-degraded-pulse {
+  0%, 100% { border-left: 3px solid transparent; }
+  50% { border-left: 3px solid var(--amber, #B86E17); }
+}
+
+.dh-card-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+.dh-id {
+  font-weight: 700; font-size: 11px; color: var(--text-bright, #E8ECF0);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100px;
+}
+.dh-role {
+  padding: 1px 5px; border-radius: 3px; font-size: 7px; letter-spacing: 1px;
+  font-weight: 700; text-transform: uppercase;
+  background: rgba(59,130,196,0.15); color: var(--cyan, #4888D8);
+}
+.dh-role.primary { background: rgba(30,122,74,0.2); color: var(--green, #1E7A4A); }
+.dh-role.isr { background: rgba(110,88,199,0.2); color: var(--purple, #6E58C7); }
+.dh-role.overwatch { background: rgba(184,110,23,0.2); color: var(--amber, #B86E17); }
+.dh-role.logistics { background: rgba(138,150,163,0.2); color: var(--text-secondary, #8A96A3); }
+
+.dh-status-badge {
+  padding: 1px 6px; border-radius: 3px; font-size: 7px; letter-spacing: 1px;
+  font-weight: 700; text-transform: uppercase;
+}
+.dh-status-badge.nominal { background: rgba(30,122,74,0.25); color: var(--green, #1E7A4A); }
+.dh-status-badge.degraded { background: rgba(184,110,23,0.25); color: var(--amber, #B86E17); }
+.dh-status-badge.comms-degraded { background: rgba(184,110,23,0.25); color: var(--amber, #B86E17); }
+.dh-status-badge.rtb { background: rgba(59,130,196,0.2); color: var(--cyan, #4888D8); }
+.dh-status-badge.grounded { background: rgba(138,150,163,0.2); color: var(--text-tertiary, #6B7785); }
+.dh-status-badge.offline { background: rgba(194,58,62,0.25); color: var(--red, #C23A3E); }
+.dh-status-badge.isr-solo { background: rgba(110,88,199,0.2); color: var(--purple, #6E58C7); }
+
+/* Metric rows */
+.dh-metrics {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px;
+  margin-top: 4px;
+}
+.dh-metric {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 9px; line-height: 1.6;
+}
+.dh-metric-label {
+  color: var(--text-dim, #7A8899); font-size: 8px; letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.dh-metric-val {
+  font-weight: 700; color: var(--text, #D4DAE0);
+  font-variant-numeric: tabular-nums;
+}
+.dh-metric-val.green { color: var(--green, #1E7A4A); }
+.dh-metric-val.amber { color: var(--amber, #B86E17); }
+.dh-metric-val.red { color: var(--red, #C23A3E); }
+
+/* Bar component */
+.dh-bar-wrap {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 9px;
+}
+.dh-bar-label {
+  color: var(--text-dim, #7A8899); font-size: 8px; letter-spacing: 0.8px;
+  text-transform: uppercase; width: 28px; flex-shrink: 0;
+}
+.dh-bar-track {
+  flex: 1; height: 5px; background: rgba(37,43,53,0.8);
+  border-radius: 3px; overflow: hidden; position: relative;
+}
+.dh-bar-fill {
+  height: 100%; border-radius: 3px; transition: width 0.3s ease, background 0.3s ease;
+}
+.dh-bar-val {
+  font-weight: 700; font-variant-numeric: tabular-nums; width: 30px;
+  text-align: right; flex-shrink: 0;
+}
+.dh-bar-val.green { color: var(--green, #1E7A4A); }
+.dh-bar-val.amber { color: var(--amber, #B86E17); }
+.dh-bar-val.red { color: var(--red, #C23A3E); }
+
+.dh-empty {
+  padding: 16px 10px; color: var(--text-dim, #7A8899);
+  font-size: 9px; text-align: center; letter-spacing: 1px;
+  text-transform: uppercase;
+}
+</style>
+
+<!-- Drone Health Panel -->
+<div class="dh-panel" id="dh-panel">
+  <div class="dh-header">
+    <span>ASSET STATUS</span>
+    <span class="dh-count-badge" id="dh-count">0</span>
+  </div>
+  <div class="dh-scroll" id="dh-scroll">
+    <div class="dh-empty" id="dh-empty">NO ASSETS</div>
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------
+
+  var isC2Mode = false;
+  var isWargameMode = false;
+  var assetMap = {};
+
+  // ---------------------------------------------------------------
+  // DOM references
+  // ---------------------------------------------------------------
+
+  var panel = document.getElementById("dh-panel");
+  var scrollContainer = document.getElementById("dh-scroll");
+  var countBadge = document.getElementById("dh-count");
+  var emptyMsg = document.getElementById("dh-empty");
+
+  // ---------------------------------------------------------------
+  // Mode detection
+  // ---------------------------------------------------------------
+
+  function enterC2Mode() {
+    if (isC2Mode) return;
+    isC2Mode = true;
+    isWargameMode = false;
+    panel.classList.add("visible");
+  }
+
+  function enterWargameMode() {
+    isWargameMode = true;
+    isC2Mode = false;
+    panel.classList.remove("visible");
+    assetMap = {};
+  }
+
+  // ---------------------------------------------------------------
+  // Color helpers
+  // ---------------------------------------------------------------
+
+  function batteryColor(pct) {
+    if (pct > 50) return "green";
+    if (pct >= 25) return "amber";
+    return "red";
+  }
+
+  function batteryBarColor(pct) {
+    if (pct > 50) return "var(--green, #1E7A4A)";
+    if (pct >= 25) return "var(--amber, #B86E17)";
+    return "var(--red, #C23A3E)";
+  }
+
+  function rssiColor(rssi) {
+    if (rssi > 70) return "green";
+    if (rssi >= 50) return "amber";
+    return "red";
+  }
+
+  function rssiBarColor(rssi) {
+    if (rssi > 70) return "var(--green, #1E7A4A)";
+    if (rssi >= 50) return "var(--amber, #B86E17)";
+    return "var(--red, #C23A3E)";
+  }
+
+  function gpsColor(sats, hdop) {
+    if (sats > 10 && hdop < 2) return "green";
+    return "amber";
+  }
+
+  function statusBadgeClass(status) {
+    if (!status) return "grounded";
+    var s = String(status).toUpperCase();
+    if (s === "NOMINAL") return "nominal";
+    if (s === "DEGRADED") return "degraded";
+    if (s === "COMMS_DEGRADED") return "comms-degraded";
+    if (s === "RTB") return "rtb";
+    if (s === "GROUNDED") return "grounded";
+    if (s === "OFFLINE") return "offline";
+    if (s === "ISR_SOLO") return "isr-solo";
+    return "grounded";
+  }
+
+  function roleClass(role) {
+    if (!role) return "";
+    var r = String(role).toUpperCase();
+    if (r === "PRIMARY") return "primary";
+    if (r === "ISR") return "isr";
+    if (r === "OVERWATCH") return "overwatch";
+    if (r === "LOGISTICS") return "logistics";
+    return "";
+  }
+
+  function shouldAlertFlash(asset) {
+    var batt = extractBattery(asset);
+    var status = extractStatus(asset);
+    return batt < 25 || status === "OFFLINE";
+  }
+
+  function shouldDegradedPulse(asset) {
+    var status = extractStatus(asset);
+    return status === "DEGRADED" || status === "COMMS_DEGRADED";
+  }
+
+  // ---------------------------------------------------------------
+  // Field extraction (handles nested wire format)
+  // ---------------------------------------------------------------
+
+  function extractId(a) {
+    return a.drone_id || a.id || "UNKNOWN";
+  }
+
+  function extractRole(a) {
+    if (a.formation && a.formation.role) return a.formation.role;
+    return a.role || "ESCORT";
+  }
+
+  function extractBattery(a) {
+    if (a.battery && typeof a.battery.remaining_pct === "number") {
+      return a.battery.remaining_pct;
+    }
+    if (typeof a.remaining_pct === "number") return a.remaining_pct;
+    if (typeof a.battery === "number") return a.battery;
+    return 0;
+  }
+
+  function extractSatellites(a) {
+    if (a.gps && typeof a.gps.satellites === "number") return a.gps.satellites;
+    if (typeof a.satellites === "number") return a.satellites;
+    return 0;
+  }
+
+  function extractHdop(a) {
+    if (a.gps && typeof a.gps.hdop === "number") return a.gps.hdop;
+    if (typeof a.hdop === "number") return a.hdop;
+    return 99.9;
+  }
+
+  function extractRssi(a) {
+    if (a.link && typeof a.link.rssi === "number") return a.link.rssi;
+    if (typeof a.rssi === "number") return a.rssi;
+    return 0;
+  }
+
+  function extractStatus(a) {
+    var s = a.status || "GROUNDED";
+    return String(s).toUpperCase();
+  }
+
+  function extractAlt(a) {
+    if (a.position && typeof a.position.alt_agl === "number") return a.position.alt_agl;
+    if (typeof a.alt_agl === "number") return a.alt_agl;
+    if (a.position && typeof a.position.alt_msl === "number") return a.position.alt_msl;
+    if (typeof a.alt === "number") return a.alt;
+    return 0;
+  }
+
+  function extractSpeed(a) {
+    if (a.velocity && typeof a.velocity.ground_speed === "number") {
+      return a.velocity.ground_speed;
+    }
+    if (typeof a.ground_speed === "number") return a.ground_speed;
+    if (typeof a.speed === "number") return a.speed;
+    return 0;
+  }
+
+  function extractHeading(a) {
+    if (a.velocity && typeof a.velocity.heading === "number") {
+      return a.velocity.heading;
+    }
+    if (typeof a.heading === "number") return a.heading;
+    return 0;
+  }
+
+  // ---------------------------------------------------------------
+  // Card rendering
+  // ---------------------------------------------------------------
+
+  function renderCard(asset) {
+    var id = extractId(asset);
+    var role = extractRole(asset);
+    var batt = extractBattery(asset);
+    var sats = extractSatellites(asset);
+    var hdop = extractHdop(asset);
+    var rssi = extractRssi(asset);
+    var status = extractStatus(asset);
+    var alt = extractAlt(asset);
+    var speed = extractSpeed(asset);
+    var heading = extractHeading(asset);
+
+    var cardClass = "dh-card";
+    if (shouldAlertFlash(asset)) {
+      cardClass += " alert-flash";
+    } else if (shouldDegradedPulse(asset)) {
+      cardClass += " degraded-pulse";
+    }
+
+    var battClr = batteryColor(batt);
+    var rssiClr = rssiColor(rssi);
+    var gpsClr = gpsColor(sats, hdop);
+    var statusCls = statusBadgeClass(status);
+    var roleCls = roleClass(role);
+
+    var html = '<div class="' + cardClass + '" data-drone-id="' + id + '">';
+
+    // Top row: ID + role + status
+    html += '<div class="dh-card-top">';
+    html += '<span class="dh-id">' + escapeHtml(id) + '</span>';
+    html += '<span class="dh-role ' + roleCls + '">' + escapeHtml(role) + '</span>';
+    html += '<span class="dh-status-badge ' + statusCls + '">' + escapeHtml(status) + '</span>';
+    html += '</div>';
+
+    // Battery bar
+    html += '<div class="dh-bar-wrap">';
+    html += '<span class="dh-bar-label">BAT</span>';
+    html += '<div class="dh-bar-track">';
+    html += '<div class="dh-bar-fill" style="width:' + clamp(batt, 0, 100) + '%;';
+    html += 'background:' + batteryBarColor(batt) + '"></div>';
+    html += '</div>';
+    html += '<span class="dh-bar-val ' + battClr + '">' + Math.round(batt) + '%</span>';
+    html += '</div>';
+
+    // RSSI bar
+    html += '<div class="dh-bar-wrap">';
+    html += '<span class="dh-bar-label">LNK</span>';
+    html += '<div class="dh-bar-track">';
+    html += '<div class="dh-bar-fill" style="width:' + clamp(rssi, 0, 100) + '%;';
+    html += 'background:' + rssiBarColor(rssi) + '"></div>';
+    html += '</div>';
+    html += '<span class="dh-bar-val ' + rssiClr + '">' + Math.round(rssi) + '</span>';
+    html += '</div>';
+
+    // Metric grid: GPS, ALT, SPD, HDG
+    html += '<div class="dh-metrics">';
+
+    html += '<div class="dh-metric">';
+    html += '<span class="dh-metric-label">GPS</span>';
+    html += '<span class="dh-metric-val ' + gpsClr + '">';
+    html += sats + ' sat / ' + hdop.toFixed(1);
+    html += '</span></div>';
+
+    html += '<div class="dh-metric">';
+    html += '<span class="dh-metric-label">ALT</span>';
+    html += '<span class="dh-metric-val">' + alt.toFixed(1) + ' m</span>';
+    html += '</div>';
+
+    html += '<div class="dh-metric">';
+    html += '<span class="dh-metric-label">SPD</span>';
+    html += '<span class="dh-metric-val">' + speed.toFixed(1) + ' m/s</span>';
+    html += '</div>';
+
+    html += '<div class="dh-metric">';
+    html += '<span class="dh-metric-label">HDG</span>';
+    html += '<span class="dh-metric-val">' + Math.round(heading) + '</span>';
+    html += '</div>';
+
+    html += '</div>';
+    html += '</div>';
+
+    return html;
+  }
+
+  // ---------------------------------------------------------------
+  // Full panel update
+  // ---------------------------------------------------------------
+
+  function updatePanel(assets) {
+    if (!assets || !Array.isArray(assets) || assets.length === 0) {
+      emptyMsg.style.display = "";
+      countBadge.textContent = "0";
+      return;
+    }
+
+    emptyMsg.style.display = "none";
+    countBadge.textContent = String(assets.length);
+
+    // Store in map for potential external queries
+    assetMap = {};
+    for (var i = 0; i < assets.length; i++) {
+      var aid = extractId(assets[i]);
+      assetMap[aid] = assets[i];
+    }
+
+    // Sort: OFFLINE and low battery at top for visibility
+    var sorted = assets.slice().sort(function(a, b) {
+      var aAlert = shouldAlertFlash(a) ? 0 : 1;
+      var bAlert = shouldAlertFlash(b) ? 0 : 1;
+      if (aAlert !== bAlert) return aAlert - bAlert;
+
+      var aDeg = shouldDegradedPulse(a) ? 0 : 1;
+      var bDeg = shouldDegradedPulse(b) ? 0 : 1;
+      if (aDeg !== bDeg) return aDeg - bDeg;
+
+      return extractId(a).localeCompare(extractId(b));
+    });
+
+    var html = "";
+    for (var j = 0; j < sorted.length; j++) {
+      html += renderCard(sorted[j]);
+    }
+    scrollContainer.innerHTML = html;
+
+    // Re-add empty message node (hidden)
+    emptyMsg = document.createElement("div");
+    emptyMsg.className = "dh-empty";
+    emptyMsg.id = "dh-empty";
+    emptyMsg.textContent = "NO ASSETS";
+    emptyMsg.style.display = "none";
+    scrollContainer.appendChild(emptyMsg);
+  }
+
+  // ---------------------------------------------------------------
+  // Utilities
+  // ---------------------------------------------------------------
+
+  function clamp(v, lo, hi) {
+    return Math.max(lo, Math.min(hi, v));
+  }
+
+  function escapeHtml(str) {
+    var d = document.createElement("span");
+    d.textContent = String(str);
+    return d.innerHTML;
+  }
+
+  // ---------------------------------------------------------------
+  // Message listener integration
+  // ---------------------------------------------------------------
+
+  // Expose global callback for external wiring
+  window._healthOnTelemetry = function(assets) {
+    if (!Array.isArray(assets)) return;
+    enterC2Mode();
+    updatePanel(assets);
+  };
+
+  // Hook into the WebSocket message event if available.
+  // The main bulwark.html creates `ws` as a global. We patch
+  // addEventListener on the global scope to detect new WebSocket
+  // connections and attach our listener.
+  var _attachedWs = null;
+
+  function attachToWebSocket(socket) {
+    if (_attachedWs === socket) return;
+    _attachedWs = socket;
+
+    socket.addEventListener("message", function(ev) {
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+
+      // Wargame mode detection: hide panel
+      if (msg && msg.type === "WARGAME_FRAME") {
+        enterWargameMode();
+        return;
+      }
+
+      // STATE_SYNC from main backend on connect
+      if (msg && msg.type === "STATE_SYNC") {
+        enterC2Mode();
+        var assets = msg.assets || msg.drones || [];
+        updatePanel(assets);
+        return;
+      }
+
+      // Raw telemetry array (aggregator 10Hz broadcast)
+      if (Array.isArray(msg) && msg.length > 0 && msg[0].type === "ASSET_STATE") {
+        enterC2Mode();
+        updatePanel(msg);
+        return;
+      }
+
+      // Array of alert objects (ignore for health, handled elsewhere)
+    });
+  }
+
+  // Poll for global `ws` variable created by bulwark.html.
+  // Non-invasive: checks periodically rather than overriding
+  // the WebSocket constructor. Attaches once per unique instance.
+  setInterval(function() {
+    if (typeof window.ws !== "undefined" &&
+        window.ws instanceof WebSocket &&
+        window.ws !== _attachedWs) {
+      attachToWebSocket(window.ws);
+    }
+  }, 500);
+
+})();
+</script>
