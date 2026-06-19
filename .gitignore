@@ -27,3 +27,4 @@ backend/models/*.zip
 certs/
 backend/yolo11n.pt
 *.pt
+backend/runs/
