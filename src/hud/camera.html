@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OVERWATCH - Live Detection</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0B0E11; color: #D4DAE0; font-family: 'JetBrains Mono', monospace; }
+.topbar {
+  height: 46px; display: flex; align-items: center; gap: 18px; padding: 0 18px;
+  background: #141820; border-bottom: 1px solid #252B35;
+}
+.brand { font-weight: 700; font-size: 15px; letter-spacing: 2px; color: #E8ECF0; }
+.brand .sub { color: #3B82C4; margin-left: 8px; font-size: 11px; letter-spacing: 1px; }
+.status { margin-left: auto; font-size: 11px; color: #7A8899; display: flex; align-items: center; gap: 8px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #6B7785; }
+.dot.live { background: #1E7A4A; box-shadow: 0 0 8px #1E7A4A; }
+.dot.err { background: #C23A3E; }
+
+.main { display: flex; height: calc(100vh - 46px); }
+.feed { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
+.feed canvas { max-width: 100%; max-height: 100%; }
+.feed .waiting { color: #7A8899; font-size: 14px; letter-spacing: 1px; }
+
+.sidebar {
+  width: 280px; background: #141820; border-left: 1px solid #252B35;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.section-header {
+  padding: 10px 14px; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: #7A8899; border-bottom: 1px solid #252B35;
+}
+.stats { padding: 10px 14px; border-bottom: 1px solid #252B35; }
+.stat-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
+.stat-label { color: #7A8899; }
+.stat-val { color: #E8ECF0; font-weight: 700; }
+.stat-val.green { color: #1E7A4A; }
+.stat-val.amber { color: #B86E17; }
+.stat-val.accent { color: #3B82C4; }
+
+.det-list { flex: 1; overflow-y: auto; }
+.det-list::-webkit-scrollbar { width: 4px; }
+.det-list::-webkit-scrollbar-thumb { background: #252B35; border-radius: 2px; }
+.det-entry {
+  display: flex; align-items: center; gap: 8px; padding: 6px 14px;
+  border-bottom: 1px solid rgba(37,43,53,0.5); font-size: 11px;
+}
+.det-conf-bar { width: 40px; height: 6px; background: #1A1F28; border-radius: 3px; overflow: hidden; }
+.det-conf-fill { height: 100%; border-radius: 3px; background: #3B82C4; }
+.det-class { flex: 1; color: #D4DAE0; }
+.det-pct { color: #1E7A4A; font-weight: 700; width: 40px; text-align: right; }
+.det-empty { padding: 20px 14px; color: #7A8899; text-align: center; font-size: 10px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">OVERWATCH<span class="sub">LIVE DETECTION</span></div>
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span id="status-text">CONNECTING...</span>
+  </div>
+</div>
+<div class="main">
+  <div class="feed">
+    <canvas id="canvas" width="1280" height="720"></canvas>
+    <div class="waiting" id="waiting">CONNECTING TO CAMERA...</div>
+  </div>
+  <div class="sidebar">
+    <div class="section-header">Performance</div>
+    <div class="stats">
+      <div class="stat-row"><span class="stat-label">Inference</span><span class="stat-val accent" id="s-inf">--</span></div>
+      <div class="stat-row"><span class="stat-label">Detections</span><span class="stat-val green" id="s-det">0</span></div>
+      <div class="stat-row"><span class="stat-label">Resolution</span><span class="stat-val" id="s-res">--</span></div>
+      <div class="stat-row"><span class="stat-label">Model</span><span class="stat-val" id="s-model">YOLOv11n</span></div>
+    </div>
+    <div class="section-header">Detections</div>
+    <div class="det-list" id="det-list">
+      <div class="det-empty">NO DETECTIONS</div>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+var dot = document.getElementById("dot");
+var statusText = document.getElementById("status-text");
+var waiting = document.getElementById("waiting");
+var img = new Image();
+var ws;
+
+var COLORS = ["#3B82C4","#1E7A4A","#B86E17","#C23A3E","#9B59C2","#4AB0C2","#D98A2B","#E8ECF0"];
+
+function connect() {
+  ws = new WebSocket("ws://localhost:8766");
+  ws.onopen = function () {
+    dot.className = "dot live";
+    statusText.textContent = "LIVE";
+    waiting.style.display = "none";
+  };
+  ws.onclose = function () {
+    dot.className = "dot err";
+    statusText.textContent = "DISCONNECTED";
+    waiting.style.display = "";
+    waiting.textContent = "RECONNECTING...";
+    setTimeout(connect, 2000);
+  };
+  ws.onerror = function () { dot.className = "dot err"; };
+  ws.onmessage = function (ev) {
+    var msg;
+    try { msg = JSON.parse(ev.data); } catch (_) { return; }
+    if (msg.type !== "WEBCAM_FRAME") return;
+    document.getElementById("s-inf").textContent = msg.inference_ms + " ms";
+    document.getElementById("s-det").textContent = msg.detection_count;
+    document.getElementById("s-res").textContent = msg.width + "x" + msg.height;
+    img.onload = function () {
+      canvas.width = msg.width;
+      canvas.height = msg.height;
+      ctx.drawImage(img, 0, 0);
+      drawBoxes(msg.detections || []);
+    };
+    img.src = "data:image/jpeg;base64," + msg.frame;
+    renderList(msg.detections || []);
+  };
+}
+
+function drawBoxes(dets) {
+  ctx.lineWidth = 2;
+  ctx.font = "bold 14px monospace";
+  var classIdx = {};
+  dets.forEach(function (d, i) {
+    if (!(d.class in classIdx)) classIdx[d.class] = Object.keys(classIdx).length;
+    var color = COLORS[classIdx[d.class] % COLORS.length];
+    var b = d.bbox;
+    var w = b[2] - b[0], h = b[3] - b[1];
+    ctx.strokeStyle = color;
+    ctx.strokeRect(b[0], b[1], w, h);
+    var label = d.class + " " + (d.confidence * 100).toFixed(0) + "%";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(11,14,17,0.8)";
+    ctx.fillRect(b[0], b[1] - 20, tw + 10, 20);
+    ctx.fillStyle = color;
+    ctx.fillText(label, b[0] + 5, b[1] - 5);
+    // corner brackets
+    var c = 12;
+    ctx.beginPath();
+    ctx.moveTo(b[0], b[1]+c); ctx.lineTo(b[0], b[1]); ctx.lineTo(b[0]+c, b[1]);
+    ctx.moveTo(b[2]-c, b[1]); ctx.lineTo(b[2], b[1]); ctx.lineTo(b[2], b[1]+c);
+    ctx.moveTo(b[2], b[3]-c); ctx.lineTo(b[2], b[3]); ctx.lineTo(b[2]-c, b[3]);
+    ctx.moveTo(b[0]+c, b[3]); ctx.lineTo(b[0], b[3]); ctx.lineTo(b[0], b[3]-c);
+    ctx.stroke();
+  });
+}
+
+function renderList(dets) {
+  var el = document.getElementById("det-list");
+  if (!dets.length) { el.innerHTML = '<div class="det-empty">NO DETECTIONS</div>'; return; }
+  var html = "";
+  dets.forEach(function (d) {
+    var pct = (d.confidence * 100).toFixed(0);
+    html += '<div class="det-entry">'
+      + '<div class="det-conf-bar"><div class="det-conf-fill" style="width:' + pct + '%"></div></div>'
+      + '<span class="det-class">' + d.class + '</span>'
+      + '<span class="det-pct">' + pct + '%</span></div>';
+  });
+  el.innerHTML = html;
+}
+
+connect();
+</script>
+</body>
+</html>

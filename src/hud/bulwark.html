@@ -1398,5 +1398,128 @@ wireToggle("toggle-feed", "feed");
   if (window.ws && window.ws.readyState === 1) setBar("connected");
 })();
 </script>
+
+<!-- ============================================================ -->
+<!-- Webcam Detection Feed                                        -->
+<!-- ============================================================ -->
+<style>
+.webcam-panel {
+  position: fixed; bottom: 64px; left: 384px; z-index: 500; pointer-events: auto;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  border-radius: 4px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+  display: none; flex-direction: column;
+}
+.webcam-panel.visible { display: flex; }
+.webcam-header {
+  padding: 6px 10px; font-family: var(--font-data, monospace); font-size: 9px;
+  letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim, #7A8899);
+  border-bottom: 1px solid var(--border, #252B35);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.webcam-header .wc-fps { color: var(--green, #1E7A4A); }
+.webcam-canvas-wrap { position: relative; width: 380px; height: 285px; background: #000; }
+.webcam-canvas-wrap canvas { width: 100%; height: 100%; }
+.webcam-dets {
+  padding: 4px 10px; font-family: var(--font-data, monospace); font-size: 9px;
+  color: var(--text-dim, #7A8899); max-height: 80px; overflow-y: auto;
+  border-top: 1px solid var(--border, #252B35);
+}
+.webcam-det-row { padding: 1px 0; display: flex; gap: 6px; }
+.webcam-det-cls { color: var(--accent, #3B82C4); width: 80px; }
+.webcam-det-conf { color: var(--green, #1E7A4A); width: 40px; text-align: right; }
+.webcam-toggle {
+  position: fixed; bottom: 68px; left: 330px; z-index: 501; pointer-events: auto;
+  background: var(--panel, #141820); border: 1px solid var(--border, #252B35);
+  color: var(--text-dim, #7A8899); font-family: var(--font-data, monospace);
+  font-size: 9px; letter-spacing: 1px; padding: 5px 10px; border-radius: 3px;
+  cursor: pointer; text-transform: uppercase; transition: all 0.15s;
+}
+.webcam-toggle.active { border-color: var(--accent, #3B82C4); color: var(--accent, #3B82C4); background: rgba(59,130,196,0.1); }
+</style>
+
+<button class="webcam-toggle" id="wc-toggle">CAM</button>
+<div class="webcam-panel" id="webcam-panel">
+  <div class="webcam-header">
+    <span>LIVE DETECTION</span>
+    <span class="wc-fps" id="wc-fps">--</span>
+  </div>
+  <div class="webcam-canvas-wrap">
+    <canvas id="wc-canvas" width="640" height="480"></canvas>
+  </div>
+  <div class="webcam-dets" id="wc-dets"></div>
+</div>
+
+<script>
+"use strict";
+(function () {
+  var panel = document.getElementById("webcam-panel");
+  var toggle = document.getElementById("wc-toggle");
+  var canvas = document.getElementById("wc-canvas");
+  var ctx = canvas.getContext("2d");
+  var fpsEl = document.getElementById("wc-fps");
+  var detsEl = document.getElementById("wc-dets");
+  var camWs = null;
+  var active = false;
+  var img = new Image();
+
+  toggle.addEventListener("click", function () {
+    active = !active;
+    toggle.classList.toggle("active", active);
+    panel.classList.toggle("visible", active);
+    if (active) connectCam();
+    else disconnectCam();
+  });
+
+  function connectCam() {
+    if (camWs) camWs.close();
+    camWs = new WebSocket("ws://localhost:8766");
+    camWs.onmessage = function (ev) {
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (_) { return; }
+      if (msg.type !== "WEBCAM_FRAME") return;
+      fpsEl.textContent = msg.inference_ms + "ms | " + msg.detection_count + " det";
+      img.onload = function () {
+        canvas.width = msg.width || 640;
+        canvas.height = msg.height || 480;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        drawBoxes(msg.detections || []);
+      };
+      img.src = "data:image/jpeg;base64," + msg.frame;
+      renderDets(msg.detections || []);
+    };
+    camWs.onclose = function () { fpsEl.textContent = "DISCONNECTED"; };
+  }
+
+  function disconnectCam() {
+    if (camWs) { camWs.close(); camWs = null; }
+  }
+
+  function drawBoxes(dets) {
+    ctx.lineWidth = 2;
+    ctx.font = "12px monospace";
+    dets.forEach(function (d) {
+      var b = d.bbox;
+      ctx.strokeStyle = "#3B82C4";
+      ctx.strokeRect(b[0], b[1], b[2] - b[0], b[3] - b[1]);
+      ctx.fillStyle = "rgba(20,24,32,0.7)";
+      var label = d.class + " " + (d.confidence * 100).toFixed(0) + "%";
+      var tw = ctx.measureText(label).width;
+      ctx.fillRect(b[0], b[1] - 16, tw + 8, 16);
+      ctx.fillStyle = "#3B82C4";
+      ctx.fillText(label, b[0] + 4, b[1] - 4);
+    });
+  }
+
+  function renderDets(dets) {
+    if (!dets.length) { detsEl.innerHTML = '<div style="color:#7A8899;padding:4px">No detections</div>'; return; }
+    var html = "";
+    dets.slice(0, 8).forEach(function (d) {
+      html += '<div class="webcam-det-row"><span class="webcam-det-cls">' + d.class + '</span><span class="webcam-det-conf">' + (d.confidence * 100).toFixed(0) + '%</span></div>';
+    });
+    if (dets.length > 8) html += '<div style="color:#7A8899">+' + (dets.length - 8) + ' more</div>';
+    detsEl.innerHTML = html;
+  }
+})();
+</script>
 </body>
 </html>

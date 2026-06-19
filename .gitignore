@@ -25,3 +25,5 @@ backend/models/*.zip
 
 # TLS certificates
 certs/
+backend/yolo11n.pt
+*.pt
