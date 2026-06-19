@@ -42,6 +42,7 @@ class Detection:
     confidence: float
     bbox: Tuple[float, float, float, float]  # (x1, y1, x2, y2)
     class_id: int = 0
+    is_thermal: bool = False
 
 
 # ---------------------------------------------------------------------------

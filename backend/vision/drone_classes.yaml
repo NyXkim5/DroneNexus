@@ -1,0 +1,27 @@
+# OVERWATCH Drone Detection Dataset Configuration
+# YOLO-format dataset config for fine-tuning on drone/UAS targets.
+#
+# Usage:
+#   python -m scripts.train_drone_detector --data backend/vision/drone_classes.yaml
+#
+# Adjust train/val/test paths to point at your labeled image directories.
+# Labels must be in YOLO format: <class_id> <cx> <cy> <w> <h> (normalized).
+
+# Dataset root directory (absolute or relative to this file)
+path: ../data/drone_dataset
+
+# Image directories relative to 'path'
+train: images/train
+val: images/val
+test: images/test
+
+# Number of classes
+nc: 5
+
+# Class names (index matches class_id in label files)
+names:
+  0: drone
+  1: quadrotor
+  2: fixed_wing
+  3: helicopter
+  4: bird
