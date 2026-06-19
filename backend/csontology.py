@@ -183,6 +183,7 @@ class Threat:
     swarm_id: Optional[str] = None
     intent: "SwarmIntent" = SwarmIntent.UNKNOWN
     confidence: float = 1.0
+    range_to_site_m: Optional[float] = None
 
 
 @dataclass

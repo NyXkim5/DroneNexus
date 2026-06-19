@@ -76,6 +76,29 @@ def _tti_urgency(tti_s: Optional[float]) -> float:
     return 1.0 - (tti_s - TTI_FLOOR_S) / span
 
 
+def _tti_exponential_urgency(tti_s: Optional[float]) -> float:
+    """Exponential urgency multiplier based on time-to-impact bands.
+
+    Ensures imminent threats score much higher than distant ones so the
+    allocator addresses them first in saturation scenarios.
+
+    TTI > 30s:  1.0  (normal)
+    TTI 15-30s: 1.5
+    TTI 5-15s:  2.5
+    TTI < 5s:   5.0
+    None (not closing): 1.0
+    """
+    if tti_s is None:
+        return 1.0
+    if tti_s < 5.0:
+        return 5.0
+    if tti_s < 15.0:
+        return 2.5
+    if tti_s < 30.0:
+        return 1.5
+    return 1.0
+
+
 def _speed_urgency(closing_ms: float) -> float:
     """Map closing speed to a 0..1 urgency. Receding speeds clamp to 0."""
     if closing_ms <= 0.0:
@@ -115,15 +138,24 @@ def _certainty(track: Track) -> float:
 
 
 def _score_track(track: Track, site: Site) -> Threat:
-    """Score one lone hostile track into a Threat (rank filled in later)."""
+    """Score one lone hostile track into a Threat (rank filled in later).
+
+    The base blended score is multiplied by an exponential urgency factor
+    keyed on time-to-impact bands so imminent threats dominate the ranking
+    in saturation scenarios. The score can exceed 1.0 after the multiplier
+    and that is intentional: the allocator and ranker compare magnitudes,
+    not assume a 0..1 range.
+    """
     tti = time_to_impact(track, site)
     closing = max(0.0, closing_speed_to_site(track, site))
     value_at_risk = min(site.value, EXPECTED_DAMAGE_PER_DRONE)
-    score = _certainty(track) * _blend(
+    base = _certainty(track) * _blend(
         _tti_urgency(tti),
         _speed_urgency(closing),
         _value_urgency(value_at_risk, site),
     )
+    score = base * _tti_exponential_urgency(tti)
+    range_m = _range_to_site(track.position, site)
     return Threat(
         id=f"threat-{track.id}",
         score=score,
@@ -131,6 +163,7 @@ def _score_track(track: Track, site: Site) -> Threat:
         value_at_risk=value_at_risk,
         priority_rank=0,
         track_id=track.id,
+        range_to_site_m=range_m,
     )
 
 
@@ -139,7 +172,8 @@ def _score_swarm(swarm: Swarm, members: List[Track], site: Site) -> Threat:
 
     The swarm reaches the site when its leading member does, so urgency keys off
     the shortest member time-to-impact and the highest member closing speed. The
-    value at risk scales with member count to reflect a mass attack.
+    value at risk scales with member count to reflect a mass attack. An
+    exponential urgency multiplier boosts imminent threats.
     """
     ttis = [t for t in (time_to_impact(m, site) for m in members) if t is not None]
     lead_tti = min(ttis) if ttis else None
@@ -148,11 +182,13 @@ def _score_swarm(swarm: Swarm, members: List[Track], site: Site) -> Threat:
     value_at_risk = min(
         site.value, EXPECTED_DAMAGE_PER_DRONE * len(members) * SWARM_VALUE_PER_MEMBER,
     )
-    score = _blend(
+    base = _blend(
         _tti_urgency(lead_tti),
         _speed_urgency(max_closing),
         _value_urgency(value_at_risk, site),
     )
+    score = base * _tti_exponential_urgency(lead_tti)
+    range_m = _range_to_site(swarm.centroid, site)
     return Threat(
         id=f"threat-{swarm.id}",
         score=score,
@@ -160,18 +196,24 @@ def _score_swarm(swarm: Swarm, members: List[Track], site: Site) -> Threat:
         value_at_risk=value_at_risk,
         priority_rank=0,
         swarm_id=swarm.id,
+        range_to_site_m=range_m,
     )
 
 
 def _rank(threats: List[Threat]) -> List[Threat]:
     """Sort threats by descending urgency and assign 1-based priority_rank.
 
-    Primary key is score. Ties break on sooner time-to-impact. None impact time
-    sorts last among ties. The sort is stable, so equal threats keep input order.
+    Primary key is score (higher first). First tiebreaker is sooner
+    time-to-impact (lower first). Second tiebreaker is distance to the
+    defended site (closer first) so that among threats with identical
+    score and TTI the nearest one is engaged first. None values sort
+    last in their respective keys. The sort is stable, so equal threats
+    keep input order.
     """
     def key(t: Threat) -> tuple:
         tti = t.time_to_impact_s if t.time_to_impact_s is not None else math.inf
-        return (-t.score, tti)
+        rng = t.range_to_site_m if t.range_to_site_m is not None else math.inf
+        return (-t.score, tti, rng)
 
     ordered = sorted(threats, key=key)
     for rank, threat in enumerate(ordered, start=1):

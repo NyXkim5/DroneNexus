@@ -410,8 +410,13 @@ def test_cheap_area_effector_engages_decoys():
     assert len(out) >= 1  # cheap effector fires on decoys
 
 
-def test_overspend_gate_4x_blocks_probe():
-    """A 5x overspend should be blocked for PROBE (non-SATURATION) threats."""
+def test_overspend_gate_4x_blocks_distant_probe():
+    """A 5x overspend should be blocked for distant PROBE threats.
+
+    At TTI=5.0 the urgency relaxation allows higher overspend ratios. A
+    distant probe (TTI=18.0) should still be blocked because the urgency
+    cap stays close to the base 4x.
+    """
     positions = {"p1": (100.0, 0.0, 80.0)}
     # cost_per_kill = 10000 / 0.85 ~= 11765, attacker_ref = 2000, ratio ~5.9x
     interceptor = _defender(
@@ -422,9 +427,9 @@ def test_overspend_gate_4x_blocks_probe():
         resolve_position=lambda t: positions[t.id],
         attacker_cost_ref=2000.0,
     )
-    probe = _intent_threat("p1", 0.9, 1, SwarmIntent.PROBE, tti=5.0)
+    probe = _intent_threat("p1", 0.9, 1, SwarmIntent.PROBE, tti=18.0)
     out = allocator.allocate([probe], [interceptor], now=0.0)
-    assert out == []  # 5.9x overspend > 4x gate for non-SATURATION
+    assert out == []  # 5.9x overspend > ~4.5x gate for distant non-SATURATION
 
 
 def test_overspend_gate_8x_allows_saturation():
@@ -441,3 +446,29 @@ def test_overspend_gate_8x_allows_saturation():
     satur = _intent_threat("s1", 0.9, 1, SwarmIntent.SATURATION, tti=5.0)
     out = allocator.allocate([satur], [interceptor], now=0.0)
     assert len(out) == 1  # 5.9x overspend < 8x gate for SATURATION
+
+
+def test_terminal_defense_fires_unconditionally_under_5s():
+    """A threat inside 5s TTI fires regardless of overspend ratio."""
+    positions = {"t1": (100.0, 0.0, 80.0)}
+    # cost_per_kill = 25000 / 0.85 = 29412, attacker_ref = 500, ratio = 58.8x
+    interceptor = _defender(
+        "int1", (0.0, 0.0, 0.0), capacity=1, range_m=3000.0,
+        unit_cost=25_000.0, kill_prob=0.85, kind=DefenderKind.INTERCEPTOR,
+    )
+    allocator = LayeredAllocator(
+        resolve_position=lambda t: positions[t.id],
+        attacker_cost_ref=500.0,
+    )
+    imminent = _intent_threat("t1", 0.9, 1, SwarmIntent.SATURATION, tti=3.0)
+    out = allocator.allocate([imminent], [interceptor], now=0.0)
+    assert len(out) == 1  # terminal defense fires regardless of cost
+
+
+def test_tti_urgency_boosts_imminent_benefit():
+    """Threats with low TTI should get higher benefit in the auction."""
+    from defense.allocator import _tti_urgency
+    assert _tti_urgency(3.0) == 3.0  # under 5s
+    assert _tti_urgency(7.0) == 2.0  # under 10s
+    assert _tti_urgency(15.0) == 1.0  # above 10s
+    assert _tti_urgency(None) == 1.0  # unknown

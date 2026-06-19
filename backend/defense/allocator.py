@@ -300,6 +300,22 @@ _INTENT_VALUE_SCALE = {
 }
 
 
+def _tti_urgency(tti: Optional[float]) -> float:
+    """Urgency multiplier based on time-to-impact for point effector priority.
+
+    Imminent threats get higher benefit so the auction assigns point effectors
+    to the closest leakers first. TTI < 5s gets 3x, TTI < 10s gets 2x, and
+    everything else gets 1x. Unknown TTI (None) returns 1x.
+    """
+    if tti is None:
+        return 1.0
+    if tti < 5.0:
+        return 3.0
+    if tti < 10.0:
+        return 2.0
+    return 1.0
+
+
 class LayeredAllocator(Allocator):
     """Layered counter-swarm allocation: cheap area effects first, kinetic last.
 
@@ -318,7 +334,7 @@ class LayeredAllocator(Allocator):
         resolve_position: Optional[PositionResolver] = None,
         cost_weight: float = 1e-6,
         auction_eps: float = 1e-3,
-        imminent_s: float = 12.0,
+        imminent_s: float = 20.0,
         attacker_cost_ref: float = 500.0,
         min_kinetic_confidence: float = 0.4,
     ) -> None:
@@ -487,7 +503,9 @@ class LayeredAllocator(Allocator):
         """Benefit of one defender against each threat, -inf where it cannot fire.
 
         Threat scores are scaled by intent so decoys and probes yield lower
-        benefit and are deprioritized versus real attacks.
+        benefit and are deprioritized versus real attacks. An urgency multiplier
+        boosts threats with low time-to-impact so the auction prioritizes the
+        most imminent leakers over distant ones.
         """
         row: List[float] = []
         cost_penalty = self._cost_weight * defender.unit_cost
@@ -498,7 +516,9 @@ class LayeredAllocator(Allocator):
                 row.append(-math.inf)
             else:
                 scale = _INTENT_VALUE_SCALE.get(threat.intent, 1.0)
-                row.append(threat.score * scale * defender.kill_prob - cost_penalty)
+                tti_mult = _tti_urgency(threat.time_to_impact_s)
+                benefit = threat.score * scale * tti_mult * defender.kill_prob
+                row.append(benefit - cost_penalty)
         return row
 
     def _worth_spending(self, defender: Defender, threat: Threat) -> bool:
@@ -512,9 +532,11 @@ class LayeredAllocator(Allocator):
         the cost-exchange ratio on a cheap, fake, or uncertain target.
 
         Hard gate: overspend caps prevent expensive effectors from wasting
-        budget on cheap targets. SATURATION threats get a looser 8x cap because
-        every leaker counts. All other intents are capped at 4x. This prevents
-        $8K interceptors firing on $500 decoys even when the threat is imminent.
+        budget on cheap targets. SATURATION threats get a looser 8x base cap
+        because every leaker counts. All other intents are capped at 4x. Very
+        imminent threats (TTI < 10s) relax the cap further because a guaranteed
+        leak is worse than an expensive kill. Threats inside 5s always fire
+        regardless of overspend ratio.
         """
         cost_per_kill = defender.unit_cost / max(0.05, defender.kill_prob)
         if cost_per_kill <= self._attacker_cost_ref:
@@ -526,8 +548,17 @@ class LayeredAllocator(Allocator):
         tti = threat.time_to_impact_s
         if tti is None or tti > self._imminent_s:
             return False
+        # Terminal defense: threats inside 5s fire unconditionally because a
+        # leak is certain otherwise and any kill is better than none.
+        if tti < 5.0:
+            return True
         overspend = cost_per_kill / max(1.0, self._attacker_cost_ref)
-        max_overspend = 8.0 if threat.intent is SwarmIntent.SATURATION else 4.0
+        base_cap = 8.0 if threat.intent is SwarmIntent.SATURATION else 4.0
+        # Relax the overspend cap as TTI decreases. Between imminent_s and
+        # 5s the cap scales up to 4x the base, giving a gradient from "hold
+        # fire" to "fire at any cost" as the threat closes.
+        urgency = max(0.0, 1.0 - (tti - 5.0) / max(1.0, self._imminent_s - 5.0))
+        max_overspend = base_cap * (1.0 + 3.0 * urgency)
         if overspend > max_overspend:
             return False
         return True

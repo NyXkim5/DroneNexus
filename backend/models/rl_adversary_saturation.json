@@ -1,0 +1,19 @@
+{
+  "rl": {
+    "leakers_mean": 556.0,
+    "leakers_std": 41.8186561237924,
+    "intercept_rate_mean": 444.0,
+    "cost_exchange_ratio_mean": 0.54844509298837,
+    "tactic_distribution": {
+      "feint": 2261
+    },
+    "episodes": 5
+  },
+  "adaptive_baseline": {
+    "leakers_mean": 556.0,
+    "leakers_std": 41.8186561237924,
+    "intercept_rate_mean": 444.0,
+    "cost_exchange_ratio_mean": 0.54844509298837,
+    "episodes": 5
+  }
+}
