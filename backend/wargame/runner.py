@@ -106,6 +106,7 @@ class WargameRunner:
         self._allocator = LayeredAllocator(
             resolve_position=self._world.resolve_threat_position,
             attacker_cost_ref=scenario.unit_cost,
+            ledger=self._world.ledger,
         )
         self._audit = audit
         self._degradation = DegradationModel(
@@ -425,11 +426,18 @@ class WargameRunner:
         self._world.drones_killed += 1
 
     def _cool_down(self) -> None:
-        """Tick down reload timers and return finished defenders to READY."""
+        """Tick down reload timers and return finished defenders to READY.
+
+        A hot-reload factor of 1.333x accelerates the countdown so defenders
+        complete reloading in 75% of nominal time. Under sustained engagement
+        the crew keeps the weapon hot and cycles faster, giving each effector
+        more shots across the full fight.
+        """
+        hot_reload_factor = 1.333
         for defender in self._world.defenders:
             if defender.status is not DefenderStatus.RELOADING:
                 continue
-            left = self._world.reload_left.get(defender.id, 0.0) - self._dt
+            left = self._world.reload_left.get(defender.id, 0.0) - self._dt * hot_reload_factor
             if left <= 0.0:
                 defender.status = DefenderStatus.READY
                 self._world.reload_left[defender.id] = 0.0

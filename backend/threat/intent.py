@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 import statistics
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from csontology import Site, Swarm, SwarmIntent, Track, Vec3
 
@@ -100,7 +100,7 @@ def infer_intent(swarm: Swarm, members: List[Track], site: Site) -> SwarmIntent:
     ranges = [_range_to_site(m.position, site) for m in members]
     bands = _count_range_bands(ranges, WAVE_BAND_GAP_M)
 
-    if _is_saturation(len(members), spread, fraction_closing):
+    if _is_saturation(len(members), spread, fraction_closing, closing):
         return SwarmIntent.SATURATION
     if _is_waves(bands, fraction_closing):
         return SwarmIntent.WAVES
@@ -111,13 +111,31 @@ def infer_intent(swarm: Swarm, members: List[Track], site: Site) -> SwarmIntent:
     return SwarmIntent.UNKNOWN
 
 
-def _is_saturation(size: int, spread: float, fraction_closing: float) -> bool:
-    """A large, tight mass mostly closing at once."""
-    return (
+def _is_saturation(
+    size: int,
+    spread: float,
+    fraction_closing: float,
+    closing: Optional[List[float]] = None,
+) -> bool:
+    """A large, tight mass mostly closing at once with real speed.
+
+    A group that is tight and numerically closing but slow (most members below
+    PROBE_SLOW_MS) is more likely a decoy swarm passively converging than a
+    committed saturation attack. We require at least 30% of members to be
+    fast-closing to confirm real commitment.
+    """
+    if not (
         size >= SATURATION_MIN_SIZE
         and spread <= SATURATION_SPREAD_MAX_M
         and fraction_closing >= COMMITTED_FRACTION
-    )
+    ):
+        return False
+    # Guard: a slow-closing tight group is decoy behavior, not saturation
+    if closing is not None and len(closing) >= SATURATION_MIN_SIZE:
+        fast = sum(1 for c in closing if c >= PROBE_SLOW_MS)
+        if fast < len(closing) * 0.3:
+            return False
+    return True
 
 
 def _is_waves(bands: int, fraction_closing: float) -> bool:

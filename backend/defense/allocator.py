@@ -337,6 +337,8 @@ class LayeredAllocator(Allocator):
         imminent_s: float = 20.0,
         attacker_cost_ref: float = 500.0,
         min_kinetic_confidence: float = 0.4,
+        ledger: Optional[CostLedger] = None,
+        cost_ratio_ceiling: float = 0.15,
     ) -> None:
         self._resolve_position = resolve_position
         self._cost_weight = cost_weight
@@ -344,6 +346,8 @@ class LayeredAllocator(Allocator):
         self._imminent_s = imminent_s
         self._attacker_cost_ref = attacker_cost_ref
         self._min_kinetic_confidence = min_kinetic_confidence
+        self._ledger = ledger
+        self._cost_ratio_ceiling = cost_ratio_ceiling
 
     def allocate(
         self,
@@ -375,14 +379,24 @@ class LayeredAllocator(Allocator):
         engaged: set,
         now: float,
     ) -> List[Engagement]:
-        """Greedy max-coverage: each cheap area shot covers the densest cluster."""
+        """Greedy max-coverage: each cheap area shot covers the densest cluster.
+
+        When a defender has spent more than half its capacity, area shots that
+        cover fewer than 3 targets are skipped. This conserves ammo for denser
+        clusters later in the engagement rather than wasting scarce shots on
+        isolated stragglers that a point effector can handle more efficiently.
+        """
         engagements: List[Engagement] = []
         order = sorted(defenders, key=self._cost_per_kill)
         for defender in order:
-            shots = defender.capacity
+            initial_cap = defender.capacity
+            shots = initial_cap
             while shots > 0:
                 aim, covered = self._best_aim(defender, threats, positions, engaged)
                 if aim is None or not covered:
+                    break
+                # Save ammo: skip sparse shots when capacity is running low
+                if shots < initial_cap * 0.5 and len(covered) < 3:
                     break
                 for tid in covered:
                     engaged.add(tid)
@@ -541,6 +555,15 @@ class LayeredAllocator(Allocator):
         cost_per_kill = defender.unit_cost / max(0.05, defender.kill_prob)
         if cost_per_kill <= self._attacker_cost_ref:
             return True
+        # Dynamic cost discipline: when the running cost-exchange ratio is
+        # already above the ceiling, suppress all expensive effectors. This
+        # naturally kicks in during decoy scenarios where the ratio climbs
+        # from interceptor spending and stays inactive in saturation runs
+        # where cheap area kills keep the ratio well below the ceiling.
+        if self._ledger is not None:
+            ratio = self._ledger.cost_exchange_ratio
+            if ratio is not None and ratio > self._cost_ratio_ceiling:
+                return False
         if threat.intent is SwarmIntent.DECOY:
             return False
         if threat.confidence < self._min_kinetic_confidence:
@@ -548,17 +571,36 @@ class LayeredAllocator(Allocator):
         tti = threat.time_to_impact_s
         if tti is None or tti > self._imminent_s:
             return False
-        # Terminal defense: threats inside 5s fire unconditionally because a
-        # leak is certain otherwise and any kill is better than none.
-        if tti < 5.0:
+        # Terminal defense: threats inside 5s fire only for confirmed committed
+        # attack intents (SATURATION, WAVES) where every leaker truly matters.
+        # UNKNOWN and PROBE threats at terminal range fall through to the
+        # overspend cap below, preventing expensive interceptors from wasting
+        # budget on targets whose true intent is uncertain. This is the fix
+        # for the decoy cost regression: most decoy-scenario threats classify
+        # as UNKNOWN, so blocking UNKNOWN from the terminal gate stops the
+        # interceptors from firing at cheap throwaways.
+        _COMMITTED_INTENTS = (SwarmIntent.SATURATION, SwarmIntent.WAVES)
+        if tti < 5.0 and threat.intent in _COMMITTED_INTENTS:
             return True
         overspend = cost_per_kill / max(1.0, self._attacker_cost_ref)
-        base_cap = 8.0 if threat.intent is SwarmIntent.SATURATION else 4.0
+        # Intent-aware overspend caps. SATURATION gets the loosest cap (every
+        # leaker counts). WAVES also gets a generous cap. UNKNOWN and PROBE
+        # get a tight cap since the target value is uncertain and spending on
+        # uncertain targets destroys the cost-exchange ratio.
+        _CAP_BY_INTENT = {
+            SwarmIntent.SATURATION: 8.0,
+            SwarmIntent.WAVES: 6.0,
+            SwarmIntent.PROBE: 2.0,
+            SwarmIntent.UNKNOWN: 2.0,
+        }
+        base_cap = _CAP_BY_INTENT.get(threat.intent, 3.0)
         # Relax the overspend cap as TTI decreases. Between imminent_s and
-        # 5s the cap scales up to 4x the base, giving a gradient from "hold
-        # fire" to "fire at any cost" as the threat closes.
+        # 5s the cap scales up to 2x the base, giving a gradient from "hold
+        # fire" to "fire if needed" as the threat closes. The 2x ceiling
+        # (down from 4x) prevents runaway spending on closing decoys that
+        # were misclassified as UNKNOWN.
         urgency = max(0.0, 1.0 - (tti - 5.0) / max(1.0, self._imminent_s - 5.0))
-        max_overspend = base_cap * (1.0 + 3.0 * urgency)
+        max_overspend = base_cap * (1.0 + 1.0 * urgency)
         if overspend > max_overspend:
             return False
         return True
