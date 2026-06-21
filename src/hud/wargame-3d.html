@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OVERWATCH - Tactical 3D Wargame</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; font-family: 'JetBrains Mono', 'SF Mono', monospace; color: #888; }
+canvas { display: block; }
+#overlay {
+  position: fixed; top: 0; left: 0; right: 0; height: 36px; z-index: 10;
+  display: flex; align-items: center; padding: 0 16px; gap: 16px;
+  background: rgba(0,0,0,0.8); border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.brand { font-size: 11px; letter-spacing: 3px; color: rgba(255,255,255,0.4); font-weight: 300; }
+.ctrl { display: flex; gap: 6px; margin-left: auto; }
+.ctrl button {
+  background: transparent; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.3);
+  font-family: inherit; font-size: 9px; letter-spacing: 1.5px; padding: 4px 10px;
+  cursor: pointer; text-transform: uppercase;
+}
+.ctrl button:hover, .ctrl button.on { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.6); }
+#stats {
+  position: fixed; bottom: 12px; left: 12px; z-index: 10; font-size: 9px;
+  color: rgba(255,255,255,0.25); letter-spacing: 1px; line-height: 1.8;
+}
+#stats .v { color: rgba(255,255,255,0.5); }
+#stats .red { color: rgba(200,60,60,0.7); }
+#stats .blue { color: rgba(60,120,200,0.6); }
+#stats .green { color: rgba(60,180,80,0.5); }
+#clock {
+  position: fixed; top: 44px; right: 12px; z-index: 10;
+  font-size: 28px; font-weight: 200; letter-spacing: 4px;
+  color: rgba(255,255,255,0.12);
+}
+#label {
+  position: fixed; bottom: 12px; right: 12px; z-index: 10;
+  font-size: 8px; letter-spacing: 2px; color: rgba(255,255,255,0.1); text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div class="brand">OVERWATCH TACTICAL</div>
+  <div class="ctrl">
+    <button id="b-play" class="on">PLAY</button>
+    <button id="b-reset">RESET</button>
+    <button id="b-scenario" data-s="0">SCENARIO</button>
+    <button id="b-labels">LABELS</button>
+  </div>
+</div>
+<div id="stats">
+  <div>HOSTILES <span class="v red" id="s-hostiles">0</span></div>
+  <div>DEFENDERS <span class="v blue" id="s-defenders">0</span></div>
+  <div>INTERCEPTS <span class="v green" id="s-kills">0</span></div>
+  <div>LEAKERS <span class="v red" id="s-leakers">0</span></div>
+  <div>TICK <span class="v" id="s-tick">0</span></div>
+</div>
+<div id="clock">00:00</div>
+<div id="label">ENU COORDINATE FRAME -- METERS</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+
+var W = window.innerWidth, H = window.innerHeight;
+var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(50, W / H, 1, 8000);
+camera.position.set(600, 400, 600);
+var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000);
+document.body.appendChild(renderer.domElement);
+
+var controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.04;
+controls.target.set(0, 100, 0);
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.3;
+
+// ---- 3D Coordinate Box ----
+var BOX = 500;
+var boxGeo = new THREE.BoxGeometry(BOX * 2, BOX, BOX * 2);
+var boxEdges = new THREE.EdgesGeometry(boxGeo);
+var boxLine = new THREE.LineSegments(boxEdges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.06 }));
+boxLine.position.y = BOX / 2;
+scene.add(boxLine);
+
+// Axis lines
+function axisLine(from, to, color, opacity) {
+  var g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(from[0],from[1],from[2]), new THREE.Vector3(to[0],to[1],to[2])]);
+  var l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: opacity }));
+  scene.add(l);
+  return l;
+}
+axisLine([0,0,0], [BOX*1.2,0,0], 0xffffff, 0.15); // X
+axisLine([0,0,0], [0,BOX*1.1,0], 0xffffff, 0.15); // Y (up)
+axisLine([0,0,0], [0,0,BOX*1.2], 0xffffff, 0.15); // Z
+
+// Grid on ground plane
+function addGrid(y, size, divs, opacity) {
+  var step = size * 2 / divs;
+  var mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: opacity });
+  for (var i = -divs / 2; i <= divs / 2; i++) {
+    var x = i * step;
+    var g1 = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, y, -size), new THREE.Vector3(x, y, size)]);
+    scene.add(new THREE.Line(g1, mat));
+    var g2 = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-size, y, x), new THREE.Vector3(size, y, x)]);
+    scene.add(new THREE.Line(g2, mat));
+  }
+}
+addGrid(0, BOX, 20, 0.03);
+addGrid(0, BOX, 4, 0.06);
+
+// Axis labels
+var labelGroup = new THREE.Group();
+scene.add(labelGroup);
+function makeLabel(text, pos, size) {
+  var canvas = document.createElement("canvas");
+  canvas.width = 128; canvas.height = 64;
+  var ctx = canvas.getContext("2d");
+  ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.font = (size || 20) + "px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(text, 64, 40);
+  var tex = new THREE.CanvasTexture(canvas);
+  var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sprite.position.set(pos[0], pos[1], pos[2]);
+  sprite.scale.set(40, 20, 1);
+  labelGroup.add(sprite);
+  return sprite;
+}
+makeLabel("X (EAST)", [BOX * 1.3, 0, 0]);
+makeLabel("Z (NORTH)", [0, 0, BOX * 1.3]);
+makeLabel("Y (ALT)", [0, BOX * 1.15, 0]);
+// Tick marks
+for (var i = 100; i <= BOX; i += 100) {
+  makeLabel(String(i), [i, -10, 0], 12);
+  makeLabel(String(i), [0, i, 0], 12);
+  makeLabel(String(i), [0, -10, i], 12);
+}
+
+// ---- Defended site origin ----
+var siteRing = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints((function() {
+    var pts = [];
+    for (var i = 0; i <= 64; i++) { var a = i / 64 * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * 30, 0.5, Math.sin(a) * 30)); }
+    return pts;
+  })()),
+  new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 })
+);
+scene.add(siteRing);
+makeLabel("SITE", [0, -20, 0], 14);
+
+// ---- Entities ----
+var hostiles = [], defenders = [], trails = [], engagements = [];
+var kills = 0, leakers = 0, tick = 0, playing = true, showLabels = true;
+var scenarioIdx = 0;
+
+var SCENARIOS = [
+  { name: "SATURATION STRIKE", hostileCount: 40, defenderCount: 6, pattern: "converge", speed: 2.5 },
+  { name: "PROBE & FEINT", hostileCount: 15, defenderCount: 4, pattern: "probe", speed: 1.8 },
+  { name: "SWARM PINCER", hostileCount: 30, defenderCount: 5, pattern: "pincer", speed: 2.2 },
+  { name: "DECOY SATURATION", hostileCount: 50, defenderCount: 6, pattern: "decoy", speed: 3.0 },
+];
+
+function spawnHostile(pos, vel, isDecoy) {
+  var size = isDecoy ? 1.5 : 2.5;
+  var mesh = new THREE.Mesh(
+    new THREE.OctahedronGeometry(size, 0),
+    new THREE.MeshBasicMaterial({ color: isDecoy ? 0x553333 : 0xcc3333, wireframe: true, transparent: true, opacity: isDecoy ? 0.3 : 0.6 })
+  );
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  scene.add(mesh);
+  var trailPts = [mesh.position.clone()];
+  var trailGeo = new THREE.BufferGeometry().setFromPoints(trailPts);
+  var trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: isDecoy ? 0x331111 : 0x661111, transparent: true, opacity: 0.15 }));
+  scene.add(trailLine);
+  trails.push(trailLine);
+  return { mesh: mesh, vel: vel, alive: true, isDecoy: isDecoy, trailPts: trailPts, trailLine: trailLine };
+}
+
+function spawnDefender(pos) {
+  var mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(4, 4, 4),
+    new THREE.MeshBasicMaterial({ color: 0x3366aa, wireframe: true, transparent: true, opacity: 0.5 })
+  );
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  scene.add(mesh);
+  // Range ring
+  var rangePts = [];
+  for (var i = 0; i <= 64; i++) { var a = i / 64 * Math.PI * 2; rangePts.push(new THREE.Vector3(pos[0] + Math.cos(a) * 150, pos[1], pos[2] + Math.sin(a) * 150)); }
+  var rangeRing = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(rangePts),
+    new THREE.LineBasicMaterial({ color: 0x3366aa, transparent: true, opacity: 0.05 })
+  );
+  scene.add(rangeRing);
+  return { mesh: mesh, pos: pos, capacity: 8, engaged: null, rangeRing: rangeRing };
+}
+
+function spawnEngagement(from, to) {
+  var g = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(from[0], from[1], from[2]),
+    new THREE.Vector3(to[0], to[1], to[2])
+  ]);
+  var line = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x44aa44, transparent: true, opacity: 0.5 }));
+  scene.add(line);
+  return { line: line, life: 20 };
+}
+
+function spawnExplosion(pos) {
+  var pts = [];
+  for (var i = 0; i < 20; i++) {
+    pts.push(new THREE.Vector3(pos.x + (Math.random()-0.5)*15, pos.y + (Math.random()-0.5)*15, pos.z + (Math.random()-0.5)*15));
+    pts.push(new THREE.Vector3(pos.x, pos.y, pos.z));
+  }
+  var g = new THREE.BufferGeometry().setFromPoints(pts);
+  var l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }));
+  scene.add(l);
+  return { lines: l, life: 15 };
+}
+
+var explosions = [];
+
+function loadScenario(idx) {
+  // Clear
+  hostiles.forEach(function(h) { scene.remove(h.mesh); });
+  defenders.forEach(function(d) { scene.remove(d.mesh); scene.remove(d.rangeRing); });
+  trails.forEach(function(t) { scene.remove(t); });
+  engagements.forEach(function(e) { scene.remove(e.line); });
+  explosions.forEach(function(e) { scene.remove(e.lines); });
+  hostiles = []; defenders = []; trails = []; engagements = []; explosions = [];
+  kills = 0; leakers = 0; tick = 0;
+
+  var sc = SCENARIOS[idx];
+
+  // Spawn hostiles
+  for (var i = 0; i < sc.hostileCount; i++) {
+    var angle, dist, alt, vx, vy, vz, isDecoy = false;
+    if (sc.pattern === "converge") {
+      angle = Math.random() * Math.PI * 2;
+      dist = 350 + Math.random() * 100;
+      alt = 80 + Math.random() * 200;
+      var dx = -Math.cos(angle) * sc.speed * (0.8 + Math.random() * 0.4);
+      var dz = -Math.sin(angle) * sc.speed * (0.8 + Math.random() * 0.4);
+      hostiles.push(spawnHostile([Math.cos(angle)*dist, alt, Math.sin(angle)*dist], [dx, (Math.random()-0.5)*0.3, dz], false));
+    } else if (sc.pattern === "probe") {
+      angle = -0.3 + Math.random() * 0.6;
+      dist = 400 + Math.random() * 50;
+      alt = 100 + Math.random() * 150;
+      hostiles.push(spawnHostile([Math.cos(angle)*dist, alt, Math.sin(angle)*dist], [-sc.speed*(0.9+Math.random()*0.2), (Math.random()-0.5)*0.2, -Math.sin(angle)*sc.speed*0.3], false));
+    } else if (sc.pattern === "pincer") {
+      var side = i < sc.hostileCount / 2 ? 1 : -1;
+      angle = side * (0.8 + Math.random() * 0.4);
+      dist = 350 + Math.random() * 80;
+      alt = 60 + Math.random() * 180;
+      hostiles.push(spawnHostile([Math.cos(angle)*dist, alt, Math.sin(angle)*dist], [-Math.cos(angle)*sc.speed, (Math.random()-0.5)*0.3, -Math.sin(angle)*sc.speed], false));
+    } else if (sc.pattern === "decoy") {
+      isDecoy = i > sc.hostileCount * 0.3;
+      angle = Math.random() * Math.PI * 2;
+      dist = 300 + Math.random() * 150;
+      alt = isDecoy ? 40 + Math.random() * 60 : 100 + Math.random() * 200;
+      var spd = isDecoy ? sc.speed * 0.5 : sc.speed;
+      hostiles.push(spawnHostile([Math.cos(angle)*dist, alt, Math.sin(angle)*dist], [-Math.cos(angle)*spd, (Math.random()-0.5)*0.2, -Math.sin(angle)*spd], isDecoy));
+    }
+  }
+
+  // Spawn defenders around site
+  for (var i = 0; i < sc.defenderCount; i++) {
+    var da = (i / sc.defenderCount) * Math.PI * 2;
+    defenders.push(spawnDefender([Math.cos(da) * 60, 20, Math.sin(da) * 60]));
+  }
+
+  document.getElementById("b-scenario").textContent = sc.name;
+}
+
+// ---- Simulation ----
+function simTick() {
+  if (!playing) return;
+  tick++;
+
+  hostiles.forEach(function(h) {
+    if (!h.alive) return;
+    h.mesh.position.x += h.vel[0];
+    h.mesh.position.y += h.vel[1];
+    h.mesh.position.z += h.vel[2];
+    h.mesh.rotation.x += 0.02;
+    h.mesh.rotation.y += 0.03;
+
+    // Trail
+    h.trailPts.push(h.mesh.position.clone());
+    if (h.trailPts.length > 60) h.trailPts.shift();
+    h.trailLine.geometry.dispose();
+    h.trailLine.geometry = new THREE.BufferGeometry().setFromPoints(h.trailPts);
+
+    // Leaker check
+    var d = h.mesh.position.length();
+    if (d < 25) {
+      h.alive = false;
+      h.mesh.material.opacity = 0.05;
+      if (!h.isDecoy) leakers++;
+    }
+
+    // Out of bounds
+    if (h.mesh.position.y < 0 || d > 700) {
+      h.alive = false;
+      h.mesh.material.opacity = 0.02;
+    }
+  });
+
+  // Defender engagement
+  defenders.forEach(function(def) {
+    if (def.capacity <= 0) return;
+    // Find nearest alive hostile in range
+    var best = null, bestDist = 150;
+    hostiles.forEach(function(h) {
+      if (!h.alive) return;
+      var dx = h.mesh.position.x - def.pos[0];
+      var dy = h.mesh.position.y - def.pos[1];
+      var dz = h.mesh.position.z - def.pos[2];
+      var dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      if (dist < bestDist) { bestDist = dist; best = h; }
+    });
+    if (best && tick % 3 === 0) {
+      // Engage
+      var hitProb = best.isDecoy ? 0.3 : 0.7;
+      engagements.push(spawnEngagement(def.pos, [best.mesh.position.x, best.mesh.position.y, best.mesh.position.z]));
+      if (Math.random() < hitProb) {
+        explosions.push(spawnExplosion(best.mesh.position));
+        best.alive = false;
+        best.mesh.material.opacity = 0.02;
+        kills++;
+        def.capacity--;
+      }
+    }
+  });
+
+  // Fade engagement lines
+  engagements = engagements.filter(function(e) {
+    e.life--;
+    e.line.material.opacity = e.life / 20 * 0.5;
+    if (e.life <= 0) { scene.remove(e.line); return false; }
+    return true;
+  });
+
+  // Fade explosions
+  explosions = explosions.filter(function(e) {
+    e.life--;
+    e.lines.material.opacity = e.life / 15 * 0.6;
+    if (e.life <= 0) { scene.remove(e.lines); return false; }
+    return true;
+  });
+
+  // Pulse defenders
+  defenders.forEach(function(d) {
+    d.mesh.rotation.y += 0.01;
+    var s = 1 + Math.sin(tick * 0.1) * 0.1;
+    d.mesh.scale.set(s, s, s);
+  });
+
+  // HUD
+  var alive = hostiles.filter(function(h) { return h.alive; }).length;
+  document.getElementById("s-hostiles").textContent = alive;
+  document.getElementById("s-defenders").textContent = defenders.filter(function(d) { return d.capacity > 0; }).length;
+  document.getElementById("s-kills").textContent = kills;
+  document.getElementById("s-leakers").textContent = leakers;
+  document.getElementById("s-tick").textContent = tick;
+  var mm = Math.floor(tick / 60), ss = tick % 60;
+  document.getElementById("clock").textContent = String(mm).padStart(2, "0") + ":" + String(ss).padStart(2, "0");
+}
+
+// ---- Render loop ----
+var clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  if (tick % 1 === 0) simTick();
+  labelGroup.visible = showLabels;
+  renderer.render(scene, camera);
+}
+
+// ---- Controls ----
+document.getElementById("b-play").addEventListener("click", function() {
+  playing = !playing;
+  this.textContent = playing ? "PAUSE" : "PLAY";
+  this.className = playing ? "ctrl-btn on" : "ctrl-btn";
+});
+document.getElementById("b-reset").addEventListener("click", function() { loadScenario(scenarioIdx); });
+document.getElementById("b-scenario").addEventListener("click", function() {
+  scenarioIdx = (scenarioIdx + 1) % SCENARIOS.length;
+  loadScenario(scenarioIdx);
+});
+document.getElementById("b-labels").addEventListener("click", function() {
+  showLabels = !showLabels;
+  this.className = showLabels ? "on" : "";
+});
+window.addEventListener("resize", function() {
+  W = window.innerWidth; H = window.innerHeight;
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  renderer.setSize(W, H);
+});
+
+loadScenario(0);
+animate();
+</script>
+</body>
+</html>
