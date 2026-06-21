@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head><title>Three.js Test</title></head>
+<body style="margin:0;background:#000">
+<script src="js/three.min.js"></script>
+<script>
+var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 1, 1000);
+camera.position.z = 5;
+var renderer = new THREE.WebGLRenderer();
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+var geo = new THREE.BoxGeometry(1,1,1);
+var mat = new THREE.MeshBasicMaterial({color: 0x00ff00});
+var cube = new THREE.Mesh(geo, mat);
+scene.add(cube);
+function animate() {
+  requestAnimationFrame(animate);
+  cube.rotation.x += 0.01;
+  cube.rotation.y += 0.01;
+  renderer.render(scene, camera);
+}
+animate();
+document.title = "THREE.js version: " + THREE.REVISION;
+console.log("Three.js loaded, version:", THREE.REVISION);
+</script>
+</body>
+</html>

@@ -10,7 +10,7 @@ canvas { display: block; }
 
 #vignette {
   position: fixed; inset: 0; z-index: 5; pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%);
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%);
 }
 #scanlines {
   position: fixed; inset: 0; z-index: 6; pointer-events: none;
@@ -99,7 +99,7 @@ var renderer = new THREE.WebGLRenderer({antialias: true, powerPreference: "high-
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.85;
+renderer.toneMappingExposure = 1.4;
 document.body.appendChild(renderer.domElement);
 var ctrl = new THREE.OrbitControls(camera, renderer.domElement);
 ctrl.enableDamping = true; ctrl.dampingFactor = 0.04; ctrl.target.set(0, 80, 0);
@@ -162,18 +162,18 @@ function glowTex(sz, stops) {
 })();
 
 // -- Lights --
-scene.add(new THREE.AmbientLight(0x223344, 0.5));
-scene.add(new THREE.HemisphereLight(0x1a2233, 0x080a0f, 0.4));
-var dirLight = new THREE.DirectionalLight(0x445566, 0.35);
+scene.add(new THREE.AmbientLight(0x445566, 1.2));
+scene.add(new THREE.HemisphereLight(0x334466, 0x111822, 0.8));
+var dirLight = new THREE.DirectionalLight(0x8899bb, 0.7);
 dirLight.position.set(300, 600, 200); scene.add(dirLight);
 
 // -- Ground plane with grid --
 (function() {
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000),
-    new THREE.MeshPhongMaterial({color: 0x080b12, specular: 0x0a0c14, shininess: 2}))
+    new THREE.MeshPhongMaterial({color: 0x141c28, specular: 0x223344, shininess: 5}))
     .rotateX(-Math.PI / 2));
   // Grid with glow dots at intersections
-  var gridMat = new THREE.LineBasicMaterial({color: 0x0f1420, transparent: true, opacity: 0.6});
+  var gridMat = new THREE.LineBasicMaterial({color: 0x1c2538, transparent: true, opacity: 0.6});
   var gridPts = [];
   for (var i = -600; i <= 600; i += 60) {
     gridPts.push(new THREE.Vector3(i, 0.2, -600), new THREE.Vector3(i, 0.2, 600));
@@ -181,7 +181,7 @@ dirLight.position.set(300, 600, 200); scene.add(dirLight);
   }
   scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(gridPts), gridMat));
   // Streets (slightly lighter bands)
-  var streetMat = new THREE.MeshBasicMaterial({color: 0x0c1018, transparent: true, opacity: 0.8});
+  var streetMat = new THREE.MeshBasicMaterial({color: 0x182028, transparent: true, opacity: 0.8});
   for (var sx = -500; sx <= 500; sx += 120) {
     var s = new THREE.Mesh(new THREE.PlaneGeometry(8, 1200), streetMat);
     s.rotation.x = -Math.PI / 2; s.position.set(sx, 0.3, 0); scene.add(s);
@@ -203,7 +203,7 @@ dirLight.position.set(300, 600, 200); scene.add(dirLight);
     map: dotTex, size: 4, transparent: true, sizeAttenuation: true, depthWrite: false
   })));
   // Water
-  var waterMat = new THREE.MeshPhongMaterial({color: 0x060d14, specular: 0x1a2838, shininess: 40, transparent: true, opacity: 0.9});
+  var waterMat = new THREE.MeshPhongMaterial({color: 0x0e1a28, specular: 0x1a2838, shininess: 40, transparent: true, opacity: 0.9});
   var water = new THREE.Mesh(new THREE.PlaneGeometry(1500, 3000), waterMat);
   water.rotation.x = -Math.PI / 2; water.position.set(900, 0.1, 0); scene.add(water);
   window._waterMat = waterMat;
@@ -233,7 +233,7 @@ function addBuilding(x, z, w, d, h, opts) {
   }
   if (bandPts.length) {
     scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(bandPts),
-      new THREE.LineBasicMaterial({color: 0x1a2030, transparent: true, opacity: 0.3})));
+      new THREE.LineBasicMaterial({color: 0x253040, transparent: true, opacity: 0.3})));
   }
 
   // Ambient occlusion shadow at base
@@ -244,7 +244,7 @@ function addBuilding(x, z, w, d, h, opts) {
   // Rooftop mechanical room
   if (h > 80 && !opts.noRoof) {
     scene.add(new THREE.Mesh(new THREE.BoxGeometry(w * 0.25, 5, d * 0.25),
-      new THREE.MeshPhongMaterial({color: 0x0a0d14}))
+      new THREE.MeshPhongMaterial({color: 0x162030}))
       .translateX(x).translateY(h + 2.5).translateZ(z));
   }
 
@@ -264,7 +264,7 @@ function addBuilding(x, z, w, d, h, opts) {
   var h = 326, segments = 24;
   var geo = new THREE.CylinderGeometry(13, 19, h, segments);
   var mat = new THREE.MeshPhongMaterial({
-    color: 0x1a2840, specular: 0x334455, shininess: 50,
+    color: 0x2a3d5a, specular: 0x334455, shininess: 50,
     transparent: true, opacity: 0.88
   });
   var tower = new THREE.Mesh(geo, mat);
@@ -297,13 +297,13 @@ function addBuilding(x, z, w, d, h, opts) {
 (function() {
   var h = 260;
   var geo = new THREE.ConeGeometry(18, h, 4);
-  var mat = new THREE.MeshPhongMaterial({color: 0x1c2230, specular: 0x2a3344, shininess: 25});
+  var mat = new THREE.MeshPhongMaterial({color: 0x283448, specular: 0x2a3344, shininess: 25});
   var m = new THREE.Mesh(geo, mat);
   m.position.set(-250, h / 2, 180); m.rotation.y = Math.PI / 4; scene.add(m);
   buildingData.push({x: -250, z: 180, w: 36, d: 36, h: h});
   // Spire
   scene.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.5, 20, 6),
-    new THREE.MeshPhongMaterial({color: 0x1a2030}))
+    new THREE.MeshPhongMaterial({color: 0x253040}))
     .translateX(-250).translateY(h + 10).translateZ(180));
   // AO
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(44, 44),
@@ -319,9 +319,9 @@ function addSteppedBuilding(x, z, w, d, h) {
     var scale = 1 - s * 0.12;
     var sw = w * scale, sd = d * scale, sh = stepH;
     var baseY = s * stepH;
-    var color = new THREE.Color().setHSL(0.6, 0.12, 0.055 + (baseY + sh) / 4000);
+    var color = new THREE.Color().setHSL(0.6, 0.12, 0.11 + (baseY + sh) / 2000);
     var mesh = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, sd),
-      new THREE.MeshPhongMaterial({color: color, specular: 0x0f1218, shininess: 10}));
+      new THREE.MeshPhongMaterial({color: color, specular: 0x223344, shininess: 10}));
     mesh.position.set(x, baseY + sh / 2, z); scene.add(mesh);
   }
   buildingData.push({x: x, z: z, w: w, d: d, h: h});
@@ -366,7 +366,7 @@ addSteppedBuilding(85, 95, 33, 28, 160);
     }
   }
   var geo = new THREE.BoxGeometry(1, 1, 1);
-  var mat = new THREE.MeshPhongMaterial({color: 0x0d1018, specular: 0x0a0c10, shininess: 5});
+  var mat = new THREE.MeshPhongMaterial({color: 0x1a2535, specular: 0x1a2838, shininess: 5});
   var inst = new THREE.InstancedMesh(geo, mat, list.length);
   var dum = new THREE.Object3D();
   var colors = new Float32Array(list.length * 3);
@@ -374,7 +374,7 @@ addSteppedBuilding(85, 95, 33, 28, 160);
     dum.position.set(list[fi].x, list[fi].h / 2, list[fi].z);
     dum.scale.set(list[fi].w, list[fi].h, list[fi].d);
     dum.updateMatrix(); inst.setMatrixAt(fi, dum.matrix);
-    var c = new THREE.Color().setHSL(0.6, 0.08 + Math.random() * 0.06, 0.04 + Math.random() * 0.02);
+    var c = new THREE.Color().setHSL(0.6, 0.08 + Math.random() * 0.06, 0.10 + Math.random() * 0.05);
     colors[fi * 3] = c.r; colors[fi * 3 + 1] = c.g; colors[fi * 3 + 2] = c.b;
   }
   inst.instanceMatrix.needsUpdate = true;
