@@ -12,7 +12,7 @@ canvas { display: block; }
   display: flex; align-items: center; padding: 0 14px; gap: 14px;
   background: rgba(0,0,0,0.85); border-bottom: 1px solid rgba(255,255,255,0.05);
 }
-.brand { font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.3); font-weight: 300; }
+.brand { font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.3); }
 .sep { color: rgba(255,255,255,0.08); }
 .sc-name { font-size: 10px; letter-spacing: 2px; color: rgba(60,130,200,0.6); }
 .ctrls { display: flex; gap: 5px; margin-left: auto; }
@@ -22,24 +22,20 @@ canvas { display: block; }
 }
 .ctrls button:hover, .ctrls button.on { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.6); }
 #stats {
-  position: fixed; top: 40px; left: 12px; z-index: 10; font-size: 8px;
+  position: fixed; top: 40px; left: 12px; z-index: 10; font-size: 9px;
   color: rgba(255,255,255,0.2); letter-spacing: 1.5px; line-height: 2.2;
 }
-#stats .v { color: rgba(255,255,255,0.45); }
-#stats .r { color: rgba(200,80,80,0.6); }
-#stats .b { color: rgba(80,150,220,0.6); }
-#stats .g { color: rgba(80,200,100,0.5); }
+#stats .v { color: rgba(255,255,255,0.5); }
+#stats .r { color: rgba(220,80,80,0.7); }
+#stats .b { color: rgba(80,150,230,0.7); }
+#stats .g { color: rgba(80,210,110,0.6); }
 #clock {
   position: fixed; top: 42px; right: 12px; z-index: 10;
-  font-size: 32px; font-weight: 100; letter-spacing: 5px; color: rgba(255,255,255,0.07);
+  font-size: 32px; font-weight: 100; letter-spacing: 5px; color: rgba(255,255,255,0.08);
 }
-#target-lbl {
+#tgt-lbl {
   position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 10;
-  font-size: 8px; letter-spacing: 3px; color: rgba(200,70,70,0.3); text-transform: uppercase;
-}
-#bottom-r {
-  position: fixed; bottom: 8px; right: 12px; z-index: 10;
-  font-size: 7px; letter-spacing: 2px; color: rgba(255,255,255,0.07);
+  font-size: 8px; letter-spacing: 3px; color: rgba(200,70,70,0.35); text-transform: uppercase;
 }
 </style>
 </head>
@@ -56,568 +52,392 @@ canvas { display: block; }
   </div>
 </div>
 <div id="stats">
-  <div>LAUNCH VEHICLE <span class="v">WHITE VAN -- MISSION ST</span></div>
+  <div>LAUNCH <span class="v">WHITE VAN -- MISSION ST</span></div>
   <div>TARGET <span class="r" id="s-tgt">SALESFORCE TOWER</span></div>
-  <div>SWARM DEPLOYED <span class="b" id="s-deployed">0</span></div>
-  <div>IN FLIGHT <span class="b" id="s-flight">0</span></div>
-  <div>ON TARGET <span class="g" id="s-ontarget">0</span></div>
-  <div>ALTITUDE <span class="v" id="s-alt">--</span></div>
+  <div>DEPLOYED <span class="b" id="s-dep">0</span></div>
+  <div>IN FLIGHT <span class="b" id="s-fly">0</span></div>
+  <div>ON TARGET <span class="g" id="s-on">0</span></div>
 </div>
 <div id="clock">00:00</div>
-<div id="target-lbl">TARGET: SALESFORCE TOWER -- 415 MISSION ST -- 37.7897N 122.3972W</div>
-<div id="bottom-r">CLASSIFIED // OVERWATCH v1.0</div>
+<div id="tgt-lbl">TARGET: SALESFORCE TOWER -- 415 MISSION ST</div>
 
 <script src="js/three.min.js"></script>
 <script src="js/OrbitControls.js"></script>
 <script>
 "use strict";
 
+// ---- SCENE ----
 var scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x0a0c10, 400, 2000);
+scene.background = new THREE.Color(0x080a12);
+scene.fog = new THREE.Fog(0x080a12, 600, 1800);
+
 var camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 1, 5000);
-camera.position.set(250, 180, 350);
+camera.position.set(300, 200, 400);
+
 var renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setClearColor(0x0a0c10);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-var controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.target.set(0, 100, 0);
-controls.autoRotate = true;
-controls.autoRotateSpeed = 0.2;
+var orbitCtrl = new THREE.OrbitControls(camera, renderer.domElement);
+orbitCtrl.enableDamping = true;
+orbitCtrl.dampingFactor = 0.05;
+orbitCtrl.target.set(0, 80, 0);
+orbitCtrl.autoRotate = true;
+orbitCtrl.autoRotateSpeed = 0.2;
 
-// ---- Lighting -- night city ----
-scene.add(new THREE.AmbientLight(0x1a1e2e, 0.5));
-var moon = new THREE.DirectionalLight(0x6677aa, 0.5);
-moon.position.set(300, 600, -200);
-moon.castShadow = true;
-scene.add(moon);
-scene.add(new THREE.HemisphereLight(0x1a2040, 0x0a0a0a, 0.3));
-// City glow from below
-var cityGlow = new THREE.PointLight(0xffaa44, 0.3, 1000);
-cityGlow.position.set(0, 5, 0);
-scene.add(cityGlow);
+// ---- LIGHTS ----
+scene.add(new THREE.AmbientLight(0x334466, 0.8));
+var dir = new THREE.DirectionalLight(0xaabbcc, 0.6);
+dir.position.set(200, 500, 300);
+scene.add(dir);
+var dir2 = new THREE.DirectionalLight(0x6677aa, 0.3);
+dir2.position.set(-200, 300, -100);
+scene.add(dir2);
 
-// ---- Materials ----
-var buildingMats = [
-  new THREE.MeshStandardMaterial({ color: 0x1a1e28, metalness: 0.7, roughness: 0.3 }),
-  new THREE.MeshStandardMaterial({ color: 0x1e2230, metalness: 0.8, roughness: 0.2 }),
-  new THREE.MeshStandardMaterial({ color: 0x161a24, metalness: 0.6, roughness: 0.4 }),
-  new THREE.MeshStandardMaterial({ color: 0x222838, metalness: 0.9, roughness: 0.1 }),
-];
-var glassMat = new THREE.MeshStandardMaterial({ color: 0x2a3a55, metalness: 0.95, roughness: 0.05, transparent: true, opacity: 0.85 });
+// ---- GROUND ----
+var ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(2000, 2000),
+  new THREE.MeshBasicMaterial({ color: 0x0c0e14 })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
 
-// ---- Build a building ----
-function makeBuilding(x, z, w, d, h, opts) {
-  opts = opts || {};
-  var group = new THREE.Group();
+// Street grid
+for (var gx = -500; gx <= 500; gx += 50) {
+  var g1 = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(gx, 0.3, -500), new THREE.Vector3(gx, 0.3, 500)
+  ]);
+  scene.add(new THREE.Line(g1, new THREE.LineBasicMaterial({ color: 0x1a1e28 })));
+}
+for (var gz = -500; gz <= 500; gz += 50) {
+  var g2 = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-500, 0.3, gz), new THREE.Vector3(500, 0.3, gz)
+  ]);
+  scene.add(new THREE.Line(g2, new THREE.LineBasicMaterial({ color: 0x1a1e28 })));
+}
 
-  // Main structure
+// ---- BUILDING HELPER ----
+function addBuilding(x, z, w, d, h) {
+  // Solid building - visible gray/blue
   var geo = new THREE.BoxGeometry(w, h, d);
-  var mat = opts.mat || buildingMats[Math.floor(Math.random() * buildingMats.length)];
+  var hue = 0.58 + Math.random() * 0.08;
+  var sat = 0.15 + Math.random() * 0.1;
+  var light = 0.12 + Math.random() * 0.06 + (h / 1500);
+  var color = new THREE.Color().setHSL(hue, sat, light);
+  var mat = new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.3 });
   var mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(0, h / 2, 0);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  group.add(mesh);
+  mesh.position.set(x, h / 2, z);
+  scene.add(mesh);
 
-  // Subtle edge highlight
-  var edges = new THREE.LineSegments(
-    new THREE.EdgesGeometry(geo),
-    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.04 })
-  );
+  // White edge lines so you can see the shape
+  var edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08 });
+  var edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
   edges.position.copy(mesh.position);
-  group.add(edges);
+  scene.add(edges);
 
-  // Window grid (horizontal lines = floors)
+  // Lit windows -- bright yellow/white dots
   if (h > 40) {
-    var floorSpacing = 4;
-    var windowMat = new THREE.LineBasicMaterial({ color: 0xeedd88, transparent: true, opacity: 0.06 + Math.random() * 0.06 });
-    for (var fy = 8; fy < h - 4; fy += floorSpacing) {
-      // Front and back
-      for (var side = -1; side <= 1; side += 2) {
-        var floorLine = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(-w / 2 + 1, fy, side * d / 2 + side * 0.5),
-          new THREE.Vector3(w / 2 - 1, fy, side * d / 2 + side * 0.5)
-        ]);
-        group.add(new THREE.Line(floorLine, windowMat));
-      }
-      // Left and right
-      for (var side2 = -1; side2 <= 1; side2 += 2) {
-        var floorLine2 = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(side2 * w / 2 + side2 * 0.5, fy, -d / 2 + 1),
-          new THREE.Vector3(side2 * w / 2 + side2 * 0.5, fy, d / 2 - 1)
-        ]);
-        group.add(new THREE.Line(floorLine2, windowMat));
-      }
-    }
-  }
-
-  // Random lit windows (warm dots)
-  if (h > 30) {
-    var windowGeo = new THREE.PlaneGeometry(2, 2.5);
-    for (var wy = 10; wy < h - 5; wy += 4) {
+    var winMat = new THREE.MeshBasicMaterial({ color: 0xffeeaa, transparent: true, opacity: 0.3 });
+    for (var wy = 8; wy < h - 4; wy += 6) {
       for (var face = 0; face < 4; face++) {
-        if (Math.random() > 0.25) continue;
-        var wMat = new THREE.MeshBasicMaterial({
-          color: Math.random() > 0.7 ? 0xffeebb : 0xccddff,
-          transparent: true, opacity: 0.08 + Math.random() * 0.15
-        });
-        var wMesh = new THREE.Mesh(windowGeo, wMat);
-        var wOff = (Math.random() - 0.5) * (face < 2 ? w * 0.7 : d * 0.7);
-        if (face === 0) { wMesh.position.set(wOff, wy, d / 2 + 0.5); }
-        else if (face === 1) { wMesh.position.set(wOff, wy, -d / 2 - 0.5); }
-        else if (face === 2) { wMesh.position.set(w / 2 + 0.5, wy, wOff); wMesh.rotation.y = Math.PI / 2; }
-        else { wMesh.position.set(-w / 2 - 0.5, wy, wOff); wMesh.rotation.y = Math.PI / 2; }
-        group.add(wMesh);
+        if (Math.random() > 0.3) continue;
+        var wm = new THREE.Mesh(new THREE.PlaneGeometry(2, 2.5), winMat);
+        var wo = (Math.random() - 0.5) * (face < 2 ? w * 0.7 : d * 0.7);
+        if (face === 0) { wm.position.set(x + wo, wy, z + d/2 + 0.5); }
+        else if (face === 1) { wm.position.set(x + wo, wy, z - d/2 - 0.5); }
+        else if (face === 2) { wm.position.set(x + w/2 + 0.5, wy, z + wo); wm.rotation.y = Math.PI/2; }
+        else { wm.position.set(x - w/2 - 0.5, wy, z + wo); wm.rotation.y = Math.PI/2; }
+        scene.add(wm);
       }
     }
   }
-
-  // Roof detail
-  if (h > 80 && Math.random() > 0.4) {
-    var roofBox = new THREE.Mesh(
-      new THREE.BoxGeometry(w * 0.3, 6, d * 0.3),
-      new THREE.MeshStandardMaterial({ color: 0x111118, metalness: 0.5 })
-    );
-    roofBox.position.set(0, h + 3, 0);
-    group.add(roofBox);
-    // Antenna
-    var antenna = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.3, 0.3, 15, 4),
-      new THREE.MeshBasicMaterial({ color: 0x333333 })
-    );
-    antenna.position.set(0, h + 12, 0);
-    group.add(antenna);
-    // Red light
-    var redLight = new THREE.Mesh(
-      new THREE.SphereGeometry(0.6, 4, 4),
-      new THREE.MeshBasicMaterial({ color: 0xff2222 })
-    );
-    redLight.position.set(0, h + 20, 0);
-    redLight.userData.blink = true;
-    group.add(redLight);
-  }
-
-  group.position.set(x, 0, z);
-  scene.add(group);
-  return group;
 }
 
-// ---- Salesforce Tower (THE TARGET) ----
-function makeSalesforceTower() {
-  var group = new THREE.Group();
+// ---- SALESFORCE TOWER ----
+(function() {
   var h = 326;
-  // Tapered cylinder body
-  var geo = new THREE.CylinderGeometry(14, 20, h, 24);
-  var mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    color: 0x1e2844, metalness: 0.95, roughness: 0.05, envMapIntensity: 1
-  }));
-  mesh.position.y = h / 2;
-  mesh.castShadow = true;
-  group.add(mesh);
-
-  // Glass panels (vertical lines)
-  for (var vi = 0; vi < 24; vi++) {
-    var angle = (vi / 24) * Math.PI * 2;
-    var pts = [];
-    for (var vy = 0; vy < h; vy += 2) {
-      var r = 20 - (vy / h) * 6;
-      pts.push(new THREE.Vector3(Math.cos(angle) * (r + 0.3), vy, Math.sin(angle) * (r + 0.3)));
-    }
-    var vline = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({ color: 0x4466aa, transparent: true, opacity: 0.08 })
-    );
-    group.add(vline);
-  }
-
-  // Floor lines
-  for (var fy = 10; fy < h; fy += 4) {
-    var r2 = 20 - (fy / h) * 6;
-    var fPts = [];
-    for (var fi = 0; fi <= 48; fi++) {
-      var fa = (fi / 48) * Math.PI * 2;
-      fPts.push(new THREE.Vector3(Math.cos(fa) * (r2 + 0.3), fy, Math.sin(fa) * (r2 + 0.3)));
-    }
-    group.add(new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(fPts),
-      new THREE.LineBasicMaterial({ color: 0xeedd88, transparent: true, opacity: 0.03 })
-    ));
-  }
-
-  // Crown light
-  var crown = new THREE.PointLight(0x4466cc, 0.5, 100);
-  crown.position.set(0, h + 5, 0);
-  group.add(crown);
-
-  // Target ring
-  var ringPts = [];
-  for (var ri = 0; ri <= 64; ri++) {
-    var ra = ri / 64 * Math.PI * 2;
-    ringPts.push(new THREE.Vector3(Math.cos(ra) * 30, 0, Math.sin(ra) * 30));
-  }
-  var ring = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(ringPts),
-    new THREE.LineBasicMaterial({ color: 0xcc3333, transparent: true, opacity: 0.3 })
-  );
-  ring.position.y = h + 15;
-  ring.userData.isRing = true;
-  group.add(ring);
-
-  // Threat beam
-  var beam = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.4, 0.4, 600, 4),
-    new THREE.MeshBasicMaterial({ color: 0xcc3333, transparent: true, opacity: 0.03 })
-  );
-  beam.position.y = 300;
-  group.add(beam);
-
-  scene.add(group);
-  return group;
-}
-
-// ---- Transamerica Pyramid ----
-function makeTransamerica() {
-  var group = new THREE.Group();
-  var h = 260;
-  var geo = new THREE.ConeGeometry(22, h, 4);
-  var mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    color: 0x2a2e38, metalness: 0.8, roughness: 0.2
-  }));
-  mesh.position.y = h / 2;
-  mesh.rotation.y = Math.PI / 4;
-  mesh.castShadow = true;
-  group.add(mesh);
-  var edges = new THREE.LineSegments(
+  var geo = new THREE.CylinderGeometry(14, 20, h, 20);
+  var mat = new THREE.MeshStandardMaterial({ color: 0x2a3555, metalness: 0.9, roughness: 0.1 });
+  var mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(0, h/2, 0);
+  scene.add(mesh);
+  // Edges
+  scene.add(new THREE.LineSegments(
     new THREE.EdgesGeometry(geo),
-    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.06 })
+    new THREE.LineBasicMaterial({ color: 0x4466aa, transparent: true, opacity: 0.15 })
+  ).translateY(h/2));
+  // Crown glow
+  scene.add(new THREE.PointLight(0x4488ff, 1, 80).translateY(h + 5));
+  // Target ring
+  var rPts = [];
+  for (var i = 0; i <= 64; i++) { var a = i/64*Math.PI*2; rPts.push(new THREE.Vector3(Math.cos(a)*28, 0, Math.sin(a)*28)); }
+  var ring = new THREE.Line(new THREE.BufferGeometry().setFromPoints(rPts),
+    new THREE.LineBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.5 }));
+  ring.position.y = h + 15;
+  ring.userData.pulse = true;
+  scene.add(ring);
+  // Red beam
+  var beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.5, 0.5, 500, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.04 })
   );
+  beam.position.y = 250;
+  scene.add(beam);
+})();
+
+// ---- TRANSAMERICA PYRAMID ----
+(function() {
+  var geo = new THREE.ConeGeometry(22, 260, 4);
+  var mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x334455, metalness: 0.7, roughness: 0.3 }));
+  mesh.position.set(-250, 130, 180);
+  mesh.rotation.y = Math.PI/4;
+  scene.add(mesh);
+  var edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.1 }));
   edges.position.copy(mesh.position);
   edges.rotation.copy(mesh.rotation);
-  group.add(edges);
-  group.position.set(-250, 0, 180);
-  scene.add(group);
-  return group;
+  scene.add(edges);
+})();
+
+// ---- NAMED BUILDINGS ----
+addBuilding(60, -50, 28, 28, 244);
+addBuilding(-80, -90, 30, 30, 197);
+addBuilding(-200, 100, 45, 35, 237);
+addBuilding(150, -200, 25, 25, 195);
+addBuilding(-40, 60, 35, 30, 183);
+addBuilding(-180, 50, 40, 30, 212);
+addBuilding(-120, 200, 35, 25, 174);
+addBuilding(30, 80, 30, 28, 148);
+addBuilding(80, 100, 35, 30, 160);
+
+// ---- FILL CITY ----
+for (var bx = -350; bx <= 350; bx += 55) {
+  for (var bz = -300; bz <= 350; bz += 55) {
+    if (Math.random() < 0.2) continue;
+    if (Math.abs(bx) < 40 && Math.abs(bz) < 40) continue;
+    addBuilding(
+      bx + (Math.random()-0.5)*15, bz + (Math.random()-0.5)*15,
+      14 + Math.random()*20, 14 + Math.random()*20,
+      25 + Math.random()*100
+    );
+  }
 }
 
-// ---- White Van ----
-function makeVan(x, z) {
-  var group = new THREE.Group();
-  // Body
+// ---- WHITE VAN ----
+var vanGroup = new THREE.Group();
+(function() {
+  // Body -- BRIGHT WHITE so you can see it
   var body = new THREE.Mesh(
-    new THREE.BoxGeometry(6, 4, 14),
-    new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0.2 })
+    new THREE.BoxGeometry(6, 4.5, 14),
+    new THREE.MeshBasicMaterial({ color: 0xeeeeee })
   );
-  body.position.y = 3;
-  body.castShadow = true;
-  group.add(body);
+  body.position.y = 3.5;
+  vanGroup.add(body);
   // Cab
   var cab = new THREE.Mesh(
     new THREE.BoxGeometry(5.5, 3, 4),
-    new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.6 })
+    new THREE.MeshBasicMaterial({ color: 0xdddddd })
   );
-  cab.position.set(0, 5, -5);
-  group.add(cab);
+  cab.position.set(0, 5.5, -5);
+  vanGroup.add(cab);
   // Windshield
-  var windshield = new THREE.Mesh(
+  var ws = new THREE.Mesh(
     new THREE.PlaneGeometry(4.5, 2.5),
-    new THREE.MeshBasicMaterial({ color: 0x223344, transparent: true, opacity: 0.7 })
+    new THREE.MeshBasicMaterial({ color: 0x224466 })
   );
-  windshield.position.set(0, 5.5, -7.1);
-  group.add(windshield);
+  ws.position.set(0, 6, -7.1);
+  vanGroup.add(ws);
   // Wheels
-  var wheelGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.6, 8);
-  var wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-  [[-3.2, 1.2, -4], [3.2, 1.2, -4], [-3.2, 1.2, 4], [3.2, 1.2, 4]].forEach(function(p) {
-    var w = new THREE.Mesh(wheelGeo, wheelMat);
-    w.position.set(p[0], p[1], p[2]);
-    w.rotation.z = Math.PI / 2;
-    group.add(w);
+  var wGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.6, 8);
+  var wMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+  [[-3.2,1.2,-4],[3.2,1.2,-4],[-3.2,1.2,4],[3.2,1.2,4]].forEach(function(p) {
+    var w = new THREE.Mesh(wGeo, wMat);
+    w.position.set(p[0],p[1],p[2]);
+    w.rotation.z = Math.PI/2;
+    vanGroup.add(w);
   });
   // Open rear doors
-  var doorMat = new THREE.MeshStandardMaterial({ color: 0xd0d0d0, roughness: 0.6 });
-  var leftDoor = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.5, 3), doorMat);
-  leftDoor.position.set(-3.3, 3.2, 7.5);
-  leftDoor.rotation.y = -0.8;
-  group.add(leftDoor);
-  var rightDoor = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.5, 3), doorMat);
-  rightDoor.position.set(3.3, 3.2, 7.5);
-  rightDoor.rotation.y = 0.8;
-  group.add(rightDoor);
-  // Interior glow (drones launching from inside)
-  var glow = new THREE.PointLight(0x3388ff, 0.8, 30);
-  glow.position.set(0, 3, 5);
-  group.add(glow);
+  var dMat = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+  var ld = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.5, 3), dMat);
+  ld.position.set(-3.3, 3.5, 8); ld.rotation.y = -0.8;
+  vanGroup.add(ld);
+  var rd = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.5, 3), dMat);
+  rd.position.set(3.3, 3.5, 8); rd.rotation.y = 0.8;
+  vanGroup.add(rd);
+  // Blue interior glow
+  vanGroup.add(new THREE.PointLight(0x3388ff, 2, 30).translateY(3));
+  // Spotlight on van
+  vanGroup.add(new THREE.PointLight(0xffffff, 0.5, 40).translateY(12));
+})();
+var VAN_X = 180, VAN_Z = 220;
+vanGroup.position.set(VAN_X, 0, VAN_Z);
+vanGroup.rotation.y = Math.atan2(-VAN_X, -VAN_Z);
+scene.add(vanGroup);
 
-  // Label
-  var canvas = document.createElement("canvas");
-  canvas.width = 256; canvas.height = 64;
-  var ctx = canvas.getContext("2d");
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.font = "14px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("LAUNCH VEHICLE", 128, 30);
-  var tex = new THREE.CanvasTexture(canvas);
-  var label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
-  label.position.set(0, 12, 0);
-  label.scale.set(30, 8, 1);
-  group.add(label);
-
-  group.position.set(x, 0, z);
-  group.rotation.y = Math.atan2(-x, -z); // Face toward tower
-  scene.add(group);
-  return group;
-}
-
-// ---- Build the city ----
-makeSalesforceTower();
-makeTransamerica();
-
-// Named buildings
-makeBuilding(60, -50, 28, 28, 244);   // 181 Fremont
-makeBuilding(-80, -90, 30, 30, 197);   // Millennium
-makeBuilding(-200, 100, 45, 35, 237);  // 555 California
-makeBuilding(150, -200, 25, 25, 195);  // One Rincon
-makeBuilding(-40, 60, 35, 30, 183);    // 50 Fremont
-makeBuilding(-180, 50, 40, 30, 212);   // 345 California
-makeBuilding(-120, 200, 35, 25, 174);  // Embarcadero 4
-makeBuilding(30, 80, 30, 28, 148);     // 100 First
-makeBuilding(80, 100, 35, 30, 160);    // McKesson
-
-// Fill with mid-rise buildings
-for (var bx = -350; bx <= 350; bx += 50) {
-  for (var bz = -250; bz <= 350; bz += 50) {
-    if (Math.random() < 0.25) continue;
-    if (Math.abs(bx) < 35 && Math.abs(bz) < 35) continue; // Keep tower area clear
-    var existsTooClose = false;
-    SF_CHECK: for (var ci = 0; ci < arguments.length; ci++) break SF_CHECK;
-    makeBuilding(
-      bx + (Math.random() - 0.5) * 15,
-      bz + (Math.random() - 0.5) * 15,
-      12 + Math.random() * 22,
-      12 + Math.random() * 22,
-      20 + Math.random() * 100
-    );
-  }
-}
-
-// ---- Streets (brighter than before) ----
-var streetMat2 = new THREE.MeshBasicMaterial({ color: 0x111115 });
-for (var sx = -400; sx <= 400; sx += 50) {
-  var street = new THREE.Mesh(new THREE.PlaneGeometry(4, 800), streetMat2);
-  street.rotation.x = -Math.PI / 2;
-  street.position.set(sx, 0.1, 0);
-  scene.add(street);
-}
-for (var sz = -300; sz <= 400; sz += 50) {
-  var street2 = new THREE.Mesh(new THREE.PlaneGeometry(800, 4), streetMat2);
-  street2.rotation.x = -Math.PI / 2;
-  street2.position.set(0, 0.1, sz);
-  scene.add(street2);
-}
-
-// Ground
-scene.add(new THREE.Mesh(
-  new THREE.PlaneGeometry(2000, 2000),
-  new THREE.MeshStandardMaterial({ color: 0x080a0e, roughness: 1 })
-).rotateX(-Math.PI / 2));
-
-// ---- Van and Drones ----
-var VAN_POS = [200, 250]; // x, z -- a block away from tower
-var van = makeVan(VAN_POS[0], VAN_POS[1]);
-
-var SWARM_COUNT = 24;
+// ---- DRONES ----
+var TOTAL = 24;
 var drones = [];
 var deployed = 0, onTarget = 0, tick = 0, playing = true, trackCam = false;
-var deployInterval = 8; // ticks between each drone launch
 
-function makeSwarmer(startX, startZ) {
+function spawnDrone() {
   var mesh = new THREE.Mesh(
-    new THREE.OctahedronGeometry(2, 0),
-    new THREE.MeshBasicMaterial({ color: 0x44aaff, wireframe: true, transparent: true, opacity: 0.7 })
+    new THREE.OctahedronGeometry(2.5, 0),
+    new THREE.MeshBasicMaterial({ color: 0x44aaff, wireframe: true })
   );
-  // Start at van rear
-  mesh.position.set(startX, 5, startZ);
+  mesh.position.set(VAN_X, 4, VAN_Z);
   scene.add(mesh);
-
-  // Glow
-  var glow = new THREE.PointLight(0x3388ff, 0.15, 20);
-  mesh.add(glow);
-
+  // Bright glow so you can see it
+  var light = new THREE.PointLight(0x4488ff, 0.4, 30);
+  mesh.add(light);
   var trail = [];
   var trailLine = new THREE.Line(
     new THREE.BufferGeometry(),
-    new THREE.LineBasicMaterial({ color: 0x1133aa, transparent: true, opacity: 0.15 })
+    new THREE.LineBasicMaterial({ color: 0x2244aa, transparent: true, opacity: 0.3 })
   );
   scene.add(trailLine);
-
   return {
-    mesh: mesh, alive: true, launched: false, arrived: false,
-    trail: trail, trailLine: trailLine,
-    // Each drone takes a slightly different path
-    pathPhase: Math.random() * Math.PI * 2,
-    altitude: 40 + Math.random() * 200,
-    orbitAngle: Math.random() * Math.PI * 2,
-    speed: 3 + Math.random() * 2,
-    phase: "launch" // launch -> climb -> approach -> orbit
+    mesh: mesh, trail: trail, trailLine: trailLine,
+    launched: false, arrived: false,
+    alt: 50 + Math.random() * 220,
+    phase: "wait",
+    pathOff: Math.random() * Math.PI * 2,
+    spd: 3 + Math.random() * 2,
+    orbitA: Math.random() * Math.PI * 2
   };
 }
+for (var di = 0; di < TOTAL; di++) drones.push(spawnDrone());
 
-for (var i = 0; i < SWARM_COUNT; i++) {
-  drones.push(makeSwarmer(VAN_POS[0], VAN_POS[1]));
-}
-
-// ---- Simulation ----
-function simTick() {
+// ---- SIM LOOP ----
+function step() {
   if (!playing) return;
   tick++;
 
-  // Deploy drones one by one from the van
-  if (tick % deployInterval === 0 && deployed < SWARM_COUNT) {
+  // Deploy one drone every 6 ticks
+  if (tick % 6 === 0 && deployed < TOTAL) {
     drones[deployed].launched = true;
-    drones[deployed].phase = "launch";
+    drones[deployed].phase = "rise";
     deployed++;
   }
 
   drones.forEach(function(dr, idx) {
-    if (!dr.launched || dr.arrived) return;
-
+    if (!dr.launched || dr.phase === "wait") return;
     var p = dr.mesh.position;
-    var targetAlt = dr.altitude;
-    var targetX = 0, targetZ = 0; // Salesforce Tower
 
-    if (dr.phase === "launch") {
-      // Rise straight up from van
-      p.y += 2;
-      if (p.y > 30) dr.phase = "climb";
+    if (dr.phase === "rise") {
+      p.y += 2.5;
+      if (p.y > 25) dr.phase = "climb";
     } else if (dr.phase === "climb") {
-      // Climb to cruise altitude while starting to move toward target
-      p.y += (targetAlt - p.y) * 0.02;
-      var dx = targetX - p.x, dz = targetZ - p.z;
-      var dist = Math.sqrt(dx * dx + dz * dz);
-      p.x += (dx / dist) * dr.speed * 0.5;
-      p.z += (dz / dist) * dr.speed * 0.5;
-      // Add weaving through buildings
-      p.x += Math.sin(tick * 0.05 + dr.pathPhase) * 1.5;
-      p.z += Math.cos(tick * 0.07 + dr.pathPhase * 1.3) * 1.5;
-      if (Math.abs(p.y - targetAlt) < 10) dr.phase = "approach";
-    } else if (dr.phase === "approach") {
-      // Fast approach to tower
-      var dx2 = targetX - p.x, dz2 = targetZ - p.z;
-      var dist2 = Math.sqrt(dx2 * dx2 + dz2 * dz2);
-      p.x += (dx2 / dist2) * dr.speed;
-      p.z += (dz2 / dist2) * dr.speed;
-      // Weave
-      p.x += Math.sin(tick * 0.08 + dr.pathPhase) * 0.8;
-      p.z += Math.cos(tick * 0.1 + dr.pathPhase * 1.5) * 0.8;
-      p.y += Math.sin(tick * 0.05 + idx) * 0.3;
-      if (dist2 < 40) dr.phase = "orbit";
+      p.y += (dr.alt - p.y) * 0.025;
+      var dx = -p.x, dz = -p.z;
+      var dist = Math.sqrt(dx*dx + dz*dz) || 1;
+      p.x += (dx/dist) * dr.spd * 0.4;
+      p.z += (dz/dist) * dr.spd * 0.4;
+      p.x += Math.sin(tick*0.06 + dr.pathOff) * 1.2;
+      p.z += Math.cos(tick*0.08 + dr.pathOff) * 1.2;
+      if (Math.abs(p.y - dr.alt) < 8) dr.phase = "strike";
+    } else if (dr.phase === "strike") {
+      var dx2 = -p.x, dz2 = -p.z;
+      var dist2 = Math.sqrt(dx2*dx2 + dz2*dz2) || 1;
+      p.x += (dx2/dist2) * dr.spd;
+      p.z += (dz2/dist2) * dr.spd;
+      p.x += Math.sin(tick*0.1 + dr.pathOff) * 0.6;
+      p.z += Math.cos(tick*0.12 + dr.pathOff) * 0.6;
+      p.y += Math.sin(tick*0.05 + idx) * 0.3;
+      if (dist2 < 35) dr.phase = "orbit";
     } else if (dr.phase === "orbit") {
-      // Orbit the tower
-      dr.orbitAngle += 0.015 + idx * 0.002;
-      var orbitR = 25 + idx * 3;
-      p.x = Math.cos(dr.orbitAngle) * orbitR;
-      p.z = Math.sin(dr.orbitAngle) * orbitR;
-      p.y = targetAlt + Math.sin(dr.orbitAngle * 2 + idx) * 10;
+      dr.orbitA += 0.02 + idx * 0.002;
+      var oR = 25 + idx * 2.5;
+      p.x = Math.cos(dr.orbitA) * oR;
+      p.z = Math.sin(dr.orbitA) * oR;
+      p.y = dr.alt + Math.sin(dr.orbitA * 2) * 8;
       if (!dr.arrived) { dr.arrived = true; onTarget++; }
     }
 
-    // Spin
-    dr.mesh.rotation.x += 0.04;
-    dr.mesh.rotation.y += 0.06;
+    dr.mesh.rotation.x += 0.05;
+    dr.mesh.rotation.y += 0.07;
 
     // Trail
     dr.trail.push(p.clone());
-    if (dr.trail.length > 60) dr.trail.shift();
+    if (dr.trail.length > 50) dr.trail.shift();
     if (dr.trail.length > 1) {
       dr.trailLine.geometry.dispose();
       dr.trailLine.geometry = new THREE.BufferGeometry().setFromPoints(dr.trail);
     }
   });
 
-  // Blink building lights
-  scene.traverse(function(obj) {
-    if (obj.userData && obj.userData.blink) {
-      obj.visible = Math.sin(tick * 0.15) > 0;
-    }
-    if (obj.userData && obj.userData.isRing) {
-      var s = 1 + Math.sin(tick * 0.08) * 0.15;
-      obj.scale.set(s, s, s);
+  // Pulse target ring
+  scene.traverse(function(o) {
+    if (o.userData && o.userData.pulse) {
+      var s = 1 + Math.sin(tick * 0.1) * 0.12;
+      o.scale.set(s, s, s);
     }
   });
 
   // HUD
   var inFlight = drones.filter(function(d) { return d.launched && !d.arrived; }).length;
-  document.getElementById("s-deployed").textContent = deployed + " / " + SWARM_COUNT;
-  document.getElementById("s-flight").textContent = inFlight;
-  document.getElementById("s-ontarget").textContent = onTarget;
-  var lead = drones.find(function(d) { return d.launched && !d.arrived; });
-  document.getElementById("s-alt").textContent = lead ? Math.round(lead.mesh.position.y) + "m" : (onTarget > 0 ? "ON STATION" : "--");
-  var mm = Math.floor(tick / 60), ss = tick % 60;
-  document.getElementById("clock").textContent = String(mm).padStart(2, "0") + ":" + String(ss).padStart(2, "0");
+  document.getElementById("s-dep").textContent = deployed + "/" + TOTAL;
+  document.getElementById("s-fly").textContent = inFlight;
+  document.getElementById("s-on").textContent = onTarget;
+  var mm = Math.floor(tick/60), ss = tick%60;
+  document.getElementById("clock").textContent = String(mm).padStart(2,"0") + ":" + String(ss).padStart(2,"0");
 }
 
-// ---- Track cam ----
-function updateCam() {
+// ---- TRACK CAM ----
+function camUpdate() {
   if (!trackCam) return;
-  var lead = drones.find(function(d) { return d.launched && !d.arrived; });
-  if (!lead) {
-    var last = drones.filter(function(d) { return d.arrived; }).pop();
-    if (last) lead = last;
-    else return;
-  }
-  var p = lead.mesh.position;
-  camera.position.lerp(new THREE.Vector3(p.x + 50, p.y + 20, p.z + 50), 0.03);
-  controls.target.lerp(new THREE.Vector3(p.x, p.y, p.z), 0.06);
+  var tgt = drones.find(function(d) { return d.launched && !d.arrived; });
+  if (!tgt) tgt = drones.filter(function(d) { return d.arrived; }).pop();
+  if (!tgt) return;
+  var p = tgt.mesh.position;
+  camera.position.lerp(new THREE.Vector3(p.x+40, p.y+15, p.z+40), 0.03);
+  orbitCtrl.target.lerp(new THREE.Vector3(p.x, p.y, p.z), 0.06);
 }
 
-// ---- Render ----
 function animate() {
   requestAnimationFrame(animate);
-  simTick();
-  updateCam();
-  controls.update();
+  step();
+  camUpdate();
+  orbitCtrl.update();
   renderer.render(scene, camera);
 }
 
-// ---- Controls ----
-document.getElementById("b-play").addEventListener("click", function() {
+// ---- CONTROLS ----
+document.getElementById("b-play").onclick = function() {
   playing = !playing;
   this.textContent = playing ? "PAUSE" : "PLAY";
-});
-document.getElementById("b-reset").addEventListener("click", function() {
+};
+document.getElementById("b-reset").onclick = function() {
   drones.forEach(function(d) { scene.remove(d.mesh); scene.remove(d.trailLine); });
   drones = [];
-  for (var i = 0; i < SWARM_COUNT; i++) drones.push(makeSwarmer(VAN_POS[0], VAN_POS[1]));
+  for (var i = 0; i < TOTAL; i++) drones.push(spawnDrone());
   deployed = 0; onTarget = 0; tick = 0;
-});
-document.getElementById("b-next").addEventListener("click", function() {
-  // Cycle van position
-  var positions = [[200, 250], [-300, 200], [250, -180], [-200, -200]];
-  var names = ["VAN DEPLOY -- MISSION ST", "VAN DEPLOY -- MONTGOMERY ST", "VAN DEPLOY -- FREMONT ST", "VAN DEPLOY -- HOWARD ST"];
-  var ci = (positions.findIndex(function(p) { return p[0] === VAN_POS[0] && p[1] === VAN_POS[1]; }) + 1) % positions.length;
-  VAN_POS[0] = positions[ci][0]; VAN_POS[1] = positions[ci][1];
-  scene.remove(van);
-  van = makeVan(VAN_POS[0], VAN_POS[1]);
-  document.getElementById("sc-name").textContent = names[ci];
-  document.getElementById("b-reset").click();
-});
-document.getElementById("b-cam").addEventListener("click", function() {
+};
+document.getElementById("b-next").onclick = function() {
+  var spots = [[180,220],[-280,180],[220,-160],[-180,-180]];
+  var names = ["MISSION ST","MONTGOMERY ST","FREMONT ST","HOWARD ST"];
+  var ci = 0;
+  for (var i = 0; i < spots.length; i++) {
+    if (Math.abs(spots[i][0]-VAN_X)<10 && Math.abs(spots[i][1]-VAN_Z)<10) { ci = (i+1)%spots.length; break; }
+  }
+  VAN_X = spots[ci][0]; VAN_Z = spots[ci][1];
+  scene.remove(vanGroup);
+  vanGroup.position.set(VAN_X, 0, VAN_Z);
+  vanGroup.rotation.y = Math.atan2(-VAN_X, -VAN_Z);
+  scene.add(vanGroup);
+  document.getElementById("sc-name").textContent = "VAN DEPLOY -- " + names[ci];
+  document.getElementById("b-reset").onclick();
+};
+document.getElementById("b-cam").onclick = function() {
   trackCam = !trackCam;
   this.className = trackCam ? "on" : "";
-  controls.autoRotate = !trackCam;
-});
-window.addEventListener("resize", function() {
-  camera.aspect = innerWidth / innerHeight;
+  orbitCtrl.autoRotate = !trackCam;
+};
+window.onresize = function() {
+  camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-});
+};
 
 animate();
 </script>
