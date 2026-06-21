@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OVERWATCH - San Francisco Tactical Simulation</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+canvas { display: block; }
+#hud-top {
+  position: fixed; top: 0; left: 0; right: 0; height: 32px; z-index: 10;
+  display: flex; align-items: center; padding: 0 14px; gap: 14px;
+  background: rgba(0,0,0,0.85); border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.brand { font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.25); font-weight: 300; }
+.sep { color: rgba(255,255,255,0.08); }
+.scenario-name { font-size: 10px; letter-spacing: 2px; color: rgba(200,60,60,0.5); }
+.ctrls { display: flex; gap: 5px; margin-left: auto; }
+.ctrls button {
+  background: transparent; border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.2);
+  font-family: inherit; font-size: 8px; letter-spacing: 1.5px; padding: 3px 8px; cursor: pointer; text-transform: uppercase;
+}
+.ctrls button:hover, .ctrls button.on { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.5); }
+#stats-left {
+  position: fixed; top: 40px; left: 12px; z-index: 10; font-size: 8px;
+  color: rgba(255,255,255,0.15); letter-spacing: 1.5px; line-height: 2;
+}
+#stats-left .v { color: rgba(255,255,255,0.35); }
+#stats-left .r { color: rgba(200,60,60,0.5); }
+#stats-left .b { color: rgba(60,130,200,0.5); }
+#stats-left .g { color: rgba(60,180,80,0.4); }
+#clock-main {
+  position: fixed; top: 40px; right: 12px; z-index: 10;
+  font-size: 36px; font-weight: 100; letter-spacing: 6px; color: rgba(255,255,255,0.06);
+}
+#target-label {
+  position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 10;
+  font-size: 9px; letter-spacing: 3px; color: rgba(200,60,60,0.3); text-transform: uppercase;
+}
+#corner-br {
+  position: fixed; bottom: 8px; right: 12px; z-index: 10;
+  font-size: 7px; letter-spacing: 2px; color: rgba(255,255,255,0.06); text-transform: uppercase;
+}
+#corner-bl {
+  position: fixed; bottom: 8px; left: 12px; z-index: 10;
+  font-size: 7px; letter-spacing: 2px; color: rgba(255,255,255,0.06);
+}
+</style>
+</head>
+<body>
+<div id="hud-top">
+  <div class="brand">OVERWATCH</div>
+  <span class="sep">|</span>
+  <div class="scenario-name" id="sc-name">URBAN STRIKE -- SAN FRANCISCO</div>
+  <div class="ctrls">
+    <button id="b-play" class="on">PAUSE</button>
+    <button id="b-reset">RESET</button>
+    <button id="b-next">NEXT SCENARIO</button>
+    <button id="b-cam">TRACK CAM</button>
+  </div>
+</div>
+<div id="stats-left">
+  <div>THEATER <span class="v">SAN FRANCISCO CBD</span></div>
+  <div>TARGET <span class="r" id="s-target">SALESFORCE TOWER</span></div>
+  <div>HOSTILES <span class="r" id="s-host">0</span></div>
+  <div>DEFENDERS <span class="b" id="s-def">0</span></div>
+  <div>NEUTRALIZED <span class="g" id="s-kills">0</span></div>
+  <div>LEAKERS <span class="r" id="s-leak">0</span></div>
+  <div>ALTITUDE <span class="v" id="s-alt">--</span></div>
+  <div>TICK <span class="v" id="s-tick">0</span></div>
+</div>
+<div id="clock-main">00:00</div>
+<div id="target-label">TARGET: SALESFORCE TOWER -- 415 MISSION ST</div>
+<div id="corner-br">37.7897N 122.3972W -- CLASSIFIED</div>
+<div id="corner-bl">OVERWATCH ISR PLATFORM v1.0</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+
+var scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000000, 0.0006);
+var camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 1, 10000);
+camera.position.set(800, 500, 800);
+var renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000000);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+var controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.04;
+controls.target.set(0, 150, 0);
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.15;
+
+// Lighting -- minimal
+scene.add(new THREE.AmbientLight(0x222233, 0.4));
+var moonLight = new THREE.DirectionalLight(0x8899bb, 0.3);
+moonLight.position.set(500, 800, -300);
+scene.add(moonLight);
+
+// ---- SF Building Data (approximate positions, heights in meters) ----
+var SF_BUILDINGS = [
+  // Salesforce Tower -- THE TARGET
+  { x: 0, z: 0, w: 40, d: 40, h: 326, name: "SALESFORCE TOWER", isTarget: true },
+  // Transamerica Pyramid
+  { x: -250, z: 180, w: 30, d: 30, h: 260, name: "TRANSAMERICA", isPyramid: true },
+  // 181 Fremont
+  { x: 60, z: -50, w: 28, d: 28, h: 244, name: "181 FREMONT" },
+  // Millennium Tower
+  { x: -80, z: -90, w: 30, d: 30, h: 197, name: "MILLENNIUM" },
+  // 555 California
+  { x: -200, z: 100, w: 45, d: 35, h: 237, name: "555 CALIFORNIA" },
+  // One Rincon Hill
+  { x: 150, z: -200, w: 25, d: 25, h: 195, name: "ONE RINCON" },
+  // 50 Fremont
+  { x: -40, z: 60, w: 35, d: 30, h: 183, name: "50 FREMONT" },
+  // 345 California
+  { x: -180, z: 50, w: 40, d: 30, h: 212, name: "345 CALIFORNIA" },
+  // Embarcadero Center towers
+  { x: -120, z: 200, w: 35, d: 25, h: 174, name: "EMBARC 4" },
+  { x: -160, z: 230, w: 30, d: 25, h: 170, name: "EMBARC 3" },
+  { x: -200, z: 260, w: 30, d: 25, h: 126, name: "EMBARC 2" },
+  // 100 First
+  { x: 30, z: 80, w: 30, d: 28, h: 148, name: "100 FIRST" },
+  // McKesson
+  { x: 80, z: 100, w: 35, d: 30, h: 160, name: "MCKESSON" },
+  // Random downtown buildings
+];
+
+// Add random mid-rise buildings to fill the grid
+for (var bx = -400; bx <= 400; bx += 60) {
+  for (var bz = -300; bz <= 400; bz += 60) {
+    if (Math.random() < 0.3) continue;
+    var tooClose = SF_BUILDINGS.some(function(b) { return Math.abs(b.x - bx) < 50 && Math.abs(b.z - bz) < 50; });
+    if (tooClose) continue;
+    SF_BUILDINGS.push({
+      x: bx + (Math.random() - 0.5) * 20,
+      z: bz + (Math.random() - 0.5) * 20,
+      w: 15 + Math.random() * 25,
+      d: 15 + Math.random() * 25,
+      h: 30 + Math.random() * 120,
+    });
+  }
+}
+
+// ---- Build city ----
+var buildingMeshes = [];
+
+SF_BUILDINGS.forEach(function(b) {
+  var geo, mesh;
+
+  if (b.isPyramid) {
+    // Transamerica pyramid
+    geo = new THREE.ConeGeometry(25, b.h, 4);
+    mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color: 0x000000, wireframe: false, transparent: true, opacity: 0.7,
+      metalness: 0.9, roughness: 0.3
+    }));
+    mesh.position.set(b.x, b.h / 2, b.z);
+    mesh.rotation.y = Math.PI / 4;
+    scene.add(mesh);
+    // Wireframe overlay
+    var wireGeo = new THREE.ConeGeometry(25, b.h, 4);
+    var wire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(wireGeo),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08 })
+    );
+    wire.position.copy(mesh.position);
+    wire.rotation.y = mesh.rotation.y;
+    scene.add(wire);
+  } else if (b.isTarget) {
+    // Salesforce Tower -- tapered cylinder
+    geo = new THREE.CylinderGeometry(16, 22, b.h, 16);
+    mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color: 0x111122, wireframe: false, transparent: true, opacity: 0.8,
+      metalness: 0.95, roughness: 0.1, emissive: 0x110011, emissiveIntensity: 0.1
+    }));
+    mesh.position.set(b.x, b.h / 2, b.z);
+    scene.add(mesh);
+    // Pulsing target ring at top
+    var ringPts = [];
+    for (var ri = 0; ri <= 64; ri++) {
+      var ra = ri / 64 * Math.PI * 2;
+      ringPts.push(new THREE.Vector3(Math.cos(ra) * 25, 0, Math.sin(ra) * 25));
+    }
+    var targetRing = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(ringPts),
+      new THREE.LineBasicMaterial({ color: 0xcc3333, transparent: true, opacity: 0.4 })
+    );
+    targetRing.position.set(b.x, b.h + 10, b.z);
+    targetRing.userData.isTargetRing = true;
+    scene.add(targetRing);
+    // Vertical beam
+    var beamGeo = new THREE.CylinderGeometry(0.5, 0.5, 500, 4);
+    var beam = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xcc3333, transparent: true, opacity: 0.04 }));
+    beam.position.set(b.x, 250, b.z);
+    scene.add(beam);
+    // Wireframe
+    var wf = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.CylinderGeometry(16, 22, b.h, 16)),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.06 })
+    );
+    wf.position.copy(mesh.position);
+    scene.add(wf);
+  } else {
+    // Regular box building
+    geo = new THREE.BoxGeometry(b.w, b.h, b.d);
+    var brightness = 0.02 + Math.random() * 0.03;
+    mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color: new THREE.Color(brightness, brightness, brightness + 0.01),
+      metalness: 0.8, roughness: 0.4, transparent: true, opacity: 0.85
+    }));
+    mesh.position.set(b.x, b.h / 2, b.z);
+    scene.add(mesh);
+    // Edge wireframe
+    var edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.03 + (b.h > 100 ? 0.02 : 0) });
+    var edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+    edges.position.copy(mesh.position);
+    scene.add(edges);
+  }
+
+  // Window lights (random dots on faces)
+  if (b.h > 60) {
+    var windowCount = Math.floor(b.h / 15) * 4;
+    for (var wi = 0; wi < windowCount; wi++) {
+      var side = Math.floor(Math.random() * 4);
+      var wy = 10 + Math.random() * (b.h - 20);
+      var wOffset = (Math.random() - 0.5) * (side < 2 ? b.w : b.d) * 0.8;
+      var wx, wz;
+      if (side === 0) { wx = b.x + b.w / 2 + 0.5; wz = b.z + wOffset; }
+      else if (side === 1) { wx = b.x - b.w / 2 - 0.5; wz = b.z + wOffset; }
+      else if (side === 2) { wx = b.x + wOffset; wz = b.z + b.d / 2 + 0.5; }
+      else { wx = b.x + wOffset; wz = b.z - b.d / 2 - 0.5; }
+      if (Math.random() < 0.3) {
+        var dot = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.5, 1.5),
+          new THREE.MeshBasicMaterial({ color: 0xeedd88, transparent: true, opacity: 0.08 + Math.random() * 0.1 })
+        );
+        dot.position.set(wx, wy, wz);
+        if (side < 2) dot.rotation.y = Math.PI / 2;
+        scene.add(dot);
+      }
+    }
+  }
+
+  buildingMeshes.push(mesh);
+});
+
+// ---- Street grid ----
+var streetMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.02 });
+for (var sx = -500; sx <= 500; sx += 60) {
+  var sg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(sx, 0.2, -400), new THREE.Vector3(sx, 0.2, 500)]);
+  scene.add(new THREE.Line(sg, streetMat));
+}
+for (var sz = -400; sz <= 500; sz += 60) {
+  var sg2 = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-500, 0.2, sz), new THREE.Vector3(500, 0.2, sz)]);
+  scene.add(new THREE.Line(sg2, streetMat));
+}
+
+// Ground
+var ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(2000, 2000),
+  new THREE.MeshStandardMaterial({ color: 0x020204, roughness: 1 })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// ---- Drones ----
+var hostiles = [], defenders = [], engLines = [], explosions = [];
+var kills = 0, leakers = 0, tick = 0, playing = true, trackCam = false;
+var scenarioIdx = 0;
+
+var SCENARIOS = [
+  { name: "URBAN STRIKE -- SALESFORCE TOWER", count: 20, pattern: "strike", speed: 3 },
+  { name: "CANYON RUN -- LOW ALTITUDE", count: 12, pattern: "canyon", speed: 4 },
+  { name: "SWARM CONVERGENCE -- ALL VECTORS", count: 35, pattern: "swarm", speed: 2.5 },
+  { name: "DECOY FLOOD -- FINANCIAL DISTRICT", count: 45, pattern: "decoy", speed: 2 },
+];
+
+function makeDrone(pos, vel, isDecoy, isFriendly) {
+  var color = isFriendly ? 0x3366cc : (isDecoy ? 0x442222 : 0xcc3333);
+  var opacity = isDecoy ? 0.2 : (isFriendly ? 0.6 : 0.5);
+  var mesh = new THREE.Mesh(
+    new THREE.OctahedronGeometry(isFriendly ? 3 : 2.5, 0),
+    new THREE.MeshBasicMaterial({ color: color, wireframe: true, transparent: true, opacity: opacity })
+  );
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  scene.add(mesh);
+  var trail = [];
+  var trailLine = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: isFriendly ? 0x112244 : (isDecoy ? 0x221111 : 0x441111), transparent: true, opacity: 0.12 })
+  );
+  scene.add(trailLine);
+  return { mesh: mesh, vel: vel, alive: true, isDecoy: isDecoy, isFriendly: isFriendly, trail: trail, trailLine: trailLine, age: 0 };
+}
+
+function loadScenario(idx) {
+  hostiles.forEach(function(h) { scene.remove(h.mesh); scene.remove(h.trailLine); });
+  defenders.forEach(function(d) { scene.remove(d.mesh); scene.remove(d.trailLine); });
+  engLines.forEach(function(e) { scene.remove(e.line); });
+  explosions.forEach(function(e) { scene.remove(e.mesh); });
+  hostiles = []; defenders = []; engLines = []; explosions = [];
+  kills = 0; leakers = 0; tick = 0;
+
+  var sc = SCENARIOS[idx];
+  document.getElementById("sc-name").textContent = sc.name;
+
+  // Spawn hostiles
+  for (var i = 0; i < sc.count; i++) {
+    var px, py, pz, vx, vy, vz, isDecoy = false;
+
+    if (sc.pattern === "strike") {
+      // Come from the east (bay side), weave between buildings
+      px = 600 + Math.random() * 200;
+      py = 80 + Math.random() * 200;
+      pz = (Math.random() - 0.5) * 400;
+      vx = -sc.speed * (0.8 + Math.random() * 0.4);
+      vy = (Math.random() - 0.5) * 0.5;
+      vz = (Math.random() - 0.5) * 1;
+    } else if (sc.pattern === "canyon") {
+      // Low altitude through street canyons
+      px = 500 + Math.random() * 100;
+      py = 20 + Math.random() * 40;
+      pz = (Math.random() - 0.5) * 300;
+      vx = -sc.speed * (0.9 + Math.random() * 0.2);
+      vy = (Math.random() - 0.5) * 0.2;
+      vz = Math.sin(i) * 0.5;
+    } else if (sc.pattern === "swarm") {
+      var angle = Math.random() * Math.PI * 2;
+      var dist = 500 + Math.random() * 200;
+      px = Math.cos(angle) * dist;
+      py = 100 + Math.random() * 250;
+      pz = Math.sin(angle) * dist;
+      vx = -Math.cos(angle) * sc.speed * (0.8 + Math.random() * 0.4);
+      vy = (Math.random() - 0.5) * 0.3;
+      vz = -Math.sin(angle) * sc.speed * (0.8 + Math.random() * 0.4);
+    } else if (sc.pattern === "decoy") {
+      isDecoy = i > sc.count * 0.25;
+      var angle2 = Math.random() * Math.PI * 2;
+      var dist2 = 400 + Math.random() * 200;
+      px = Math.cos(angle2) * dist2;
+      py = isDecoy ? 30 + Math.random() * 60 : 120 + Math.random() * 200;
+      pz = Math.sin(angle2) * dist2;
+      var spd = isDecoy ? sc.speed * 0.4 : sc.speed;
+      vx = -Math.cos(angle2) * spd;
+      vy = (Math.random() - 0.5) * 0.2;
+      vz = -Math.sin(angle2) * spd;
+    }
+    hostiles.push(makeDrone([px, py, pz], [vx, vy, vz], isDecoy, false));
+  }
+
+  // Spawn defenders around Salesforce Tower
+  var defPositions = [
+    [50, 180, 50], [-50, 200, -50], [80, 160, -80], [-60, 220, 60], [0, 300, 0]
+  ];
+  defPositions.forEach(function(p) {
+    defenders.push(makeDrone(p, [0, 0, 0], false, true));
+  });
+}
+
+// ---- Simulation ----
+function simStep() {
+  if (!playing) return;
+  tick++;
+
+  // Move hostiles toward target (0,0,0 = Salesforce Tower base)
+  hostiles.forEach(function(h) {
+    if (!h.alive) return;
+    h.age++;
+
+    // Steer toward target with some noise
+    var tx = -h.mesh.position.x * 0.003 + h.vel[0];
+    var tz = -h.mesh.position.z * 0.003 + h.vel[2];
+    h.mesh.position.x += tx;
+    h.mesh.position.y += h.vel[1];
+    h.mesh.position.z += tz;
+
+    // Avoid ground
+    if (h.mesh.position.y < 15) h.mesh.position.y = 15;
+
+    h.mesh.rotation.x += 0.03;
+    h.mesh.rotation.z += 0.02;
+
+    // Trail
+    h.trail.push(h.mesh.position.clone());
+    if (h.trail.length > 40) h.trail.shift();
+    if (h.trail.length > 1) {
+      h.trailLine.geometry.dispose();
+      h.trailLine.geometry = new THREE.BufferGeometry().setFromPoints(h.trail);
+    }
+
+    // Hit target?
+    var dist = Math.sqrt(h.mesh.position.x * h.mesh.position.x + h.mesh.position.z * h.mesh.position.z);
+    if (dist < 30 && h.mesh.position.y < 340) {
+      h.alive = false;
+      h.mesh.material.opacity = 0.02;
+      if (!h.isDecoy) leakers++;
+    }
+  });
+
+  // Defenders intercept
+  defenders.forEach(function(d) {
+    if (!d.alive) return;
+    d.mesh.rotation.y += 0.02;
+
+    // Orbit around tower
+    var da = tick * 0.005 + defenders.indexOf(d) * 1.2;
+    var orbitR = 80 + defenders.indexOf(d) * 20;
+    d.mesh.position.x = Math.cos(da) * orbitR;
+    d.mesh.position.z = Math.sin(da) * orbitR;
+
+    // Find and engage nearest hostile
+    var best = null, bestDist = 200;
+    hostiles.forEach(function(h) {
+      if (!h.alive) return;
+      var dx = h.mesh.position.x - d.mesh.position.x;
+      var dy = h.mesh.position.y - d.mesh.position.y;
+      var dz = h.mesh.position.z - d.mesh.position.z;
+      var dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      if (dist < bestDist) { bestDist = dist; best = h; }
+    });
+
+    if (best && tick % 4 === 0) {
+      // Engagement line
+      var lg = new THREE.BufferGeometry().setFromPoints([
+        d.mesh.position.clone(), best.mesh.position.clone()
+      ]);
+      var ll = new THREE.Line(lg, new THREE.LineBasicMaterial({ color: 0x44aa44, transparent: true, opacity: 0.4 }));
+      scene.add(ll);
+      engLines.push({ line: ll, life: 12 });
+
+      if (Math.random() < (best.isDecoy ? 0.2 : 0.6)) {
+        // Kill
+        var ex = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(6, 0),
+          new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.8 })
+        );
+        ex.position.copy(best.mesh.position);
+        scene.add(ex);
+        explosions.push({ mesh: ex, life: 20 });
+        best.alive = false;
+        best.mesh.material.opacity = 0.01;
+        kills++;
+      }
+    }
+  });
+
+  // Fade engagement lines
+  engLines = engLines.filter(function(e) {
+    e.life--;
+    e.line.material.opacity = e.life / 12 * 0.4;
+    if (e.life <= 0) { scene.remove(e.line); return false; }
+    return true;
+  });
+
+  // Fade explosions
+  explosions = explosions.filter(function(e) {
+    e.life--;
+    e.mesh.material.opacity = e.life / 20 * 0.8;
+    e.mesh.scale.multiplyScalar(1.08);
+    if (e.life <= 0) { scene.remove(e.mesh); return false; }
+    return true;
+  });
+
+  // Pulse target ring
+  scene.traverse(function(obj) {
+    if (obj.userData && obj.userData.isTargetRing) {
+      var s = 1 + Math.sin(tick * 0.08) * 0.15;
+      obj.scale.set(s, s, s);
+    }
+  });
+
+  // HUD
+  var alive = hostiles.filter(function(h) { return h.alive && !h.isDecoy; }).length;
+  var aliveDecoy = hostiles.filter(function(h) { return h.alive && h.isDecoy; }).length;
+  document.getElementById("s-host").textContent = alive + (aliveDecoy > 0 ? " (+" + aliveDecoy + " decoy)" : "");
+  document.getElementById("s-def").textContent = defenders.length;
+  document.getElementById("s-kills").textContent = kills;
+  document.getElementById("s-leak").textContent = leakers;
+  document.getElementById("s-tick").textContent = tick;
+  var leadDrone = hostiles.find(function(h) { return h.alive; });
+  document.getElementById("s-alt").textContent = leadDrone ? Math.round(leadDrone.mesh.position.y) + "m" : "--";
+  var mm = Math.floor(tick / 60), ss = tick % 60;
+  document.getElementById("clock-main").textContent = String(mm).padStart(2, "0") + ":" + String(ss).padStart(2, "0");
+}
+
+// ---- Track cam ----
+function updateTrackCam() {
+  if (!trackCam) return;
+  var lead = hostiles.find(function(h) { return h.alive && !h.isDecoy; });
+  if (!lead) return;
+  var p = lead.mesh.position;
+  camera.position.lerp(new THREE.Vector3(p.x + 80, p.y + 40, p.z + 80), 0.02);
+  controls.target.lerp(new THREE.Vector3(p.x, p.y, p.z), 0.05);
+}
+
+// ---- Render ----
+function animate() {
+  requestAnimationFrame(animate);
+  simStep();
+  updateTrackCam();
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ---- Controls ----
+document.getElementById("b-play").addEventListener("click", function() {
+  playing = !playing;
+  this.textContent = playing ? "PAUSE" : "PLAY";
+});
+document.getElementById("b-reset").addEventListener("click", function() { loadScenario(scenarioIdx); });
+document.getElementById("b-next").addEventListener("click", function() {
+  scenarioIdx = (scenarioIdx + 1) % SCENARIOS.length;
+  loadScenario(scenarioIdx);
+});
+document.getElementById("b-cam").addEventListener("click", function() {
+  trackCam = !trackCam;
+  this.className = trackCam ? "on" : "";
+  controls.autoRotate = !trackCam;
+});
+window.addEventListener("resize", function() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+loadScenario(0);
+animate();
+</script>
+</body>
+</html>
