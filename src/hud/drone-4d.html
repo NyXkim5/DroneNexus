@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OVERWATCH - 4D Drone Visualization</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0B0E11; overflow: hidden; font-family: 'JetBrains Mono', monospace; }
+canvas { display: block; }
+#hud {
+  position: fixed; top: 0; left: 0; right: 0; height: 46px; z-index: 10;
+  display: flex; align-items: center; padding: 0 18px; gap: 18px;
+  background: rgba(20,24,32,0.9); border-bottom: 1px solid #252B35;
+}
+.brand { font-weight: 700; font-size: 15px; letter-spacing: 2px; color: #E8ECF0; }
+.brand .sub { color: #3B82C4; margin-left: 8px; font-size: 11px; }
+.controls { display: flex; gap: 8px; margin-left: auto; align-items: center; }
+.btn {
+  background: transparent; border: 1px solid #252B35; color: #7A8899;
+  font-family: inherit; font-size: 10px; letter-spacing: 1px; padding: 5px 12px;
+  border-radius: 3px; cursor: pointer; text-transform: uppercase;
+}
+.btn:hover { border-color: #3B82C4; color: #3B82C4; }
+.btn.active { border-color: #3B82C4; color: #3B82C4; background: rgba(59,130,196,0.1); }
+.btn.red { border-color: #C23A3E; color: #C23A3E; }
+.btn.green { border-color: #1E7A4A; color: #1E7A4A; }
+#info {
+  position: fixed; bottom: 12px; left: 12px; z-index: 10;
+  background: rgba(20,24,32,0.9); border: 1px solid #252B35; border-radius: 4px;
+  padding: 10px 14px; font-size: 10px; color: #7A8899; min-width: 200px;
+}
+#info .row { display: flex; justify-content: space-between; padding: 2px 0; }
+#info .val { color: #E8ECF0; font-weight: 700; }
+#info .val.green { color: #1E7A4A; }
+#info .val.red { color: #C23A3E; }
+#info .val.blue { color: #3B82C4; }
+#timeline {
+  position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 10;
+  background: rgba(20,24,32,0.9); border: 1px solid #252B35; border-radius: 4px;
+  padding: 8px 14px; display: flex; align-items: center; gap: 10px;
+}
+#timeline input { width: 300px; accent-color: #3B82C4; }
+#timeline .time { font-size: 10px; color: #7A8899; font-family: monospace; }
+#legend {
+  position: fixed; top: 60px; right: 12px; z-index: 10;
+  background: rgba(20,24,32,0.9); border: 1px solid #252B35; border-radius: 4px;
+  padding: 10px 14px; font-size: 10px; color: #7A8899;
+}
+#legend .item { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+#legend .dot { width: 10px; height: 10px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="brand">OVERWATCH<span class="sub">4D VISUALIZATION</span></div>
+  <div class="controls">
+    <button class="btn green" id="btn-play">PLAY</button>
+    <button class="btn" id="btn-reset">RESET</button>
+    <button class="btn" id="btn-trails">TRAILS</button>
+    <button class="btn" id="btn-targets">TARGETS</button>
+    <button class="btn" id="btn-grid">GRID</button>
+    <select class="btn" id="scenario-select" style="padding:4px 8px">
+      <option value="strike">STRIKE MISSION</option>
+      <option value="patrol">PATROL ORBIT</option>
+      <option value="swarm">SWARM ATTACK</option>
+      <option value="intercept">INTERCEPT</option>
+    </select>
+    <button class="btn" id="btn-speed-down">0.5x</button>
+    <button class="btn active" id="btn-speed-1">1x</button>
+    <button class="btn" id="btn-speed-up">2x</button>
+  </div>
+</div>
+
+<div id="info">
+  <div class="row"><span>Time</span><span class="val blue" id="i-time">0.0s</span></div>
+  <div class="row"><span>Altitude</span><span class="val" id="i-alt">0m</span></div>
+  <div class="row"><span>Speed</span><span class="val" id="i-speed">0 m/s</span></div>
+  <div class="row"><span>Heading</span><span class="val" id="i-heading">0°</span></div>
+  <div class="row"><span>Distance to target</span><span class="val red" id="i-dist">--</span></div>
+  <div class="row"><span>Waypoint</span><span class="val green" id="i-wp">0 / 0</span></div>
+  <div class="row"><span>Status</span><span class="val green" id="i-status">READY</span></div>
+</div>
+
+<div id="timeline">
+  <span class="time" id="t-current">00:00</span>
+  <input type="range" id="t-slider" min="0" max="1000" value="0" />
+  <span class="time" id="t-total">00:00</span>
+</div>
+
+<div id="legend">
+  <div class="item"><div class="dot" style="background:#3B82C4"></div>Drone</div>
+  <div class="item"><div class="dot" style="background:#C23A3E"></div>Target</div>
+  <div class="item"><div class="dot" style="background:#1E7A4A"></div>Waypoint</div>
+  <div class="item"><div class="dot" style="background:#B86E17"></div>Trail</div>
+  <div class="item"><div class="dot" style="background:#9B59C2"></div>Defended Site</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+
+// ---- Scene setup ----
+var scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0B0E11, 0.0008);
+var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
+camera.position.set(300, 250, 400);
+var renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0x0B0E11);
+document.body.appendChild(renderer.domElement);
+
+var controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.target.set(0, 30, 0);
+
+// ---- Lighting ----
+scene.add(new THREE.AmbientLight(0x334455, 0.6));
+var dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(200, 400, 300);
+scene.add(dirLight);
+var hemiLight = new THREE.HemisphereLight(0x3B82C4, 0x1E7A4A, 0.3);
+scene.add(hemiLight);
+
+// ---- Ground grid ----
+var gridHelper = new THREE.GridHelper(2000, 40, 0x252B35, 0x1A1F28);
+scene.add(gridHelper);
+var groundPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(2000, 2000),
+  new THREE.MeshStandardMaterial({ color: 0x0B0E11, roughness: 1 })
+);
+groundPlane.rotation.x = -Math.PI / 2;
+groundPlane.position.y = -0.5;
+scene.add(groundPlane);
+
+// ---- Drone model (low-poly quad) ----
+function createDrone(color) {
+  var group = new THREE.Group();
+  // Body
+  var body = new THREE.Mesh(
+    new THREE.BoxGeometry(4, 1.5, 4),
+    new THREE.MeshStandardMaterial({ color: color, metalness: 0.6, roughness: 0.3 })
+  );
+  group.add(body);
+  // Arms
+  var armGeo = new THREE.BoxGeometry(12, 0.5, 0.5);
+  var armMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.4 });
+  var arm1 = new THREE.Mesh(armGeo, armMat);
+  arm1.rotation.y = Math.PI / 4;
+  group.add(arm1);
+  var arm2 = new THREE.Mesh(armGeo, armMat);
+  arm2.rotation.y = -Math.PI / 4;
+  group.add(arm2);
+  // Rotors
+  var rotorGeo = new THREE.CylinderGeometry(2.5, 2.5, 0.2, 16);
+  var rotorMat = new THREE.MeshStandardMaterial({ color: 0x3B82C4, transparent: true, opacity: 0.4 });
+  var offsets = [[4.2, 0.8, 4.2], [-4.2, 0.8, 4.2], [4.2, 0.8, -4.2], [-4.2, 0.8, -4.2]];
+  offsets.forEach(function(o) {
+    var rotor = new THREE.Mesh(rotorGeo, rotorMat);
+    rotor.position.set(o[0], o[1], o[2]);
+    rotor.userData.isRotor = true;
+    group.add(rotor);
+  });
+  // Direction indicator
+  var nose = new THREE.Mesh(
+    new THREE.ConeGeometry(0.8, 3, 8),
+    new THREE.MeshStandardMaterial({ color: 0x1E7A4A })
+  );
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.z = 3;
+  group.add(nose);
+  return group;
+}
+
+// ---- Target markers ----
+function createTarget(pos, color) {
+  var group = new THREE.Group();
+  // Ring
+  var ring = new THREE.Mesh(
+    new THREE.TorusGeometry(5, 0.5, 8, 32),
+    new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.3 })
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.set(pos[0], pos[1] || 1, pos[2]);
+  group.add(ring);
+  // Vertical beam
+  var beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 0.3, 80, 8),
+    new THREE.MeshStandardMaterial({ color: color, transparent: true, opacity: 0.2 })
+  );
+  beam.position.set(pos[0], 40, pos[2]);
+  group.add(beam);
+  // Pulse sphere
+  var pulse = new THREE.Mesh(
+    new THREE.SphereGeometry(3, 16, 16),
+    new THREE.MeshStandardMaterial({ color: color, transparent: true, opacity: 0.3 })
+  );
+  pulse.position.set(pos[0], pos[1] || 1, pos[2]);
+  pulse.userData.isPulse = true;
+  group.add(pulse);
+  return group;
+}
+
+// ---- Waypoint marker ----
+function createWaypoint(pos, index) {
+  var group = new THREE.Group();
+  var sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(2, 12, 12),
+    new THREE.MeshStandardMaterial({ color: 0x1E7A4A, emissive: 0x1E7A4A, emissiveIntensity: 0.5 })
+  );
+  sphere.position.set(pos[0], pos[1], pos[2]);
+  group.add(sphere);
+  return group;
+}
+
+// ---- Defended site ----
+var site = new THREE.Mesh(
+  new THREE.CylinderGeometry(15, 15, 2, 32),
+  new THREE.MeshStandardMaterial({ color: 0x9B59C2, transparent: true, opacity: 0.3, emissive: 0x9B59C2, emissiveIntensity: 0.2 })
+);
+site.position.set(0, 1, 0);
+scene.add(site);
+var siteDome = new THREE.Mesh(
+  new THREE.SphereGeometry(60, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+  new THREE.MeshStandardMaterial({ color: 0x9B59C2, transparent: true, opacity: 0.05, wireframe: true })
+);
+scene.add(siteDome);
+
+// ---- Scenarios ----
+var SCENARIOS = {
+  strike: {
+    name: "STRIKE MISSION",
+    waypoints: [
+      [0, 30, 0], [100, 50, 80], [200, 60, 40], [300, 80, -60],
+      [350, 100, -150], [280, 70, -250], [150, 50, -300], [0, 30, -200]
+    ],
+    targets: [[350, 1, -150], [150, 1, -300]],
+    speed: 25, duration: 60
+  },
+  patrol: {
+    name: "PATROL ORBIT",
+    waypoints: (function() {
+      var pts = [];
+      for (var i = 0; i <= 36; i++) {
+        var a = (i / 36) * Math.PI * 2;
+        pts.push([Math.cos(a) * 200, 60 + Math.sin(a * 3) * 10, Math.sin(a) * 200]);
+      }
+      return pts;
+    })(),
+    targets: [[0, 1, 0]],
+    speed: 15, duration: 90
+  },
+  swarm: {
+    name: "SWARM ATTACK",
+    waypoints: [
+      [-400, 40, 300], [-300, 50, 200], [-200, 60, 100], [-100, 70, 50], [0, 30, 0]
+    ],
+    targets: [[0, 1, 0]],
+    speed: 35, duration: 40,
+    swarmCount: 5
+  },
+  intercept: {
+    name: "INTERCEPT",
+    waypoints: [
+      [0, 30, 0], [50, 80, -50], [120, 120, -100], [200, 100, -80],
+      [300, 60, 10], [250, 40, 100], [100, 30, 50], [0, 30, 0]
+    ],
+    targets: [[200, 80, -80], [300, 50, 10]],
+    speed: 40, duration: 50
+  }
+};
+
+// ---- State ----
+var currentScenario = "strike";
+var drone, trail, trailPoints, targets, waypoints, swarmDrones;
+var playing = false, simTime = 0, speed = 1, showTrails = true, showTargets = true;
+var totalDuration = 60;
+
+function loadScenario(name) {
+  var sc = SCENARIOS[name];
+  if (!sc) return;
+  currentScenario = name;
+  totalDuration = sc.duration;
+  simTime = 0;
+
+  // Clear old
+  if (drone) scene.remove(drone);
+  if (trail) scene.remove(trail);
+  if (targets) targets.forEach(function(t) { scene.remove(t); });
+  if (waypoints) waypoints.forEach(function(w) { scene.remove(w); });
+  if (swarmDrones) swarmDrones.forEach(function(d) { scene.remove(d); });
+  targets = []; waypoints = []; swarmDrones = [];
+
+  // Drone
+  drone = createDrone(0x3B82C4);
+  var start = sc.waypoints[0];
+  drone.position.set(start[0], start[1], start[2]);
+  scene.add(drone);
+
+  // Swarm drones
+  if (sc.swarmCount) {
+    for (var i = 1; i < sc.swarmCount; i++) {
+      var sd = createDrone(0x4888D8);
+      sd.position.set(start[0] + (Math.random() - 0.5) * 30, start[1] + (Math.random() - 0.5) * 10, start[2] + (Math.random() - 0.5) * 30);
+      sd.userData.offset = [(Math.random() - 0.5) * 40, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 40];
+      scene.add(sd);
+      swarmDrones.push(sd);
+    }
+  }
+
+  // Trail
+  trailPoints = [];
+  var trailGeo = new THREE.BufferGeometry();
+  var trailMat = new THREE.LineBasicMaterial({ color: 0xB86E17, transparent: true, opacity: 0.6 });
+  trail = new THREE.Line(trailGeo, trailMat);
+  scene.add(trail);
+
+  // Targets
+  sc.targets.forEach(function(t) {
+    var tg = createTarget(t, 0xC23A3E);
+    scene.add(tg);
+    targets.push(tg);
+  });
+
+  // Waypoints
+  sc.waypoints.forEach(function(w, i) {
+    var wg = createWaypoint(w, i);
+    scene.add(wg);
+    waypoints.push(wg);
+  });
+
+  // Path line
+  var pathPts = sc.waypoints.map(function(w) { return new THREE.Vector3(w[0], w[1], w[2]); });
+  var pathGeo = new THREE.BufferGeometry().setFromPoints(pathPts);
+  var pathLine = new THREE.Line(pathGeo, new THREE.LineDashedMaterial({ color: 0x1E7A4A, dashSize: 5, gapSize: 3, transparent: true, opacity: 0.4 }));
+  pathLine.computeLineDistances();
+  scene.add(pathLine);
+  waypoints.push(pathLine);
+
+  updateHUD();
+}
+
+// ---- Interpolation ----
+function getPositionAtTime(t) {
+  var sc = SCENARIOS[currentScenario];
+  var wps = sc.waypoints;
+  var totalLen = 0;
+  var segLens = [];
+  for (var i = 1; i < wps.length; i++) {
+    var dx = wps[i][0] - wps[i-1][0], dy = wps[i][1] - wps[i-1][1], dz = wps[i][2] - wps[i-1][2];
+    var len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    segLens.push(len);
+    totalLen += len;
+  }
+  var progress = Math.min(1, t / totalDuration);
+  var dist = progress * totalLen;
+  var accum = 0;
+  for (var i = 0; i < segLens.length; i++) {
+    if (accum + segLens[i] >= dist) {
+      var segProgress = (dist - accum) / segLens[i];
+      var a = wps[i], b = wps[i+1];
+      return {
+        x: a[0] + (b[0] - a[0]) * segProgress,
+        y: a[1] + (b[1] - a[1]) * segProgress,
+        z: a[2] + (b[2] - a[2]) * segProgress,
+        wpIndex: i,
+        wpTotal: wps.length
+      };
+    }
+    accum += segLens[i];
+  }
+  var last = wps[wps.length - 1];
+  return { x: last[0], y: last[1], z: last[2], wpIndex: wps.length - 1, wpTotal: wps.length };
+}
+
+// ---- HUD update ----
+function updateHUD() {
+  var pos = getPositionAtTime(simTime);
+  document.getElementById("i-time").textContent = simTime.toFixed(1) + "s";
+  document.getElementById("i-alt").textContent = pos.y.toFixed(0) + "m";
+  document.getElementById("i-heading").textContent = ((Math.atan2(drone.position.x, drone.position.z) * 180 / Math.PI + 360) % 360).toFixed(0) + "\u00B0";
+  document.getElementById("i-wp").textContent = (pos.wpIndex + 1) + " / " + pos.wpTotal;
+  document.getElementById("i-speed").textContent = SCENARIOS[currentScenario].speed + " m/s";
+  var nearestTarget = Infinity;
+  targets.forEach(function(t) {
+    t.children.forEach(function(c) {
+      if (c.userData.isPulse) {
+        var d = drone.position.distanceTo(c.position);
+        if (d < nearestTarget) nearestTarget = d;
+      }
+    });
+  });
+  document.getElementById("i-dist").textContent = nearestTarget < 9999 ? nearestTarget.toFixed(0) + "m" : "--";
+  document.getElementById("i-status").textContent = playing ? "IN FLIGHT" : (simTime > 0 ? "HOLDING" : "READY");
+  document.getElementById("t-slider").value = (simTime / totalDuration * 1000).toFixed(0);
+  var mm = Math.floor(simTime / 60), ss = Math.floor(simTime % 60);
+  document.getElementById("t-current").textContent = String(mm).padStart(2, "0") + ":" + String(ss).padStart(2, "0");
+  var tmm = Math.floor(totalDuration / 60), tss = Math.floor(totalDuration % 60);
+  document.getElementById("t-total").textContent = String(tmm).padStart(2, "0") + ":" + String(tss).padStart(2, "0");
+}
+
+// ---- Animation ----
+var clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  var dt = clock.getDelta();
+  if (playing && simTime < totalDuration) {
+    simTime += dt * speed;
+    if (simTime > totalDuration) simTime = totalDuration;
+  }
+
+  // Update drone position
+  var pos = getPositionAtTime(simTime);
+  var prevPos = { x: drone.position.x, y: drone.position.y, z: drone.position.z };
+  drone.position.set(pos.x, pos.y, pos.z);
+
+  // Face direction of travel
+  var dx = pos.x - prevPos.x, dz = pos.z - prevPos.z;
+  if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+    drone.rotation.y = Math.atan2(dx, dz);
+    drone.rotation.z = Math.sin(simTime * 2) * 0.05;
+    drone.rotation.x = Math.sin(simTime * 1.5) * 0.03;
+  }
+
+  // Spin rotors
+  drone.children.forEach(function(c) {
+    if (c.userData && c.userData.isRotor) c.rotation.y += 0.8;
+  });
+
+  // Swarm drones follow with offset
+  swarmDrones.forEach(function(sd) {
+    var off = sd.userData.offset;
+    sd.position.set(pos.x + off[0] + Math.sin(simTime * 0.5 + off[0]) * 5,
+                    pos.y + off[1] + Math.sin(simTime * 0.7 + off[1]) * 3,
+                    pos.z + off[2] + Math.cos(simTime * 0.5 + off[2]) * 5);
+    sd.rotation.y = drone.rotation.y + (Math.random() - 0.5) * 0.1;
+    sd.children.forEach(function(c) { if (c.userData && c.userData.isRotor) c.rotation.y += 0.8; });
+  });
+
+  // Trail
+  if (playing && showTrails) {
+    trailPoints.push(new THREE.Vector3(pos.x, pos.y, pos.z));
+    if (trailPoints.length > 2) {
+      trail.geometry.dispose();
+      trail.geometry = new THREE.BufferGeometry().setFromPoints(trailPoints);
+    }
+  }
+  trail.visible = showTrails;
+  targets.forEach(function(t) { t.visible = showTargets; });
+
+  // Pulse targets
+  var pulse = Math.sin(simTime * 3) * 0.3 + 1;
+  targets.forEach(function(t) {
+    t.children.forEach(function(c) {
+      if (c.userData.isPulse) c.scale.set(pulse, pulse, pulse);
+    });
+  });
+
+  controls.update();
+  updateHUD();
+  renderer.render(scene, camera);
+}
+
+// ---- Controls ----
+document.getElementById("btn-play").addEventListener("click", function() {
+  playing = !playing;
+  this.textContent = playing ? "PAUSE" : "PLAY";
+  this.className = playing ? "btn red" : "btn green";
+});
+document.getElementById("btn-reset").addEventListener("click", function() {
+  simTime = 0; trailPoints = [];
+  trail.geometry.dispose();
+  trail.geometry = new THREE.BufferGeometry();
+  playing = false;
+  document.getElementById("btn-play").textContent = "PLAY";
+  document.getElementById("btn-play").className = "btn green";
+});
+document.getElementById("btn-trails").addEventListener("click", function() {
+  showTrails = !showTrails;
+  this.className = showTrails ? "btn active" : "btn";
+});
+document.getElementById("btn-targets").addEventListener("click", function() {
+  showTargets = !showTargets;
+  this.className = showTargets ? "btn active" : "btn";
+});
+document.getElementById("btn-grid").addEventListener("click", function() {
+  gridHelper.visible = !gridHelper.visible;
+  this.className = gridHelper.visible ? "btn active" : "btn";
+});
+document.getElementById("t-slider").addEventListener("input", function() {
+  simTime = (this.value / 1000) * totalDuration;
+});
+document.getElementById("scenario-select").addEventListener("change", function() {
+  loadScenario(this.value);
+});
+document.getElementById("btn-speed-down").addEventListener("click", function() { speed = 0.5; updateSpeedBtns(); });
+document.getElementById("btn-speed-1").addEventListener("click", function() { speed = 1; updateSpeedBtns(); });
+document.getElementById("btn-speed-up").addEventListener("click", function() { speed = 2; updateSpeedBtns(); });
+function updateSpeedBtns() {
+  document.getElementById("btn-speed-down").className = speed === 0.5 ? "btn active" : "btn";
+  document.getElementById("btn-speed-1").className = speed === 1 ? "btn active" : "btn";
+  document.getElementById("btn-speed-up").className = speed === 2 ? "btn active" : "btn";
+}
+
+window.addEventListener("resize", function() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---- Start ----
+loadScenario("strike");
+animate();
+</script>
+</body>
+</html>
