@@ -35,22 +35,19 @@ PORT_HUD=8888
 PORT_WEBCAM=8766
 
 # -- Child PIDs --
-PIDS=()
+PID_BACKEND=""
+PID_HUD=""
+PID_WEBCAM=""
 
 cleanup() {
     echo ""
     echo -e "${YELLOW}[OVERWATCH] Shutting down...${NC}"
-    for pid in "${PIDS[@]}"; do
-        if kill -0 "$pid" 2>/dev/null; then
-            kill "$pid" 2>/dev/null || true
-        fi
+    for pid in $PID_BACKEND $PID_HUD $PID_WEBCAM; do
+        [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
     done
-    # Wait briefly then force-kill stragglers
     sleep 1
-    for pid in "${PIDS[@]}"; do
-        if kill -0 "$pid" 2>/dev/null; then
-            kill -9 "$pid" 2>/dev/null || true
-        fi
+    for pid in $PID_BACKEND $PID_HUD $PID_WEBCAM; do
+        [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
     done
     echo -e "${GREEN}[OVERWATCH] All services stopped.${NC}"
     exit 0
@@ -106,22 +103,22 @@ echo -e "  ${GREEN}[OK]${NC} All ports available"
 echo -e "${CYAN}[2/5] Starting Backend API on port $PORT_BACKEND...${NC}"
 cd "$PROJECT_ROOT/backend"
 python3 main.py > "$LOG_BACKEND" 2>&1 &
-PIDS+=($!)
-echo -e "  ${GREEN}[OK]${NC} Backend PID: ${PIDS[-1]} (log: $LOG_BACKEND)"
+PID_BACKEND=$!
+echo -e "  ${GREEN}[OK]${NC} Backend PID: $PID_BACKEND (log: $LOG_BACKEND)"
 
 # -- Start HUD Server --
 echo -e "${CYAN}[3/5] Starting HUD file server on port $PORT_HUD...${NC}"
 cd "$PROJECT_ROOT/src/hud"
 python3 -m http.server $PORT_HUD > "$LOG_HUD" 2>&1 &
-PIDS+=($!)
-echo -e "  ${GREEN}[OK]${NC} HUD Server PID: ${PIDS[-1]} (log: $LOG_HUD)"
+PID_HUD=$!
+echo -e "  ${GREEN}[OK]${NC} HUD Server PID: $PID_HUD (log: $LOG_HUD)"
 
 # -- Start Webcam Detector --
 echo -e "${CYAN}[4/5] Starting Webcam Detector on port $PORT_WEBCAM...${NC}"
 cd "$PROJECT_ROOT/backend"
 python3 -m scripts.webcam_detect --port $PORT_WEBCAM > "$LOG_WEBCAM" 2>&1 &
-PIDS+=($!)
-echo -e "  ${GREEN}[OK]${NC} Webcam PID: ${PIDS[-1]} (log: $LOG_WEBCAM)"
+PID_WEBCAM=$!
+echo -e "  ${GREEN}[OK]${NC} Webcam PID: $PID_WEBCAM (log: $LOG_WEBCAM)"
 
 # -- Wait for services --
 echo -e "${CYAN}[5/5] Waiting for services to be ready...${NC}"
@@ -129,7 +126,7 @@ wait_for_service "http://localhost:$PORT_BACKEND/api/v1/ontology/taskforce/healt
 wait_for_service "http://localhost:$PORT_HUD/bulwark.html" "HUD Server"
 # Webcam detector is WebSocket-only so just check the process is alive
 sleep 2
-if kill -0 "${PIDS[2]}" 2>/dev/null; then
+if kill -0 "$PID_WEBCAM" 2>/dev/null; then
     echo -e "  ${GREEN}[OK]${NC} Webcam Detector is running"
 else
     echo -e "  ${YELLOW}[WARN]${NC} Webcam Detector exited (camera may not be available)"
