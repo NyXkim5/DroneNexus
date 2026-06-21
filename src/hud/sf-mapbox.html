@@ -45,7 +45,7 @@ body { background: #000; overflow: hidden; font-family: 'JetBrains Mono', monosp
   <div id="drone-icons"></div>
 </div>
 <div id="clock">00:00</div>
-<div id="tgt">TARGET: SALESFORCE TOWER - 415 MISSION ST - 37.7897N 122.3972W</div>
+<div id="tgt">SWARM OPS - EMBARCADERO / PIER 39 / SALESFORCE / GHIRARDELLI - SAN FRANCISCO</div>
 
 <script>
 "use strict";
@@ -54,17 +54,17 @@ var urlToken = new URLSearchParams(window.location.search).get("token");
 mapboxgl.accessToken = urlToken || localStorage.getItem("mapbox_token") || prompt("Enter Mapbox access token:")
 if (mapboxgl.accessToken) localStorage.setItem("mapbox_token", mapboxgl.accessToken);
 
-var SF_CENTER = [-122.3972, 37.7897];
+var SF_CENTER = [-122.3942, 37.7935];
 var VAN_POS = [-122.3948, 37.7878];
 
 var TARGETS = [
+  { lng: -122.3936, lat: 37.7956, alt: 50, name: "EMBARCADERO CENTER", hit: false },
+  { lng: -122.4093, lat: 37.8087, alt: 15, name: "PIER 39 / FISHERMANS WHARF", hit: false },
   { lng: -122.3972, lat: 37.7897, alt: 326, name: "SALESFORCE TOWER", hit: false },
-  { lng: -122.4028, lat: 37.7952, alt: 260, name: "TRANSAMERICA PYRAMID", hit: false },
-  { lng: -122.3965, lat: 37.7890, alt: 244, name: "181 FREMONT", hit: false },
-  { lng: -122.4005, lat: 37.7925, alt: 237, name: "555 CALIFORNIA", hit: false }
+  { lng: -122.4194, lat: 37.8080, alt: 70, name: "GHIRARDELLI SQUARE", hit: false }
 ];
 
-var TOTAL = 20;
+var TOTAL = 24;
 var drones = [], deployed = 0, strikes = 0, targetsHit = 0;
 var simTime = 0, playing = true, trackCam = false, deployTimer = 0;
 
@@ -72,23 +72,29 @@ var map = new mapboxgl.Map({
   container: "map",
   style: "mapbox://styles/mapbox/dark-v11",
   center: SF_CENTER,
-  zoom: 15.8,
-  pitch: 62,
-  bearing: -25,
+  zoom: 14.8,
+  pitch: 58,
+  bearing: -20,
   antialias: true
 });
 
-// Van marker
+// White Van marker (top-down van shape)
 var vanEl = document.createElement("div");
-vanEl.style.cssText = "width:12px;height:20px;background:#e0e0e0;border:1px solid #888;border-radius:2px;box-shadow:0 0 8px rgba(50,130,255,0.5);";
-var vanMarker = new mapboxgl.Marker({element: vanEl}).setLngLat(VAN_POS).addTo(map);
+vanEl.innerHTML = '<svg width="22" height="38" viewBox="0 0 22 38"><rect x="1" y="0" width="20" height="32" rx="3" fill="#e8e8e8" stroke="#999" stroke-width="0.8"/><rect x="2" y="2" width="18" height="8" rx="2" fill="#c0c8d0" opacity="0.6"/><rect x="3" y="28" width="7" height="5" rx="1" fill="#333" opacity="0.7"/><rect x="12" y="28" width="7" height="5" rx="1" fill="#333" opacity="0.7"/><rect x="5" y="32" width="12" height="6" rx="1" fill="none" stroke="#4488ff" stroke-width="1" opacity="0.6"/><circle cx="11" cy="35" r="2" fill="#4488ff" opacity="0.4"/></svg>';
+vanEl.style.cssText = "filter:drop-shadow(0 0 6px rgba(68,136,255,0.5));cursor:pointer;";
+var vanMarker = new mapboxgl.Marker({element: vanEl, anchor: "center"}).setLngLat(VAN_POS).addTo(map);
+// Van label
+var vanPopup = new mapboxgl.Popup({offset: 20, closeButton: false, className: "van-popup"}).setHTML('<div style="font-family:monospace;font-size:9px;letter-spacing:1.5px;color:#4488ff;background:rgba(0,0,0,0.85);padding:4px 8px;border:1px solid rgba(68,136,255,0.3);border-radius:2px;">LAUNCH VEHICLE</div>');
+vanMarker.setPopup(vanPopup).togglePopup();
 
-// Target markers
+// Target markers with labels
 TARGETS.forEach(function(t, i) {
   var el = document.createElement("div");
-  el.style.cssText = "width:14px;height:14px;border:2px solid #ff3333;border-radius:50%;box-shadow:0 0 12px rgba(255,50,50,0.4);";
   el.id = "tgt-marker-" + i;
-  new mapboxgl.Marker({element: el}).setLngLat([t.lng, t.lat]).addTo(map);
+  el.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="#ff3333" stroke-width="1.5" opacity="0.6"/><circle cx="14" cy="14" r="6" fill="none" stroke="#ff3333" stroke-width="1" opacity="0.4"/><circle cx="14" cy="14" r="2" fill="#ff3333" opacity="0.7"/><line x1="14" y1="0" x2="14" y2="6" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/><line x1="14" y1="22" x2="14" y2="28" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/><line x1="0" y1="14" x2="6" y2="14" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/><line x1="22" y1="14" x2="28" y2="14" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/></svg>';
+  el.style.cssText = "filter:drop-shadow(0 0 8px rgba(255,50,50,0.35));";
+  var popup = new mapboxgl.Popup({offset: 16, closeButton: false}).setHTML('<div style="font-family:monospace;font-size:7px;letter-spacing:1.5px;color:#ff6666;background:rgba(0,0,0,0.85);padding:3px 6px;border:1px solid rgba(255,50,50,0.25);border-radius:2px;">' + t.name + '</div>');
+  new mapboxgl.Marker({element: el, anchor: "center"}).setLngLat([t.lng, t.lat]).setPopup(popup).addTo(map).togglePopup();
 });
 
 map.on("style.load", function() {
@@ -153,9 +159,10 @@ function simStep(dt) {
   if (deployTimer >= 0.8 && deployed < TOTAL) {
     var dr = drones[deployed];
     dr.launched = true; dr.phase = "fly"; dr.bezT = 0;
-    // Create marker
+    // Create drone-shaped marker
     var mEl = document.createElement("div");
-    mEl.style.cssText = "width:8px;height:8px;background:rgba(68,170,255,0.8);border-radius:50%;box-shadow:0 0 10px rgba(68,170,255,0.6),0 0 20px rgba(68,170,255,0.3);";
+    mEl.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24"><line x1="4" y1="4" x2="20" y2="20" stroke="#44aaff" stroke-width="1.5" opacity="0.7"/><line x1="20" y1="4" x2="4" y2="20" stroke="#44aaff" stroke-width="1.5" opacity="0.7"/><rect x="9" y="9" width="6" height="6" rx="1" fill="#44aaff" opacity="0.8"/><circle cx="4" cy="4" r="3" fill="none" stroke="#44aaff" stroke-width="0.8" opacity="0.5"/><circle cx="20" cy="4" r="3" fill="none" stroke="#44aaff" stroke-width="0.8" opacity="0.5"/><circle cx="4" cy="20" r="3" fill="none" stroke="#44aaff" stroke-width="0.8" opacity="0.5"/><circle cx="20" cy="20" r="3" fill="none" stroke="#44aaff" stroke-width="0.8" opacity="0.5"/></svg>';
+    mEl.style.cssText = "filter:drop-shadow(0 0 6px rgba(68,170,255,0.5));transition:transform 0.15s;";
     dr.marker = new mapboxgl.Marker({element: mEl}).setLngLat([dr.lng, dr.lat]).addTo(map);
     deployed++; deployTimer = 0;
   }
@@ -185,7 +192,12 @@ function simStep(dt) {
       dr.slng *= 0.92; dr.slat *= 0.92; dr.salt *= 0.92;
       dr.lng += dr.slng; dr.lat += dr.slat; dr.alt += dr.salt;
 
-      if (dr.marker) dr.marker.setLngLat([dr.lng, dr.lat]);
+      if (dr.marker) {
+        dr.marker.setLngLat([dr.lng, dr.lat]);
+        // Rotate drone to face heading
+        var hdg = Math.atan2(dr.slng, -dr.slat) * 180 / Math.PI;
+        dr.marker.getElement().style.transform += " rotate(" + hdg.toFixed(0) + "deg)";
+      }
 
       // Trail
       dr.trailCoords.push([dr.lng, dr.lat]);
@@ -200,7 +212,10 @@ function simStep(dt) {
         if (!tgt.hit) {
           tgt.hit = true; targetsHit++;
           var tEl = document.getElementById("tgt-marker-" + dr.targetIdx);
-          if (tEl) { tEl.style.borderColor = "#44ff44"; tEl.style.boxShadow = "0 0 12px rgba(68,255,68,0.4)"; }
+          if (tEl) {
+            tEl.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="#44ff44" stroke-width="1.5" opacity="0.6"/><circle cx="14" cy="14" r="6" fill="none" stroke="#44ff44" stroke-width="1" opacity="0.5"/><circle cx="14" cy="14" r="2" fill="#44ff44" opacity="0.8"/></svg>';
+            tEl.style.filter = "drop-shadow(0 0 10px rgba(68,255,68,0.5))";
+          }
         }
       }
     }
@@ -245,7 +260,9 @@ function updateHUD() {
   document.getElementById("sDep").textContent = deployed + "/" + TOTAL;
   document.getElementById("sFly").textContent = inFlight;
   document.getElementById("sHit").textContent = strikes;
-  document.getElementById("sTH").textContent = targetsHit + " / 4";
+  document.getElementById("sTH").textContent = targetsHit + " / " + TARGETS.length;
+  var active = drones.find(function(d) { return d.launched && !d.struck; });
+  if (active) document.getElementById("sTgt").textContent = TARGETS[active.targetIdx].name;
   var ts = Math.floor(simTime);
   document.getElementById("clock").textContent = String(Math.floor(ts/60)).padStart(2,"0") + ":" + String(ts%60).padStart(2,"0");
 }
