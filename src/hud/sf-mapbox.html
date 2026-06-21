@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OVERWATCH - San Francisco Drone Swarm</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; font-family: 'JetBrains Mono', monospace; }
+#map { position: absolute; inset: 0; }
+#vignette { position: fixed; inset: 0; z-index: 5; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.5) 100%); }
+#scanlines { position: fixed; inset: 0; z-index: 6; pointer-events: none; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.015) 3px, rgba(0,0,0,0.015) 4px); }
+#hud-top { position: fixed; top: 0; left: 0; right: 0; height: 26px; z-index: 10; display: flex; align-items: center; padding: 0 14px; gap: 14px; background: rgba(0,0,0,0.88); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.brand { font-size: 9px; letter-spacing: 4px; color: rgba(255,255,255,0.22); }
+.sc { font-size: 8px; letter-spacing: 2.5px; color: rgba(80,150,220,0.5); margin-left: 12px; }
+.ctrls { display: flex; gap: 5px; margin-left: auto; }
+.ctrls button { background: transparent; border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.2); font-family: inherit; font-size: 7px; letter-spacing: 1.5px; padding: 3px 8px; cursor: pointer; text-transform: uppercase; }
+.ctrls button:hover,.ctrls button.on { border-color: rgba(255,255,255,0.25); color: rgba(255,255,255,0.5); }
+#stats { position: fixed; top: 32px; left: 10px; z-index: 10; font-size: 8px; color: rgba(255,255,255,0.18); letter-spacing: 1.2px; line-height: 2.2; }
+.sv { color: rgba(255,255,255,0.4); } .sr { color: rgba(220,80,80,0.65); } .sb { color: rgba(80,150,230,0.65); } .sg { color: rgba(80,210,110,0.55); }
+#drone-icons { display: flex; gap: 2px; margin-top: 3px; }
+.di { width: 5px; height: 5px; border: 1px solid rgba(80,150,230,0.35); } .di.active { background: rgba(80,150,230,0.55); } .di.struck { background: rgba(220,80,80,0.5); border-color: rgba(220,80,80,0.5); }
+#clock { position: fixed; top: 34px; right: 10px; z-index: 10; font-size: 26px; font-weight: 100; letter-spacing: 4px; color: rgba(255,255,255,0.06); }
+#tgt { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 7px; letter-spacing: 3px; color: rgba(200,70,70,0.25); text-transform: uppercase; }
+.mapboxgl-ctrl-logo,.mapboxgl-ctrl-attrib { display: none !important; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+<div id="hud-top">
+  <div class="brand">OVERWATCH</div>
+  <div class="sc">SWARM DEPLOY - FINANCIAL DISTRICT</div>
+  <div class="ctrls"><button id="bp" class="on">PAUSE</button><button id="br">RESET</button><button id="bt">TRACK</button></div>
+</div>
+<div id="stats">
+  <div>ORIGIN <span class="sv">WHITE VAN - MISSION ST</span></div>
+  <div>TARGET <span class="sr" id="sTgt">SALESFORCE TOWER</span></div>
+  <div>DEPLOYED <span class="sb" id="sDep">0</span></div>
+  <div>IN FLIGHT <span class="sb" id="sFly">0</span></div>
+  <div>STRIKES <span class="sg" id="sHit">0</span></div>
+  <div>TARGETS <span class="sr" id="sTH">0 / 4</span></div>
+  <div id="drone-icons"></div>
+</div>
+<div id="clock">00:00</div>
+<div id="tgt">TARGET: SALESFORCE TOWER - 415 MISSION ST - 37.7897N 122.3972W</div>
+
+<script>
+"use strict";
+// Set your Mapbox token: ?token=pk.xxx in URL or edit below
+var urlToken = new URLSearchParams(window.location.search).get("token");
+mapboxgl.accessToken = urlToken || localStorage.getItem("mapbox_token") || prompt("Enter Mapbox access token:")
+if (mapboxgl.accessToken) localStorage.setItem("mapbox_token", mapboxgl.accessToken);
+
+var SF_CENTER = [-122.3972, 37.7897];
+var VAN_POS = [-122.3948, 37.7878];
+
+var TARGETS = [
+  { lng: -122.3972, lat: 37.7897, alt: 326, name: "SALESFORCE TOWER", hit: false },
+  { lng: -122.4028, lat: 37.7952, alt: 260, name: "TRANSAMERICA PYRAMID", hit: false },
+  { lng: -122.3965, lat: 37.7890, alt: 244, name: "181 FREMONT", hit: false },
+  { lng: -122.4005, lat: 37.7925, alt: 237, name: "555 CALIFORNIA", hit: false }
+];
+
+var TOTAL = 20;
+var drones = [], deployed = 0, strikes = 0, targetsHit = 0;
+var simTime = 0, playing = true, trackCam = false, deployTimer = 0;
+
+var map = new mapboxgl.Map({
+  container: "map",
+  style: "mapbox://styles/mapbox/dark-v11",
+  center: SF_CENTER,
+  zoom: 15.8,
+  pitch: 62,
+  bearing: -25,
+  antialias: true
+});
+
+// Van marker
+var vanEl = document.createElement("div");
+vanEl.style.cssText = "width:12px;height:20px;background:#e0e0e0;border:1px solid #888;border-radius:2px;box-shadow:0 0 8px rgba(50,130,255,0.5);";
+var vanMarker = new mapboxgl.Marker({element: vanEl}).setLngLat(VAN_POS).addTo(map);
+
+// Target markers
+TARGETS.forEach(function(t, i) {
+  var el = document.createElement("div");
+  el.style.cssText = "width:14px;height:14px;border:2px solid #ff3333;border-radius:50%;box-shadow:0 0 12px rgba(255,50,50,0.4);";
+  el.id = "tgt-marker-" + i;
+  new mapboxgl.Marker({element: el}).setLngLat([t.lng, t.lat]).addTo(map);
+});
+
+map.on("style.load", function() {
+  // 3D buildings
+  map.addLayer({
+    id: "3d-buildings",
+    source: "composite",
+    "source-layer": "building",
+    filter: ["==", "extrude", "true"],
+    type: "fill-extrusion",
+    minzoom: 14,
+    paint: {
+      "fill-extrusion-color": ["interpolate", ["linear"], ["get", "height"],
+        0, "#151c28", 50, "#1a2538", 100, "#202e48", 200, "#283858", 300, "#304268"],
+      "fill-extrusion-height": ["get", "height"],
+      "fill-extrusion-base": ["get", "min_height"],
+      "fill-extrusion-opacity": 0.88
+    }
+  });
+
+  map.setFog({ color: "#0c1020", "high-color": "#0a1028", "horizon-blend": 0.06, "space-color": "#040810", "star-intensity": 0.5 });
+  map.setLight({ anchor: "viewport", color: "#7799cc", intensity: 0.5, position: [1.5, 200, 30] });
+});
+
+// Drone icons in HUD
+var iconContainer = document.getElementById("drone-icons");
+var droneIcons = [];
+for (var di = 0; di < TOTAL; di++) {
+  var el = document.createElement("div"); el.className = "di"; iconContainer.appendChild(el); droneIcons.push(el);
+}
+
+// Drone data
+function spawnDrone(idx) {
+  var tgt = TARGETS[idx % 4];
+  var startLng = VAN_POS[0], startLat = VAN_POS[1];
+  var cruiseAlt = 80 + Math.random() * 200;
+  var perpScale = (Math.random() - 0.5) * 0.003;
+  return {
+    lng: startLng, lat: startLat, alt: 5,
+    slng: 0, slat: 0, salt: 0,
+    targetIdx: idx % 4,
+    tLng: tgt.lng, tLat: tgt.lat, tAlt: tgt.alt,
+    cruiseAlt: cruiseAlt,
+    perpScale: perpScale,
+    launched: false, struck: false, phase: "wait",
+    marker: null, trailCoords: [],
+    bezT: 0, bezSpeed: 0.18 + Math.random() * 0.06,
+    _exploded: false
+  };
+}
+for (var i = 0; i < TOTAL; i++) drones.push(spawnDrone(i));
+
+function cubicBez(a, b, c, d, t) {
+  var mt = 1-t, mt2 = mt*mt, mt3 = mt2*mt, t2 = t*t, t3 = t2*t;
+  return mt3*a + 3*mt2*t*b + 3*mt*t2*c + t3*d;
+}
+
+function simStep(dt) {
+  if (!playing) return;
+  simTime += dt;
+  deployTimer += dt;
+  if (deployTimer >= 0.8 && deployed < TOTAL) {
+    var dr = drones[deployed];
+    dr.launched = true; dr.phase = "fly"; dr.bezT = 0;
+    // Create marker
+    var mEl = document.createElement("div");
+    mEl.style.cssText = "width:8px;height:8px;background:rgba(68,170,255,0.8);border-radius:50%;box-shadow:0 0 10px rgba(68,170,255,0.6),0 0 20px rgba(68,170,255,0.3);";
+    dr.marker = new mapboxgl.Marker({element: mEl}).setLngLat([dr.lng, dr.lat]).addTo(map);
+    deployed++; deployTimer = 0;
+  }
+
+  for (var i = 0; i < drones.length; i++) {
+    var dr = drones[i];
+    if (!dr.launched || dr.struck) continue;
+
+    if (dr.phase === "fly") {
+      dr.bezT += dr.bezSpeed * dt;
+      if (dr.bezT > 1) dr.bezT = 1;
+
+      // Control points
+      var dLng = dr.tLng - VAN_POS[0], dLat = dr.tLat - VAN_POS[1];
+      var p0Lng = VAN_POS[0], p0Lat = VAN_POS[1];
+      var p1Lng = VAN_POS[0] + dLng*0.3 + dr.perpScale, p1Lat = VAN_POS[1] + dLat*0.3 - dr.perpScale*0.5;
+      var p2Lng = VAN_POS[0] + dLng*0.7 + dr.perpScale*0.3, p2Lat = VAN_POS[1] + dLat*0.7 - dr.perpScale*0.2;
+      var p3Lng = dr.tLng, p3Lat = dr.tLat;
+
+      var newLng = cubicBez(p0Lng, p1Lng, p2Lng, p3Lng, dr.bezT);
+      var newLat = cubicBez(p0Lat, p1Lat, p2Lat, p3Lat, dr.bezT);
+      var newAlt = cubicBez(5, dr.cruiseAlt, dr.cruiseAlt * 0.9, dr.tAlt, dr.bezT);
+
+      dr.slng += (newLng - dr.lng) * 0.08;
+      dr.slat += (newLat - dr.lat) * 0.08;
+      dr.salt += (newAlt - dr.alt) * 0.08;
+      dr.slng *= 0.92; dr.slat *= 0.92; dr.salt *= 0.92;
+      dr.lng += dr.slng; dr.lat += dr.slat; dr.alt += dr.salt;
+
+      if (dr.marker) dr.marker.setLngLat([dr.lng, dr.lat]);
+
+      // Trail
+      dr.trailCoords.push([dr.lng, dr.lat]);
+      if (dr.trailCoords.length > 60) dr.trailCoords.shift();
+
+      // Strike check
+      var dx = dr.lng - dr.tLng, dy = dr.lat - dr.tLat;
+      if (Math.sqrt(dx*dx+dy*dy) < 0.0001 && dr.bezT >= 0.98) {
+        dr.struck = true; strikes++;
+        if (dr.marker) { dr.marker.remove(); dr.marker = null; }
+        var tgt = TARGETS[dr.targetIdx];
+        if (!tgt.hit) {
+          tgt.hit = true; targetsHit++;
+          var tEl = document.getElementById("tgt-marker-" + dr.targetIdx);
+          if (tEl) { tEl.style.borderColor = "#44ff44"; tEl.style.boxShadow = "0 0 12px rgba(68,255,68,0.4)"; }
+        }
+      }
+    }
+  }
+
+  // Update trails on map
+  updateTrails();
+  updateHUD();
+
+  // Track cam
+  if (trackCam) {
+    var lead = drones.find(function(d) { return d.launched && !d.struck; });
+    if (lead) {
+      map.easeTo({ center: [lead.lng, lead.lat], duration: 0, zoom: 17, pitch: 70 });
+    }
+  }
+}
+
+function updateTrails() {
+  var features = [];
+  for (var i = 0; i < drones.length; i++) {
+    if (drones[i].trailCoords.length < 2) continue;
+    features.push({ type: "Feature", geometry: { type: "LineString", coordinates: drones[i].trailCoords.slice() }, properties: {} });
+  }
+  var data = { type: "FeatureCollection", features: features };
+  if (map.getSource("trails")) {
+    map.getSource("trails").setData(data);
+  } else if (map.isStyleLoaded()) {
+    map.addSource("trails", { type: "geojson", data: data });
+    map.addLayer({ id: "trail-lines", type: "line", source: "trails", paint: { "line-color": "#2255aa", "line-opacity": 0.4, "line-width": 1.5 } });
+  }
+}
+
+var hudTimer = 0;
+function updateHUD() {
+  if (++hudTimer % 5 !== 0) return;
+  var inFlight = 0;
+  for (var i = 0; i < TOTAL; i++) {
+    if (drones[i].launched && !drones[i].struck) inFlight++;
+    droneIcons[i].className = drones[i].struck ? "di struck" : drones[i].launched ? "di active" : "di";
+  }
+  document.getElementById("sDep").textContent = deployed + "/" + TOTAL;
+  document.getElementById("sFly").textContent = inFlight;
+  document.getElementById("sHit").textContent = strikes;
+  document.getElementById("sTH").textContent = targetsHit + " / 4";
+  var ts = Math.floor(simTime);
+  document.getElementById("clock").textContent = String(Math.floor(ts/60)).padStart(2,"0") + ":" + String(ts%60).padStart(2,"0");
+}
+
+// Animation loop
+var lastTime = performance.now();
+function animate() {
+  requestAnimationFrame(animate);
+  var now = performance.now();
+  var dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  simStep(dt);
+}
+
+map.on("load", function() { animate(); });
+
+// Controls
+document.getElementById("bp").onclick = function() { playing = !playing; this.textContent = playing ? "PAUSE" : "PLAY"; this.className = playing ? "on" : ""; };
+document.getElementById("br").onclick = function() {
+  drones.forEach(function(d) { if (d.marker) d.marker.remove(); });
+  drones = [];
+  for (var i = 0; i < TOTAL; i++) drones.push(spawnDrone(i));
+  deployed = 0; strikes = 0; targetsHit = 0; simTime = 0; deployTimer = 0;
+  TARGETS.forEach(function(t) { t.hit = false; });
+  droneIcons.forEach(function(e) { e.className = "di"; });
+  for (var t = 0; t < 4; t++) {
+    var el = document.getElementById("tgt-marker-" + t);
+    if (el) { el.style.borderColor = "#ff3333"; el.style.boxShadow = "0 0 12px rgba(255,50,50,0.4)"; }
+  }
+  if (map.getSource("trails")) map.getSource("trails").setData({type:"FeatureCollection",features:[]});
+};
+document.getElementById("bt").onclick = function() { trackCam = !trackCam; this.className = trackCam ? "on" : ""; };
+</script>
+</body>
+</html>
