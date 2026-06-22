@@ -211,19 +211,24 @@ var scenario=new URLSearchParams(window.location.search).get("scenario")||"probe
 var wsUrl="ws://localhost:8765/ws/v1/wargame/"+scenario;
 var trackEnts={},defEnts={},assignEnts={},rangeEnts={};
 var siteEnt=null,siteRing=null,feedLines=[],ws=null,reconTimer=null;
+var trackHistory={};
+var activeEngageIds=new Set();
+var leakZoomCount=0,leakZooming=false;
+var corridorEntity=null,corridorFrameCount=0;
 var orbitAngle=0,orbitActive=true,selectEl=document.getElementById("scenario-select");
 selectEl.value=scenario;
 document.getElementById("ws-label").textContent=wsUrl.replace(/^wss?:\/\//,"");
 
-/* Camera: 800m altitude, slow orbit over origin */
-viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(ORIGIN_LON,ORIGIN_LAT,800),
-  orientation:{heading:0,pitch:Cesium.Math.toRadians(-60),roll:0},duration:2});
+/* Camera: 400m altitude, slow orbit over origin */
+var CAM_ALT=400,CAM_PITCH=-25;
+viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(ORIGIN_LON,ORIGIN_LAT,CAM_ALT),
+  orientation:{heading:0,pitch:Cesium.Math.toRadians(CAM_PITCH),roll:0},duration:2});
 
 viewer.scene.preRender.addEventListener(function(){
   if(!orbitActive)return;orbitAngle+=0.0003;
   viewer.camera.setView({destination:Cesium.Cartesian3.fromDegrees(
-    ORIGIN_LON+0.003*Math.sin(orbitAngle),ORIGIN_LAT+0.003*Math.cos(orbitAngle),800),
-    orientation:{heading:orbitAngle*1.8%6.28,pitch:Cesium.Math.toRadians(-60),roll:0}});
+    ORIGIN_LON+0.003*Math.sin(orbitAngle),ORIGIN_LAT+0.003*Math.cos(orbitAngle),CAM_ALT),
+    orientation:{heading:orbitAngle*1.8%6.28,pitch:Cesium.Math.toRadians(CAM_PITCH),roll:0}});
 });
 var idleTimer=null;
 function pauseOrbit(){orbitActive=false;if(idleTimer)clearTimeout(idleTimer);
@@ -267,10 +272,21 @@ function upsertTrack(t){
   if(lat==null&&t.enu){var g=enuToGeo(t.enu[0],t.enu[1],t.enu[2]);lat=g.lat;lon=g.lon;alt=g.alt}
   if(t.enu&&t.enu[2])alt=t.enu[2]; if(lat==null||lon==null)return;
   var intent=t.intent||"UNKNOWN",hex=INTENT_COL[intent]||INTENT_COL.UNKNOWN;
-  var col=Cesium.Color.fromCssColorString(hex),sz=Math.round(12+((t.confidence||0.5)-0.3)*23);
+  var col=Cesium.Color.fromCssColorString(hex),sz=Math.round(28+((t.confidence||0.5)-0.3)*17);
+  if(sz<28)sz=28;if(sz>40)sz=40;
+  var pos=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
+  /* Heading trail history */
+  if(!trackHistory[t.id])trackHistory[t.id]=[];
+  trackHistory[t.id].push(pos);
+  if(trackHistory[t.id].length>5)trackHistory[t.id].shift();
+  var trailId="trail-"+t.id;
+  if(!viewer.entities.getById(trailId)&&trackHistory[t.id].length>1){
+    viewer.entities.add({id:trailId,polyline:{
+      positions:new Cesium.CallbackProperty(function(){return trackHistory[this._tid]||[]}.bind({_tid:t.id}),false),
+      width:2,material:Cesium.Color.fromCssColorString(hex).withAlpha(0.3),
+      disableDepthTestDistance:Number.POSITIVE_INFINITY}})}
   var ent=trackEnts[t.id];
-  if(!ent){ent=viewer.entities.add({id:"t-"+t.id,name:t.id,
-    position:Cesium.Cartesian3.fromDegrees(lon,lat,alt),
+  if(!ent){ent=viewer.entities.add({id:"t-"+t.id,name:t.id,position:pos,
     billboard:{image:makeIcon("diamond",hex),width:sz,height:sz,disableDepthTestDistance:Number.POSITIVE_INFINITY},
     label:{text:t.id.substring(0,8)+" "+intent,font:"8px monospace",fillColor:col.withAlpha(0.85),
       showBackground:true,backgroundColor:new Cesium.Color(0,0,0,0.55),
@@ -278,7 +294,7 @@ function upsertTrack(t){
       disableDepthTestDistance:Number.POSITIVE_INFINITY,
       distanceDisplayCondition:new Cesium.DistanceDisplayCondition(0,5000)}});
     trackEnts[t.id]=ent}
-  else{ent.position=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
+  else{ent.position=pos;
     if(ent.billboard){ent.billboard.image=makeIcon("diamond",hex);ent.billboard.width=sz;ent.billboard.height=sz}
     if(ent.label)ent.label.text=t.id.substring(0,8)+" "+intent}
   ent._data=t;
@@ -314,22 +330,31 @@ function upsertDefender(d){
 function removeStale(live,ents){
   var rm=[];for(var id in ents)if(!live[id])rm.push(id);
   for(var i=0;i<rm.length;i++){viewer.entities.remove(ents[rm[i]]);delete ents[rm[i]];
-    if(rangeEnts[rm[i]]){viewer.entities.remove(rangeEnts[rm[i]]);delete rangeEnts[rm[i]]}}
+    if(rangeEnts[rm[i]]){viewer.entities.remove(rangeEnts[rm[i]]);delete rangeEnts[rm[i]]}
+    var te=viewer.entities.getById("trail-"+rm[i]);
+    if(te)viewer.entities.remove(te);
+    delete trackHistory[rm[i]]}
 }
 
-/* Assignment lines */
+/* Assignment lines - persistent engagement lines for HIT/MISS (3s) */
 function drawAssignments(asgs){
-  for(var k in assignEnts)viewer.entities.remove(assignEnts[k]);assignEnts={};
   var now=Cesium.JulianDate.now();
   for(var i=0;i<asgs.length;i++){var a=asgs[i];
+    if(a.status!=="HIT"&&a.status!=="MISS")continue;
+    var engId="engage-"+Date.now()+"-"+a.defender_id.substring(0,6)+"-"+a.track_id.substring(0,6)+"-"+i;
+    if(activeEngageIds.size>=10)continue;
     var dE=defEnts[a.defender_id],tE=trackEnts[a.track_id];if(!dE||!tE)continue;
     var dp=dE.position.getValue(now),tp=tE.position.getValue(now);if(!dp||!tp)continue;
-    var col=a.status==="HIT"?Cesium.Color.LIME.withAlpha(0.6):a.status==="MISS"?Cesium.Color.RED.withAlpha(0.6):Cesium.Color.ORANGE.withAlpha(0.5);
-    var key=a.defender_id+"-"+a.track_id;
-    assignEnts[key]=viewer.entities.add({id:"a-"+key,
-      polyline:{positions:[dp,tp],width:1.5,
+    var col=a.status==="HIT"?Cesium.Color.LIME.withAlpha(0.6):Cesium.Color.RED.withAlpha(0.6);
+    var w=a.status==="HIT"?2:1.5;
+    activeEngageIds.add(engId);
+    viewer.entities.add({id:engId,
+      polyline:{positions:[dp,tp],width:w,
         material:new Cesium.PolylineGlowMaterialProperty({glowPower:0.15,color:col}),
-        disableDepthTestDistance:Number.POSITIVE_INFINITY}})}
+        disableDepthTestDistance:Number.POSITIVE_INFINITY}});
+    (function(eid){setTimeout(function(){
+      var e=viewer.entities.getById(eid);if(e)viewer.entities.remove(e);
+      activeEngageIds.delete(eid)},3000)})(engId)}
 }
 
 /* HUD metrics */
@@ -408,6 +433,38 @@ function showCompletion(m){
   document.getElementById("completion-overlay").classList.add("visible");
 }
 
+/* Auto-zoom on LEAK event (first 3 only) */
+function onLeak(trackPos){
+  if(leakZoomCount>=3||leakZooming||viewer.trackedEntity)return;
+  leakZoomCount++;leakZooming=true;
+  viewer.camera.flyTo({
+    destination:Cesium.Cartesian3.fromDegrees(ORIGIN_LON+0.001,ORIGIN_LAT+0.001,200),
+    orientation:{heading:0,pitch:Cesium.Math.toRadians(-35),roll:0},duration:1});
+  setTimeout(function(){
+    viewer.camera.flyTo({
+      destination:Cesium.Cartesian3.fromDegrees(ORIGIN_LON,ORIGIN_LAT,CAM_ALT),
+      orientation:{heading:0,pitch:Cesium.Math.toRadians(CAM_PITCH),roll:0},duration:1.5});
+    setTimeout(function(){leakZooming=false},1600)},3000)}
+
+/* Threat approach corridor */
+function updateCorridor(tracks){
+  if(tracks.length<5)return;
+  var sumLon=0,sumLat=0;
+  for(var i=0;i<tracks.length;i++){
+    var tLat=tracks[i].lat,tLon=tracks[i].lon;
+    if(tLat==null&&tracks[i].enu){var g=enuToGeo(tracks[i].enu[0],tracks[i].enu[1],tracks[i].enu[2]);tLat=g.lat;tLon=g.lon}
+    if(tLat==null||tLon==null)continue;
+    sumLon+=tLon;sumLat+=tLat}
+  var centLon=sumLon/tracks.length,centLat=sumLat/tracks.length;
+  if(!corridorEntity){
+    corridorEntity=viewer.entities.add({id:"approach-corridor",polyline:{
+      positions:[Cesium.Cartesian3.fromDegrees(centLon,centLat,100),Cesium.Cartesian3.fromDegrees(ORIGIN_LON,ORIGIN_LAT,50)],
+      width:3,material:new Cesium.PolylineDashMaterialProperty({color:Cesium.Color.RED.withAlpha(0.2),dashLength:16}),
+      disableDepthTestDistance:Number.POSITIVE_INFINITY}})}
+  else{corridorEntity.polyline.positions=[
+    Cesium.Cartesian3.fromDegrees(centLon,centLat,100),
+    Cesium.Cartesian3.fromDegrees(ORIGIN_LON,ORIGIN_LAT,50)]}}
+
 /* WebSocket */
 function setDot(c){document.getElementById("dot").className="dot "+c}
 function setConn(t){document.getElementById("conn-label").textContent=t}
@@ -431,6 +488,7 @@ function connect(){
       var ld={};for(var j=0;j<defs.length;j++){upsertDefender(defs[j]);ld[defs[j].id]=true}
       removeStale(ld,defEnts);
       drawAssignments(asgs);ensureSite(msg.site);
+      corridorFrameCount++;if(corridorFrameCount%30===0)updateCorridor(tracks);
       if(msg.metrics)updateMetrics(msg.metrics);
       document.getElementById("asset-count").textContent=tracks.length+" TRACKS / "+defs.length+" DEFENDERS";
       for(var a=0;a<asgs.length;a++){var ag=asgs[a],dl=ag.defender_id.substring(0,8),tl=ag.track_id.substring(0,8);
@@ -441,7 +499,7 @@ function connect(){
         else if(ag.status==="MISS")addFeed('<span class="miss">'+dl+' -> '+tl+': MISS</span>');
         else if(ag.status==="LEAK"){addFeed('<span class="leak">'+tl+': LEAKED</span>');
           if(!explodedSet.has("leak-"+ag.track_id)){explodedSet.add("leak-"+ag.track_id);
-            var lp=getTrackPos(ag.track_id);if(lp)spawnSmoke(lp)}}}
+            var lp=getTrackPos(ag.track_id);if(lp){spawnSmoke(lp);onLeak(lp)}}}}
       if(msg.done){addFeed('<span class="info">--- SCENARIO COMPLETE ---</span>');setConn("COMPLETE");
         showCompletion(msg.metrics,tracks.length,defs.length)}}
     if(msg.type==="ERROR")addFeed('<span class="miss">ERR: '+(msg.error||"unknown")+'</span>')};
@@ -458,13 +516,18 @@ selectEl.addEventListener("change",function(){
   document.getElementById("ws-label").textContent=wsUrl.replace(/^wss?:\/\//,"");
   if(ws){ws.onclose=null;ws.close();ws=null}
   if(reconTimer){clearTimeout(reconTimer);reconTimer=null}
-  for(var k in trackEnts)viewer.entities.remove(trackEnts[k]);
+  for(var k in trackEnts){viewer.entities.remove(trackEnts[k]);
+    var te=viewer.entities.getById("trail-"+k);if(te)viewer.entities.remove(te)}
   for(var k2 in defEnts)viewer.entities.remove(defEnts[k2]);
   for(var k3 in assignEnts)viewer.entities.remove(assignEnts[k3]);
   for(var k4 in rangeEnts)viewer.entities.remove(rangeEnts[k4]);
+  activeEngageIds.forEach(function(eid){var e=viewer.entities.getById(eid);if(e)viewer.entities.remove(e)});
+  activeEngageIds.clear();
+  if(corridorEntity){viewer.entities.remove(corridorEntity);corridorEntity=null}
   if(siteEnt){viewer.entities.remove(siteEnt);siteEnt=null}
   if(siteRing){viewer.entities.remove(siteRing);siteRing=null}
   trackEnts={};defEnts={};assignEnts={};rangeEnts={};feedLines=[];explodedSet.clear();activeParticles=0;lastCostWin=null;
+  trackHistory={};leakZoomCount=0;leakZooming=false;corridorFrameCount=0;
   if(sitePulseRing){viewer.entities.remove(sitePulseRing);sitePulseRing=null}
   document.getElementById("feed").innerHTML='<div id="feed-title">ENGAGEMENT FEED</div>';
   document.getElementById("metrics").innerHTML="";
