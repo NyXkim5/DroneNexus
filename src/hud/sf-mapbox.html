@@ -203,58 +203,66 @@ function makeFlashTex() {
   return sharedFlashTex;
 }
 
-function buildDrone(s) {
+function buildDrone() {
+  // Build at METER scale -- group.scale handles Mercator conversion
   var g = new THREE.Group();
   var body = new THREE.Mesh(
-    new THREE.BoxGeometry(2*s, 0.5*s, 2*s),
-    new THREE.MeshStandardMaterial({color:0x2a3a55, metalness:0.6, roughness:0.3})
+    new THREE.BoxGeometry(1.2, 0.3, 1.2),
+    new THREE.MeshStandardMaterial({color:0x3a4a65, metalness:0.5, roughness:0.35})
   );
   g.add(body);
   g.userData.rotors = [];
   g.userData.exhaustCones = [];
   g.userData.detailParts = [];
   var armPos = [[1,1],[-1,1],[1,-1],[-1,-1]];
-  var armMat = new THREE.MeshPhongMaterial({color:0x4a5a70});
-  var motorMat = new THREE.MeshPhongMaterial({color:0x3a4a60});
-  var rotorMat = new THREE.MeshBasicMaterial({color:0x44aaff, transparent:true, opacity:0.35, side:THREE.DoubleSide});
+  var armMat = new THREE.MeshPhongMaterial({color:0x5a6a80});
+  var motorMat = new THREE.MeshPhongMaterial({color:0x4a5a70});
+  var rotorMat = new THREE.MeshBasicMaterial({color:0x55bbff, transparent:true, opacity:0.4, side:THREE.DoubleSide});
   var glowTex = makeGlowTex();
   for (var i = 0; i < 4; i++) {
     var ax = armPos[i][0], az = armPos[i][1];
-    var arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06*s,0.06*s,1.8*s,6), armMat);
-    arm.position.set(ax*0.7*s, 0, az*0.7*s);
-    arm.rotation.z = Math.atan2(az,ax) - Math.PI/2; arm.rotateX(Math.PI/2);
+    // Arm
+    var arm = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 0.08), armMat);
+    arm.position.set(ax*0.55, 0.05, az*0.55);
+    arm.rotation.y = Math.atan2(az, ax);
     g.add(arm);
-    var motor = new THREE.Mesh(new THREE.CylinderGeometry(0.2*s,0.2*s,0.3*s,8), motorMat);
-    motor.position.set(ax*1.4*s, 0.15*s, az*1.4*s); g.add(motor);
-    var rotor = new THREE.Mesh(new THREE.CircleGeometry(0.6*s,12), rotorMat);
-    rotor.position.set(ax*1.4*s, 0.35*s, az*1.4*s); rotor.rotation.x = -Math.PI/2;
+    // Motor pod
+    var motor = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.2, 8), motorMat);
+    motor.position.set(ax*0.9, 0.12, az*0.9); g.add(motor);
+    // Rotor disc
+    var rotor = new THREE.Mesh(new THREE.CircleGeometry(0.4, 16), rotorMat);
+    rotor.position.set(ax*0.9, 0.24, az*0.9); rotor.rotation.x = -Math.PI/2;
     g.add(rotor); g.userData.rotors.push(rotor);
+    // Glow sprite under motor
     var glow = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0x4488ff, transparent:true, opacity:0.5, blending:THREE.AdditiveBlending}));
-    glow.position.set(ax*1.4*s, -0.2*s, az*1.4*s); glow.scale.set(0.8*s,0.8*s,1);
+    glow.position.set(ax*0.9, -0.1, az*0.9); glow.scale.set(0.5, 0.5, 1);
     g.add(glow); g.userData.detailParts.push(glow);
+    // Exhaust cone
     var exhaust = new THREE.Mesh(
-      new THREE.ConeGeometry(0.15*s, 0.4*s, 6),
-      new THREE.MeshBasicMaterial({color:0x4488ff, transparent:true, opacity:0.2})
+      new THREE.ConeGeometry(0.1, 0.25, 6),
+      new THREE.MeshBasicMaterial({color:0x4488ff, transparent:true, opacity:0.15})
     );
-    exhaust.position.set(ax*1.4*s, -0.15*s, az*1.4*s); exhaust.rotation.x = Math.PI;
+    exhaust.position.set(ax*0.9, -0.05, az*0.9); exhaust.rotation.x = Math.PI;
     g.add(exhaust); g.userData.exhaustCones.push(exhaust); g.userData.detailParts.push(exhaust);
   }
-  var front = new THREE.Mesh(new THREE.SphereGeometry(0.12*s,6,6), new THREE.MeshBasicMaterial({color:0x44ff66}));
-  front.position.set(0, 0, -1.05*s); g.add(front); g.userData.detailParts.push(front);
-  var strobe = new THREE.Mesh(new THREE.SphereGeometry(0.08*s,4,4), new THREE.MeshBasicMaterial({color:0xffffff}));
-  strobe.position.set(0, 0.3*s, 0); g.add(strobe);
+  // Front nav light (green)
+  var front = new THREE.Mesh(new THREE.SphereGeometry(0.06,6,6), new THREE.MeshBasicMaterial({color:0x44ff66}));
+  front.position.set(0, 0, -0.65); g.add(front); g.userData.detailParts.push(front);
+  // Strobe
+  var strobe = new THREE.Mesh(new THREE.SphereGeometry(0.05,4,4), new THREE.MeshBasicMaterial({color:0xffffff}));
+  strobe.position.set(0, 0.2, 0); g.add(strobe);
   g.userData.strobe = strobe; g.userData.detailParts.push(strobe);
   return g;
 }
 
-function buildVan(s) {
+function buildVan() {
   var g = new THREE.Group();
-  var body = new THREE.Mesh(new THREE.BoxGeometry(2.5*s,2*s,5*s), new THREE.MeshPhongMaterial({color:0xe8e8e8, shininess:30}));
-  body.position.y = 1*s; g.add(body);
-  var cab = new THREE.Mesh(new THREE.BoxGeometry(2.4*s,1.5*s,1.8*s), new THREE.MeshPhongMaterial({color:0xc0c8d0}));
-  cab.position.set(0, 0.75*s, -3.2*s); g.add(cab);
-  var light = new THREE.PointLight(0x4488ff, 2, 8*s);
-  light.position.set(0, 1*s, 0); g.add(light); g.userData.light = light;
+  var body = new THREE.Mesh(new THREE.BoxGeometry(2.5,2,5), new THREE.MeshPhongMaterial({color:0xe8e8e8, shininess:30}));
+  body.position.y = 1; g.add(body);
+  var cab = new THREE.Mesh(new THREE.BoxGeometry(2.4,1.5,1.8), new THREE.MeshPhongMaterial({color:0xc0c8d0}));
+  cab.position.set(0, 0.75, -3.2); g.add(cab);
+  var light = new THREE.PointLight(0x4488ff, 2, 8);
+  light.position.set(0, 1, 0); g.add(light); g.userData.light = light;
   return g;
 }
 
@@ -408,7 +416,8 @@ var droneLayer = {
     threeRenderer = new THREE.WebGLRenderer({ canvas:m.getCanvas(), context:gl, antialias:true });
     threeRenderer.autoClear = false;
     var vs = meterScale(VAN_POS[1], 0);
-    vanMesh = buildVan(vs);
+    vanMesh = buildVan();
+    vanMesh.scale.setScalar(vs);
     var vw = lngLatAltToWorld(VAN_POS[0], VAN_POS[1], 0);
     vanMesh.position.set(vw.x, vw.y, vw.z); threeScene.add(vanMesh);
     initExplosionPool();
@@ -444,9 +453,9 @@ map.on("style.load", function() {
 
 function spawnDroneMesh(idx) {
   var s = meterScale(37.79, 50);
-  var mesh = buildDrone(s); mesh.visible = false; threeScene.add(mesh); droneMeshes[idx] = mesh;
-  var sh = new THREE.Mesh(new THREE.CircleGeometry(0.5*s,12), new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.3, side:THREE.DoubleSide}));
-  sh.rotation.x = -Math.PI/2; sh.visible = false; threeScene.add(sh); shadowMeshes[idx] = sh;
+  var mesh = buildDrone(); mesh.scale.setScalar(s); mesh.visible = false; threeScene.add(mesh); droneMeshes[idx] = mesh;
+  var sh = new THREE.Mesh(new THREE.CircleGeometry(1.5,12), new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.3, side:THREE.DoubleSide}));
+  sh.rotation.x = -Math.PI/2; sh.scale.setScalar(s); sh.visible = false; threeScene.add(sh); shadowMeshes[idx] = sh;
   var lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);
   var line = new THREE.Line(lineGeo, targetLineMat.clone());
   line.computeLineDistances(); line.visible = false; threeScene.add(line); targetLines[idx] = line;
@@ -612,7 +621,8 @@ function updateDroneMesh(d, i, dt) {
   if (shadowMeshes[i]) {
     var gw = lngLatAltToWorld(d.lng, d.lat, 0);
     shadowMeshes[i].position.set(gw.x, gw.y, gw.z);
-    shadowMeshes[i].scale.setScalar(1+d.alt*0.01);
+    var ms = meterScale(37.79, 0);
+    shadowMeshes[i].scale.setScalar(ms*(1+d.alt*0.01));
     shadowMeshes[i].material.opacity = Math.max(0.05, 0.3-d.alt*0.002);
   }
 }
