@@ -10,5 +10,14 @@ Public surface:
 from threat.classifier import assess, detect_swarms
 from threat.clustering import cluster_tracks
 from threat.intent import infer_intent
+from threat.predictor import ThreatCorridor, ThreatPrediction, ThreatPredictor
 
-__all__ = ["assess", "detect_swarms", "cluster_tracks", "infer_intent"]
+__all__ = [
+    "assess",
+    "detect_swarms",
+    "cluster_tracks",
+    "infer_intent",
+    "ThreatCorridor",
+    "ThreatPrediction",
+    "ThreatPredictor",
+]
