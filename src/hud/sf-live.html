@@ -97,6 +97,9 @@ html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
 <div id="scanlines"></div>
 <div id="vignette"></div>
 <div id="completion-overlay"><div id="completion-box"></div></div>
+<div id="narration" style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);z-index:15;pointer-events:none;
+  font-size:14px;letter-spacing:4px;color:rgba(140,200,255,0);text-transform:uppercase;text-align:center;
+  font-family:'JetBrains Mono',monospace;transition:color 0.8s ease;white-space:nowrap"></div>
 <div id="hud">
   <div id="top-bar">
     <span class="status-dot disconnected" id="status-dot"></span><span class="dot wait" id="dot"></span><span class="tag">OVERWATCH WARGAME</span>
@@ -121,6 +124,10 @@ html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
   </div>
   <div id="feed"><div id="feed-title">ENGAGEMENT FEED</div></div>
   <div id="detail"><span class="close" onclick="closeDetail()">X</span><div id="detail-body"></div></div>
+  <div id="threat-warning" style="position:absolute;bottom:60px;left:50%;transform:translateX(-50%);font-size:11px;
+    letter-spacing:3px;font-weight:700;text-transform:uppercase;pointer-events:none"></div>
+  <div id="status-msg" style="position:absolute;bottom:28px;left:50%;transform:translateX(-50%);font-size:8px;
+    letter-spacing:2px;text-transform:uppercase;pointer-events:none;color:rgba(70,255,130,0.9)"></div>
   <div id="bottom-bar"><span id="asset-count">-- TRACKS / -- DEFENDERS</span><span id="ws-label">--</span></div>
 </div>
 <div id="fallback">BACKEND NOT RUNNING<br>
@@ -274,6 +281,8 @@ function upsertTrack(t){
   var intent=t.intent||"UNKNOWN",hex=INTENT_COL[intent]||INTENT_COL.UNKNOWN;
   var col=Cesium.Color.fromCssColorString(hex),sz=Math.round(28+((t.confidence||0.5)-0.3)*17);
   if(sz<28)sz=28;if(sz>40)sz=40;
+  var tti=t.time_to_impact_s;
+  if(typeof tti==="number"&&tti<15){sz=Math.round(sz*(1+(1-tti/15)*0.5))}
   var pos=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
   /* Heading trail history */
   if(!trackHistory[t.id])trackHistory[t.id]=[];
@@ -405,6 +414,14 @@ viewer.screenSpaceEventHandler.setInputAction(function(click){
 },Cesium.ScreenSpaceEventType.LEFT_CLICK);
 function closeDetail(){document.getElementById("detail").style.display="none"}
 
+/* Narration system */
+var narrationShown={};
+function showNarration(key,text,duration,color){
+  if(narrationShown[key])return;narrationShown[key]=true;
+  var el=document.getElementById("narration");
+  el.textContent=text;el.style.color=color||"rgba(140,200,255,0.85)";
+  setTimeout(function(){el.style.color="rgba(140,200,255,0)"},(duration||3)*1000)}
+
 /* Scenario completion overlay */
 function showCompletion(m){
   if(!m)return;
@@ -491,6 +508,32 @@ function connect(){
       corridorFrameCount++;if(corridorFrameCount%30===0)updateCorridor(tracks);
       if(msg.metrics)updateMetrics(msg.metrics);
       document.getElementById("asset-count").textContent=tracks.length+" TRACKS / "+defs.length+" DEFENDERS";
+      /* Narration triggers */
+      showNarration("init","WARGAME INITIALIZED - "+scenario.toUpperCase().replace("_"," "),3);
+      var m=msg.metrics||{};
+      if(m.active_hostiles>0)showNarration("detected","HOSTILE SWARM DETECTED",3);
+      if((m.engagements_made||0)>0)showNarration("engaging","DEFENDERS ENGAGING",2);
+      if((m.leakers||0)>0)showNarration("leak","WARNING: LEAKER DETECTED",2,"rgba(255,70,70,0.95)");
+      var prog=(m.sim_time_s||0)/((m.total_time_s||300)*0.5);
+      if(prog>=1)showNarration("mid",(m.intercept_rate||0)>=0.7?"DEFENSE HOLDING":"DEFENSE DEGRADING",3,
+        (m.intercept_rate||0)>=0.7?"rgba(70,255,130,0.9)":"rgba(255,70,70,0.95)");
+      /* TTI threat warning */
+      var minTTI=Infinity;
+      for(var ti=0;ti<tracks.length;ti++){var tt=tracks[ti].time_to_impact_s;
+        if(typeof tt==="number"&&tt<minTTI)minTTI=tt}
+      var tw=document.getElementById("threat-warning");
+      if(minTTI<10){tw.textContent="IMMINENT THREAT: "+Math.round(minTTI)+"s";tw.style.color="rgba(255,70,70,0.95)"}
+      else{tw.textContent=""}
+      /* Story-driven status */
+      var sm=document.getElementById("status-msg");
+      var leakRate=m.leakers/(Math.max(1,m.leakers+(m.intercepts||0)));
+      if(leakRate>0.15){sm.textContent="DEFENSE DEGRADING - "+Math.round(leakRate*100)+"% LEAK RATE";
+        sm.style.color="rgba(255,70,70,0.95)"}
+      else if((m.active_hostiles||0)>50){sm.textContent="HEAVY ENGAGEMENT - "+m.active_hostiles+" HOSTILES";
+        sm.style.color="rgba(255,200,70,0.9)"}
+      else if((m.active_hostiles||0)>0){sm.textContent="DEFENSE HOLDING - RATE "+((m.intercept_rate||0)*100).toFixed(0)+"%";
+        sm.style.color="rgba(70,255,130,0.9)"}
+      else{sm.textContent=""}
       for(var a=0;a<asgs.length;a++){var ag=asgs[a],dl=ag.defender_id.substring(0,8),tl=ag.track_id.substring(0,8);
         var eKey=ag.defender_id+"-"+ag.track_id;
         if(ag.status==="HIT"){addFeed('<span class="hit">'+dl+' -> '+tl+': HIT</span>');
@@ -526,7 +569,7 @@ selectEl.addEventListener("change",function(){
   if(corridorEntity){viewer.entities.remove(corridorEntity);corridorEntity=null}
   if(siteEnt){viewer.entities.remove(siteEnt);siteEnt=null}
   if(siteRing){viewer.entities.remove(siteRing);siteRing=null}
-  trackEnts={};defEnts={};assignEnts={};rangeEnts={};feedLines=[];explodedSet.clear();activeParticles=0;lastCostWin=null;
+  trackEnts={};defEnts={};assignEnts={};rangeEnts={};feedLines=[];explodedSet.clear();activeParticles=0;lastCostWin=null;narrationShown={};
   trackHistory={};leakZoomCount=0;leakZooming=false;corridorFrameCount=0;
   if(sitePulseRing){viewer.entities.remove(sitePulseRing);sitePulseRing=null}
   document.getElementById("feed").innerHTML='<div id="feed-title">ENGAGEMENT FEED</div>';
@@ -534,6 +577,9 @@ selectEl.addEventListener("change",function(){
   document.getElementById("tick-label").textContent="T+00:00";
   document.getElementById("asset-count").textContent="-- TRACKS / -- DEFENDERS";
   document.getElementById("completion-overlay").classList.remove("visible");
+  document.getElementById("threat-warning").textContent="";
+  document.getElementById("status-msg").textContent="";
+  document.getElementById("narration").style.color="rgba(140,200,255,0)";
   connect()});
 
 connect();
