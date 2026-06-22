@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>OVERWATCH C2 - Live Telemetry</title>
+<script src="cesium/Cesium.js"></script>
+<link href="cesium/Widgets/widgets.css" rel="stylesheet">
+<script>window.CESIUM_BASE_URL = "cesium/";</script>
+<style>
+html,body,#c{margin:0;width:100%;height:100%;overflow:hidden}
+#hud{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;font-family:'JetBrains Mono',monospace}
+#top-bar{padding:6px 14px;font-size:8px;color:rgba(150,200,255,0.7);letter-spacing:2.5px;background:rgba(0,0,0,0.5);border-bottom:1px solid rgba(68,170,255,0.15);text-transform:uppercase;display:flex;justify-content:space-between}
+#status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:middle}
+#status-dot.ok{background:#0f0}#status-dot.err{background:#f44}#status-dot.connecting{background:#fa0}
+#metrics-panel{position:absolute;top:34px;right:10px;font-size:8px;color:rgba(150,200,255,0.6);letter-spacing:1.5px;background:rgba(0,0,0,0.5);padding:6px 10px;border:1px solid rgba(68,170,255,0.1);line-height:1.8}
+#engagement-log{position:absolute;bottom:80px;right:10px;font-size:7px;color:rgba(255,180,60,0.7);letter-spacing:1px;text-align:right;line-height:1.6;pointer-events:none;max-height:200px;overflow:hidden}
+#bottom-bar{position:absolute;bottom:32px;left:0;right:0;padding:4px 14px;font-size:7px;color:rgba(150,200,255,0.4);letter-spacing:2px;background:rgba(0,0,0,0.4);border-top:1px solid rgba(68,170,255,0.08);display:flex;justify-content:space-between;text-transform:uppercase}
+#fallback-msg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:12px;color:rgba(255,100,100,0.9);background:rgba(0,0,0,0.8);padding:20px 30px;border:1px solid rgba(255,100,100,0.3);font-family:'JetBrains Mono',monospace;display:none;z-index:20;text-align:center;line-height:2}
+</style>
+</head>
+<body>
+<div id="c"></div>
+<div id="hud">
+  <div id="top-bar">
+    <span><span id="status-dot" class="connecting"></span>OVERWATCH C2 LIVE | ASSETS: <span id="asset-count">0</span></span>
+    <span id="mode-label">TELEMETRY</span>
+    <span>UNCLASSIFIED // FOUO</span>
+  </div>
+  <div id="metrics-panel"></div>
+  <div id="engagement-log"></div>
+  <div id="bottom-bar"><span id="coord-label">--</span><span id="ws-label">--</span></div>
+</div>
+<div id="fallback-msg">
+  BACKEND NOT RUNNING<br>
+  Start with: <span style="color:#4af">cd backend && python3 main.py</span>
+</div>
+
+<script>
+Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlOGY0MjBhYy0zZTFlLTRkNTItOGFmNS1mYmM0ZDE1ZmYxMGYiLCJpZCI6NDQ3NDY2LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODIxMTI4MjN9.uvbJwgTognrLcj79tpt-kn46yt5S288s2hWgRBIhct8";
+var viewer = new Cesium.Viewer("c", {
+  timeline: false, animation: false, shouldAnimate: true, homeButton: false,
+  sceneModePicker: false, baseLayerPicker: false, navigationHelpButton: false,
+  geocoder: false, fullscreenButton: false
+});
+Cesium.createWorldTerrainAsync().then(function(t) { viewer.scene.terrainProvider = t; });
+Cesium.createOsmBuildingsAsync().then(function(t) { viewer.scene.primitives.add(t); }).catch(function() {});
+viewer.camera.flyTo({
+  destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.793, 600),
+  orientation: { heading: Cesium.Math.toRadians(20), pitch: Cesium.Math.toRadians(-25), roll: 0 },
+  duration: 2
+});
+
+var wsUrl = new URLSearchParams(window.location.search).get("ws") || "ws://localhost:8765/ws/v1/stream";
+var isWargame = wsUrl.indexOf("/wargame/") !== -1;
+var ws = null, reconnectTimer = null;
+var assetEntities = {}, defenderEntities = {}, assignmentEntities = {};
+var engagementLines = [];
+document.getElementById("mode-label").textContent = isWargame ? "WARGAME" : "TELEMETRY";
+document.getElementById("ws-label").textContent = wsUrl.replace("ws://", "").replace("wss://", "");
+
+function upsertAsset(asset) {
+  var id = asset.id || asset.drone_id;
+  if (!id) return;
+  var lon = asset.lon || asset.longitude, lat = asset.lat || asset.latitude;
+  var alt = asset.alt_agl || asset.altitude || 30;
+  if (lon === undefined || lat === undefined) return;
+  var pos = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+  var entity = assetEntities[id];
+  if (!entity) {
+    entity = viewer.entities.add({
+      id: "asset-" + id, name: id, position: pos,
+      model: { uri: "models/CesiumDrone.glb", minimumPixelSize: 48, scale: 4.0,
+        color: Cesium.Color.CYAN.withAlpha(0.9), colorBlendMode: Cesium.ColorBlendMode.MIX, colorBlendAmount: 0.3 },
+      path: { resolution: 1, width: 2, leadTime: 0, trailTime: 15,
+        material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.15, color: Cesium.Color.CYAN.withAlpha(0.4) }) },
+      label: { text: id, font: "9pt monospace", fillColor: Cesium.Color.WHITE.withAlpha(0.7),
+        showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.5),
+        pixelOffset: new Cesium.Cartesian2(0, -28), scale: 0.55,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3000) }
+    });
+    assetEntities[id] = entity;
+  } else { entity.position = pos; }
+}
+
+function upsertTrack(track) {
+  var id = track.id, lon = track.lon, lat = track.lat;
+  var alt = (track.enu && track.enu[2]) ? track.enu[2] : 30;
+  if (lon === undefined || lat === undefined) return;
+  var color = track.intent === "STRIKE" ? Cesium.Color.RED :
+    track.intent === "RECON" ? Cesium.Color.ORANGE :
+    track.intent === "DECOY" ? Cesium.Color.YELLOW : Cesium.Color.SALMON;
+  var entity = assetEntities[id];
+  if (!entity) {
+    entity = viewer.entities.add({
+      id: "track-" + id, name: id,
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, alt),
+      point: { pixelSize: 7, color: color, outlineColor: Cesium.Color.WHITE, outlineWidth: 1 },
+      label: { text: id.substring(0, 8), font: "7pt monospace", fillColor: color.withAlpha(0.8),
+        showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.5),
+        pixelOffset: new Cesium.Cartesian2(0, -14), scale: 0.5,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5000) }
+    });
+    assetEntities[id] = entity;
+  } else {
+    entity.position = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+    if (entity.point) entity.point.color = color;
+  }
+}
+
+function upsertDefender(def) {
+  var id = def.id, lon = def.lon, lat = def.lat;
+  var alt = (def.enu && def.enu[2]) ? def.enu[2] : 0;
+  if (lon === undefined || lat === undefined) return;
+  var color = def.status === "ENGAGING" ? Cesium.Color.LIME : Cesium.Color.DEEPSKYBLUE;
+  var entity = defenderEntities[id];
+  if (!entity) {
+    entity = viewer.entities.add({
+      id: "def-" + id, name: id,
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, alt),
+      point: { pixelSize: 10, color: color, outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
+      label: { text: def.kind + " " + id.substring(0, 6), font: "8pt monospace",
+        fillColor: Cesium.Color.DEEPSKYBLUE.withAlpha(0.8), showBackground: true,
+        backgroundColor: new Cesium.Color(0,0,0,0.5),
+        pixelOffset: new Cesium.Cartesian2(0, -18), scale: 0.5 }
+    });
+    defenderEntities[id] = entity;
+  } else {
+    entity.position = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+    if (entity.point) entity.point.color = color;
+  }
+}
+
+function drawAssignments(assignments, tracks, defenders) {
+  Object.keys(assignmentEntities).forEach(function(k) { viewer.entities.remove(assignmentEntities[k]); });
+  assignmentEntities = {};
+  var tPos = {}, dPos = {};
+  tracks.forEach(function(t) { if (t.lat && t.lon) tPos[t.id] = [t.lon, t.lat, (t.enu && t.enu[2]) || 30]; });
+  defenders.forEach(function(d) { if (d.lat && d.lon) dPos[d.id] = [d.lon, d.lat, (d.enu && d.enu[2]) || 0]; });
+  (assignments || []).forEach(function(a) {
+    var dp = dPos[a.defender_id], tp = tPos[a.track_id];
+    if (!dp || !tp) return;
+    var color = a.status === "HIT" ? Cesium.Color.LIME : a.status === "MISS" ? Cesium.Color.RED : Cesium.Color.YELLOW;
+    var key = a.defender_id + "-" + a.track_id;
+    assignmentEntities[key] = viewer.entities.add({
+      id: "assign-" + key,
+      polyline: { positions: Cesium.Cartesian3.fromDegreesArrayHeights([dp[0],dp[1],dp[2],tp[0],tp[1],tp[2]]),
+        width: 1.5, material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.2, color: color.withAlpha(0.6) }) }
+    });
+  });
+}
+
+var siteEntity = null;
+function ensureSiteMarker(site) {
+  if (siteEntity || !site || !site.lat || !site.lon) return;
+  siteEntity = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(site.lon, site.lat, 5),
+    point: { pixelSize: 12, color: Cesium.Color.WHITE.withAlpha(0.8), outlineColor: Cesium.Color.CYAN, outlineWidth: 2 },
+    label: { text: "DEFENDED SITE", font: "9pt monospace", fillColor: Cesium.Color.CYAN.withAlpha(0.9),
+      showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.6),
+      pixelOffset: new Cesium.Cartesian2(0, -20), scale: 0.6 }
+  });
+}
+
+function updateMetricsPanel(m) {
+  if (!m) { document.getElementById("metrics-panel").innerHTML = ""; return; }
+  var ratio = m.cost_exchange_ratio !== null ? m.cost_exchange_ratio.toFixed(2) : "--";
+  var rc = m.cost_exchange_win === true ? "color:rgba(80,255,120,0.8)" :
+           m.cost_exchange_win === false ? "color:rgba(255,80,80,0.8)" : "";
+  document.getElementById("metrics-panel").innerHTML =
+    "TICK " + m.tick + " | T+" + m.sim_time_s + "s<br>" +
+    "HOSTILES: " + m.active_hostiles + " | TRACKS: " + m.tracks_held + "<br>" +
+    "LEAKERS: <span style='color:rgba(255,80,80,0.8)'>" + m.leakers + "</span><br>" +
+    "INTERCEPTS: " + m.intercepts + "/" + m.engagements_made +
+    " (" + (m.intercept_rate * 100).toFixed(0) + "%)<br>" +
+    "COST RATIO: <span style='" + rc + "'>" + ratio + "</span>";
+}
+
+function addEngagementLog(text) {
+  engagementLines.push(text);
+  if (engagementLines.length > 12) engagementLines.shift();
+  document.getElementById("engagement-log").innerHTML = engagementLines.join("<br>");
+}
+
+function setStatus(cls) { document.getElementById("status-dot").className = cls; }
+
+function connect() {
+  setStatus("connecting");
+  document.getElementById("fallback-msg").style.display = "none";
+  try { ws = new WebSocket(wsUrl); } catch(e) { onFail(); return; }
+  ws.onopen = function() {
+    setStatus("ok");
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  };
+  ws.onmessage = function(ev) {
+    var msg;
+    try { msg = JSON.parse(ev.data); } catch(e) { return; }
+    if (msg.type === "STATE_SYNC") {
+      var assets = msg.assets || msg.drones || [];
+      assets.forEach(upsertAsset);
+      document.getElementById("asset-count").textContent = assets.length;
+      document.getElementById("coord-label").textContent = msg.formation || "--";
+    }
+    if (msg.type === "TELEMETRY" || msg.type === "telemetry") {
+      var items = msg.assets || msg.drones || (Array.isArray(msg) ? msg : [msg]);
+      items.forEach(upsertAsset);
+      document.getElementById("asset-count").textContent = Object.keys(assetEntities).length;
+    }
+    if (msg.type === "WARGAME_FRAME") {
+      var tracks = msg.tracks || [], defenders = msg.defenders || [];
+      tracks.forEach(upsertTrack);
+      defenders.forEach(upsertDefender);
+      drawAssignments(msg.assignments || [], tracks, defenders);
+      ensureSiteMarker(msg.site);
+      document.getElementById("asset-count").textContent = tracks.length + " T / " + defenders.length + " D";
+      if (msg.metrics) updateMetricsPanel(msg.metrics);
+      (msg.assignments || []).forEach(function(a) {
+        if (a.status === "HIT") addEngagementLog(a.defender_id.substring(0,6) + " -> " + a.track_id.substring(0,8) + " HIT");
+      });
+      if (msg.done) addEngagementLog("--- SCENARIO COMPLETE ---");
+    }
+    if (msg.type === "ERROR") addEngagementLog("ERROR: " + (msg.error || "unknown"));
+  };
+  ws.onerror = function() { onFail(); };
+  ws.onclose = function() { setStatus("err"); scheduleReconnect(); };
+}
+
+function onFail() {
+  setStatus("err");
+  document.getElementById("fallback-msg").style.display = "block";
+  scheduleReconnect();
+}
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(function() { reconnectTimer = null; connect(); }, 4000);
+}
+
+connect();
+</script>
+</body>
+</html>
