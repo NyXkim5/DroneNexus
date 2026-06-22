@@ -39,6 +39,12 @@
   #keys kbd{color:rgba(255,255,255,0.22)}
   #track-info{position:absolute;bottom:32px;right:12px;font-size:8px;letter-spacing:1.5px;
     color:rgba(80,200,255,0.6);text-transform:uppercase;text-align:right;display:none}
+  #event-log{position:absolute;bottom:80px;right:12px;width:200px;max-height:120px;overflow-y:auto;
+    font-size:7px;color:rgba(180,220,255,0.5);letter-spacing:1px;pointer-events:auto}
+  #event-log div{border-bottom:1px solid rgba(80,160,255,0.06);padding:1px 0}
+  #replay-bar{position:absolute;bottom:24px;left:0;right:0;height:3px;background:rgba(0,0,0,0.5);
+    z-index:11;cursor:pointer;pointer-events:auto}
+  #replay-progress{height:100%;width:0%;background:rgba(80,200,255,0.6);transition:width 0.1s}
   #track-info .callsign{font-size:10px;color:rgba(80,200,255,0.9);font-weight:600}
   #crosshair{position:absolute;top:50%;left:50%;width:20px;height:20px;margin:-10px 0 0 -10px;display:none}
   #crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(80,200,255,0.25)}
@@ -67,8 +73,10 @@
     <div>ACTIVE: <span class="val" id="active">0</span></div>
     <div>TARGETS: <span class="val" id="tgt-count">4</span></div>
     <div>NEUTRALIZED: <span class="val" id="neutral">0</span></div>
+    <div>THREATS: <span class="val" id="threat-count">0</span></div>
     <div id="mission-status">STATUS: <span class="val">STAGING</span></div>
   </div>
+  <div id="tile-status" style="position:absolute;top:48px;left:12px;font-size:7px;color:rgba(255,200,80,0.5);letter-spacing:1.5px">LOADING 3D TILES...</div>
   <div id="tgt-panel"><div class="hdr">TARGET STATUS</div><div id="tgt-list"></div></div>
   <div id="keys">
     <div><kbd>SPACE</kbd> pause <kbd>1-5</kbd> speed <kbd>R</kbd> reset <kbd>D</kbd> demo</div>
@@ -76,17 +84,50 @@
   </div>
   <div id="track-info"><div class="callsign" id="track-callsign"></div><div id="track-detail"></div><div id="track-extra"></div></div>
   <div id="crosshair"></div>
+  <div id="event-log"></div>
 </div>
+<div id="replay-bar"><div id="replay-progress"></div></div>
 <div id="bottom-bar"><span>37.7897N 122.3972W</span><span class="clock" id="clock-display">T+00:00.0</span><span id="speed-display">1X</span><span class="classification">UNCLASSIFIED // FOUO</span></div>
 
 <script>
 Cesium.Ion.defaultAccessToken="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlOGY0MjBhYy0zZTFlLTRkNTItOGFmNS1mYmM0ZDE1ZmYxMGYiLCJpZCI6NDQ3NDY2LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODIxMTI4MjN9.uvbJwgTognrLcj79tpt-kn46yt5S288s2hWgRBIhct8";
+Cesium.RequestScheduler.maximumRequests=25;
+Cesium.RequestScheduler.maximumRequestsPerServer=18;
+Cesium.RequestScheduler.requestsByServer["tile.googleapis.com:443"]=18;
 var V=new Cesium.Viewer("c",{timeline:false,animation:false,shouldAnimate:false,globe:false,
   baseLayerPicker:false,geocoder:false,sceneModePicker:false,homeButton:false,
   navigationHelpButton:false,fullscreenButton:false,infoBox:false,selectionIndicator:false});
 V.scene.fog.enabled=true; V.scene.fog.density=0.0003; V.scene.highDynamicRange=false;
-(async function(){try{V.scene.primitives.add(await Cesium.createGooglePhotorealistic3DTileset())}catch(e){
-  V.scene.globe=new Cesium.Globe();try{V.scene.primitives.add(await Cesium.createOsmBuildingsAsync())}catch(e2){}}})();
+V.resolutionScale=window.devicePixelRatio>1?0.75:1.0;
+(async function(){
+  var tileStatus=document.getElementById("tile-status");
+  try{
+    var tileset=await Cesium.createGooglePhotorealistic3DTileset();
+    V.scene.primitives.add(tileset);
+    console.log("Google 3D Tiles loaded successfully");
+    tileStatus.textContent="PHOTOREALISTIC";tileStatus.style.color="rgba(80,255,130,0.5)";
+  }catch(e){
+    console.warn("Google 3D Tiles failed:",e.message);
+    try{
+      var tileset=await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
+      V.scene.primitives.add(tileset);
+      console.log("Google 3D Tiles loaded via asset ID 2275207");
+      tileStatus.textContent="PHOTOREALISTIC";tileStatus.style.color="rgba(80,255,130,0.5)";
+    }catch(e2){
+      console.warn("Google 3D Tiles asset fallback failed:",e2.message);
+      V.scene.globe=new Cesium.Globe();
+      if(V.scene.globe)V.scene.globe.maximumScreenSpaceError=2;
+      try{
+        V.scene.primitives.add(await Cesium.createOsmBuildingsAsync());
+        console.log("OSM Buildings loaded as fallback");
+        tileStatus.textContent="OSM BUILDINGS";tileStatus.style.color="rgba(255,200,80,0.5)";
+      }catch(e3){
+        console.warn("OSM Buildings failed:",e3.message);
+        tileStatus.textContent="2D IMAGERY";tileStatus.style.color="rgba(255,70,70,0.5)";
+      }
+    }
+  }
+})();
 
 /* 64x64 anti-aliased drone icon */
 function createDroneIcon(hex){
@@ -102,6 +143,17 @@ function createDroneIcon(hex){
 }
 var ICONS={cyan:createDroneIcon("rgba(80,200,255,0.9)"),orange:createDroneIcon("rgba(255,160,60,0.9)"),
   magenta:createDroneIcon("rgba(255,80,180,0.9)"),lime:createDroneIcon("rgba(100,255,80,0.9)"),red:createDroneIcon("rgba(255,70,70,0.9)")};
+
+/* Red diamond threat icon */
+function createThreatIcon(){
+  var c=document.createElement("canvas");c.width=32;c.height=32;
+  var g=c.getContext("2d");
+  g.fillStyle="rgba(255,60,60,0.9)";
+  g.beginPath();g.moveTo(16,2);g.lineTo(30,16);g.lineTo(16,30);g.lineTo(2,16);g.closePath();g.fill();
+  g.strokeStyle="rgba(255,255,255,0.5)";g.lineWidth=1;g.stroke();
+  return c.toDataURL();
+}
+var THREAT_ICON=createThreatIcon();
 var IK=["cyan","orange","magenta","lime"];
 var CC=[Cesium.Color.fromCssColorString("rgba(80,200,255,0.7)"),Cesium.Color.fromCssColorString("rgba(255,160,60,0.7)"),
   Cesium.Color.fromCssColorString("rgba(255,80,180,0.7)"),Cesium.Color.fromCssColorString("rgba(100,255,80,0.7)")];
@@ -110,6 +162,7 @@ var LAUNCH={lon:-122.3948,lat:37.7878},MKT={lon:-122.400,lat:37.792};
 var T0=Cesium.JulianDate.fromIso8601("2026-06-22T00:00:00Z"),TE=Cesium.JulianDate.addSeconds(T0,300,new Cesium.JulianDate());
 var arrivals=[],bdaShown=[],missionDone=false,flashTimers=[];
 var curScn="strike",curTgts=[],curTotal=0,curPer=0;
+var threatIds=[],threatsSpawned=false,threatCount=0;
 var OV={dest:Cesium.Cartesian3.fromDegrees(-122.401,37.796,1500),
   orient:{heading:Cesium.Math.toRadians(15),pitch:Cesium.Math.toRadians(-35),roll:0}};
 V.clock.startTime=T0.clone();V.clock.stopTime=TE.clone();V.clock.currentTime=T0.clone();
@@ -147,8 +200,11 @@ function buildPath(tgt,di,ti,ppt){
 function clearScenario(){
   var rm=[];V.entities.values.forEach(function(e){if(e.id&&(e.id.indexOf("drone-")===0||e.id.indexOf("tgt-")===0||
     e.id.indexOf("hvec-")===0||e.id.indexOf("fline-")===0||e.id.indexOf("ops-")===0||
-    e.id.indexOf("ering-")===0||e.id==="launch-marker"||e.id==="boundary-ring"))rm.push(e)});
-  rm.forEach(function(e){V.entities.remove(e)});arrivals=[];bdaShown=[];missionDone=false;flashTimers=[];
+    e.id.indexOf("ering-")===0||e.id.indexOf("threat-")===0||e.id.indexOf("engline-")===0||
+    e.id==="launch-marker"||e.id==="boundary-ring"))rm.push(e)});
+  rm.forEach(function(e){V.entities.remove(e)});arrivals=[];bdaShown=[];missionDone=false;flashTimers=[];clearEventLog();
+  threatIds=[];threatsSpawned=false;threatCount=0;
+  document.getElementById("threat-count").textContent="0";
   V.trackedEntity=undefined;tracking=false;
   document.getElementById("track-info").style.display="none";document.getElementById("crosshair").style.display="none";
   V.clock.currentTime=T0.clone();V.clock.shouldAnimate=true;
@@ -351,9 +407,117 @@ function spawnEngagementRing(tgt,arrTime){
   setTimeout(function(){V.entities.remove(ring)},3000);
 }
 
+/* Threat detection overlay (strike scenario only) */
+function spawnThreat(lon,lat,alt,id,detectTime){
+  var tId="threat-"+id;threatIds.push(tId);
+  var threatPos=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
+  V.entities.add({id:tId,
+    position:threatPos,
+    billboard:{image:THREAT_ICON,width:16,height:16,
+      color:new Cesium.CallbackProperty(function(){
+        var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0);
+        if(el<detectTime)return Cesium.Color.TRANSPARENT;
+        if(el<detectTime+5)return Cesium.Color.RED;
+        if(el<detectTime+8)return Cesium.Color.ORANGE;
+        if(el<detectTime+10)return new Cesium.Color(0.3,1.0,0.3,0.9);
+        return new Cesium.Color(0.5,0.5,0.5,0.35);
+      },false),
+      disableDepthTestDistance:Number.POSITIVE_INFINITY,
+      eyeOffset:new Cesium.Cartesian3(0,0,-60)},
+    label:{text:new Cesium.CallbackProperty(function(){
+        var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0);
+        if(el<detectTime)return "";
+        if(el<detectTime+5)return "HOSTILE-"+String(id).padStart(3,"0");
+        if(el<detectTime+8)return "UAS SWARM - HOSTILE";
+        if(el<detectTime+10)return "ENGAGEMENT AUTH";
+        return "NEUTRALIZED";
+      },false),
+      font:"bold 7px monospace",
+      fillColor:new Cesium.CallbackProperty(function(){
+        var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0);
+        if(el<detectTime)return Cesium.Color.TRANSPARENT;
+        if(el<detectTime+5)return Cesium.Color.fromCssColorString("rgba(255,80,80,0.95)");
+        if(el<detectTime+8)return Cesium.Color.fromCssColorString("rgba(255,180,60,0.95)");
+        if(el<detectTime+10)return Cesium.Color.fromCssColorString("rgba(80,255,130,0.95)");
+        return Cesium.Color.fromCssColorString("rgba(160,160,160,0.5)");
+      },false),
+      showBackground:true,
+      backgroundColor:new Cesium.CallbackProperty(function(){
+        var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0);
+        if(el<detectTime)return Cesium.Color.TRANSPARENT;
+        return new Cesium.Color(0.02,0,0,0.75);
+      },false),
+      backgroundPadding:new Cesium.Cartesian2(4,2),
+      pixelOffset:new Cesium.Cartesian2(0,-16),scale:0.75,
+      disableDepthTestDistance:Number.POSITIVE_INFINITY}
+  });
+  /* Engagement line from nearest drone to threat */
+  var engId="engline-"+id;threatIds.push(engId);
+  V.entities.add({id:engId,polyline:{
+    positions:new Cesium.CallbackProperty(function(){
+      var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0);
+      if(el<detectTime+8||el>=detectTime+10)return[Cesium.Cartesian3.ZERO,Cesium.Cartesian3.ZERO];
+      var best=null,bestD=Infinity,now=V.clock.currentTime;
+      for(var i=0;i<curTotal;i++){var de=V.entities.getById("drone-"+i);
+        if(!de||!de.position)continue;var dp=de.position.getValue(now);if(!dp)continue;
+        var dd=Cesium.Cartesian3.distance(dp,threatPos);if(dd<bestD){bestD=dd;best=dp}}
+      return best?[best,threatPos]:[Cesium.Cartesian3.ZERO,Cesium.Cartesian3.ZERO];
+    },false),
+    width:1.5,
+    material:new Cesium.CallbackProperty(function(){
+      var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0);
+      if(el<detectTime+8||el>=detectTime+10)return Cesium.Color.TRANSPARENT;
+      return Cesium.Color.fromCssColorString("rgba(80,255,130,0.6)");
+    },false),
+    disableDepthTestDistance:Number.POSITIVE_INFINITY}});
+}
+
+function spawnThreats(){
+  if(threatsSpawned||curScn!=="strike")return;
+  threatsSpawned=true;var tid=1;
+  for(var ti=0;ti<curTgts.length;ti++){
+    var tgt=curTgts[ti],offsets=[
+      {dlon:0.0012,dlat:0.0008},{dlon:-0.0010,dlat:0.0006},
+      {dlon:0.0005,dlat:-0.0010},{dlon:-0.0008,dlat:-0.0005}];
+    var baseDetect=30+ti*3;
+    for(var oi=0;oi<offsets.length;oi++){
+      spawnThreat(tgt.lon+offsets[oi].dlon,tgt.lat+offsets[oi].dlat,tgt.alt+20+oi*10,
+        tid,baseDetect+oi*2);tid++}}
+}
+
+function countActiveThreats(){
+  var cnt=0;
+  for(var i=0;i<threatIds.length;i++){
+    var eid=threatIds[i];if(eid.indexOf("engline-")===0)continue;
+    var te=V.entities.getById(eid);if(!te||!te.billboard)continue;
+    var col=te.billboard.color.getValue(V.clock.currentTime);
+    if(col&&col.alpha>0.1&&!(col.red<0.6&&col.green<0.6&&col.blue<0.6))cnt++}
+  return cnt;
+}
+
 /* Timer: T+01:23.5 */
 function fmtTime(el){var s=Math.max(0,el),mn=Math.floor(s/60),sc=Math.floor(s%60),ds=Math.floor((s%1)*10);
   return "T+"+String(mn).padStart(2,"0")+":"+String(sc).padStart(2,"0")+"."+ds}
+
+/* Replay event log */
+var loggedEvents=new Set();
+function fmtLogTime(el){var s=Math.max(0,el),mn=Math.floor(s/60),sc=Math.floor(s%60);
+  return "T+"+String(mn).padStart(2,"0")+":"+String(sc).padStart(2,"0")}
+function logEvent(key,text){
+  if(loggedEvents.has(key))return;loggedEvents.add(key);
+  var log=document.getElementById("event-log"),div=document.createElement("div");
+  div.textContent=text;log.appendChild(div);log.scrollTop=log.scrollHeight;
+}
+function clearEventLog(){document.getElementById("event-log").innerHTML="";loggedEvents.clear()}
+
+/* Replay bar seek */
+document.getElementById("replay-bar").addEventListener("click",function(e){
+  var rect=this.getBoundingClientRect();
+  var pct=(e.clientX-rect.left)/rect.width;
+  var totalDur=Cesium.JulianDate.secondsDifference(TE,T0);
+  var newTime=Cesium.JulianDate.addSeconds(T0,pct*totalDur,new Cesium.JulianDate());
+  V.clock.currentTime=newTime;
+});
 
 /* Track info with target and ETA */
 function updateTrack(){if(!tracking)return;var te=V.trackedEntity;if(!te||!te.position)return;
@@ -373,20 +537,33 @@ function updateHUD(){
   var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0),ts=fmtTime(el);
   document.getElementById("top-time").textContent=ts;document.getElementById("clock-display").textContent=ts;
   document.getElementById("speed-display").textContent=V.clock.multiplier+"X";
-  if(el<1){bdaShown.fill(false);if(flashTimers.length)flashTimers.fill(0);missionDone=false}
+  var totalDuration=Cesium.JulianDate.secondsDifference(TE,T0);
+  var rpct=Math.min(100,Math.max(0,(el/totalDuration)*100));
+  document.getElementById("replay-progress").style.width=rpct+"%";
+  if(el<1){bdaShown.fill(false);if(flashTimers.length)flashTimers.fill(0);missionDone=false;clearEventLog();
+    if(threatsSpawned){for(var ti2=0;ti2<threatIds.length;ti2++){var te2=V.entities.getById(threatIds[ti2]);if(te2)V.entities.remove(te2)}
+      threatIds=[];threatsSpawned=false;threatCount=0}}
+  if(curScn==="strike"&&el>=30&&!threatsSpawned)spawnThreats();
+  if(curScn==="strike"&&threatsSpawned){threatCount=countActiveThreats();document.getElementById("threat-count").textContent=threatCount}
+  else{document.getElementById("threat-count").textContent="0"}
   if(curScn==="recon"){var ac=0;
-    for(var i=0;i<curTotal;i++){var de=V.entities.getById("drone-"+i);if(de&&de.position.getValue(V.clock.currentTime))ac++}
+    for(var i=0;i<curTotal;i++){var de=V.entities.getById("drone-"+i);if(de&&de.position.getValue(V.clock.currentTime))ac++;
+      if(de&&el>=0)logEvent("recon-deploy-"+i,fmtLogTime(0)+" SCOUT-"+String(i+1).padStart(2,"0")+" DEPLOYED")}
+    if(el>=5)for(var ri=0;ri<RECON_A.length;ri++)logEvent("recon-orbit-"+ri,fmtLogTime(5)+" "+RECON_A[ri].name+" AO: ON STATION");
     document.getElementById("active").textContent=ac;document.getElementById("neutral").textContent="---";
     var h="";for(var a=0;a<RECON_A.length;a++)h+='<div class="tgt-row"><span>'+RECON_A[a].name+'</span><span class="st" style="color:rgba(80,200,255,0.7)">ORBITING</span></div>';
     document.getElementById("tgt-list").innerHTML=h;
     document.getElementById("mission-status").innerHTML='STATUS: <span class="val" style="color:rgba(80,200,255,0.9)">PATROL</span>';
     updateTrack();orbitTick();Cesium.requestAnimationFrame(updateHUD);return}
   var ac=0;for(var i=0;i<arrivals.length;i++){var dd=curScn==="strike"?i*1.5:Math.max(0,arrivals[i].arrival-80);
-    if(el>=dd&&el<arrivals[i].arrival+3)ac++}
+    if(el>=dd&&el<arrivals[i].arrival+3)ac++;
+    if(el>=dd)logEvent("deploy-"+i,fmtLogTime(dd)+" "+arrivals[i].label+" DEPLOYED");
+    if(el>=arrivals[i].arrival)logEvent("station-"+i,fmtLogTime(arrivals[i].arrival)+" "+arrivals[i].label+" ON STATION")}
   var neut=0,h="";
   for(var t=0;t<curTgts.length;t++){var cnt=0,need=curPer;
     for(var j=0;j<arrivals.length;j++)if(arrivals[j].ti===t&&el>=arrivals[j].arrival)cnt++;
-    var done=cnt>=need;if(done)neut++;if(done&&!bdaShown[t]){bdaShown[t]=true;flashTimers[t]=el;spawnEngagementRing(curTgts[t],el)}
+    var done=cnt>=need;if(done)neut++;if(done&&!bdaShown[t]){bdaShown[t]=true;flashTimers[t]=el;spawnEngagementRing(curTgts[t],el);
+      logEvent("bda-"+t,fmtLogTime(el)+" "+curTgts[t].name+": BDA CONFIRM")}
     var te=V.entities.getById("tgt-"+t);
     if(te&&te.point){if(flashTimers[t]>0&&el-flashTimers[t]<0.5){te.point.pixelSize=20;te.point.color=Cesium.Color.WHITE.withAlpha(0.95);
       te.point.outlineColor=Cesium.Color.WHITE.withAlpha(0.5)}else if(done){te.point.pixelSize=8;
@@ -399,7 +576,8 @@ function updateHUD(){
   if(neut>=curTgts.length)sEl.innerHTML='STATUS: <span class="val" style="color:rgba(80,255,130,0.95)">MISSION COMPLETE</span>';
   else if(ac>0)sEl.innerHTML='STATUS: <span class="val" style="color:rgba(255,200,80,0.9)">ACTIVE</span>';
   else sEl.innerHTML='STATUS: <span class="val">STAGING</span>';
-  if(neut>=curTgts.length&&!missionDone){missionDone=true;tracking=false;V.trackedEntity=undefined;
+  if(neut>=curTgts.length&&!missionDone){missionDone=true;logEvent("complete",fmtLogTime(el)+" MISSION COMPLETE");
+    tracking=false;V.trackedEntity=undefined;
     document.getElementById("track-info").style.display="none";document.getElementById("crosshair").style.display="none";
     V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.400,37.796,3000),
       orientation:{heading:0,pitch:Cesium.Math.toRadians(-80),roll:0},duration:3});

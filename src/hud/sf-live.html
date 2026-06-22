@@ -2,236 +2,292 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>OVERWATCH C2 - Live Telemetry</title>
+<title>OVERWATCH WARGAME - Live</title>
+<script>window.CESIUM_BASE_URL="cesium/";</script>
 <script src="cesium/Cesium.js"></script>
 <link href="cesium/Widgets/widgets.css" rel="stylesheet">
-<script>window.CESIUM_BASE_URL = "cesium/";</script>
 <style>
-html,body,#c{margin:0;width:100%;height:100%;overflow:hidden}
-#hud{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;font-family:'JetBrains Mono',monospace}
-#top-bar{padding:6px 14px;font-size:8px;color:rgba(150,200,255,0.7);letter-spacing:2.5px;background:rgba(0,0,0,0.5);border-bottom:1px solid rgba(68,170,255,0.15);text-transform:uppercase;display:flex;justify-content:space-between}
-#status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:middle}
-#status-dot.ok{background:#0f0}#status-dot.err{background:#f44}#status-dot.connecting{background:#fa0}
-#metrics-panel{position:absolute;top:34px;right:10px;font-size:8px;color:rgba(150,200,255,0.6);letter-spacing:1.5px;background:rgba(0,0,0,0.5);padding:6px 10px;border:1px solid rgba(68,170,255,0.1);line-height:1.8}
-#engagement-log{position:absolute;bottom:80px;right:10px;font-size:7px;color:rgba(255,180,60,0.7);letter-spacing:1px;text-align:right;line-height:1.6;pointer-events:none;max-height:200px;overflow:hidden}
-#bottom-bar{position:absolute;bottom:32px;left:0;right:0;padding:4px 14px;font-size:7px;color:rgba(150,200,255,0.4);letter-spacing:2px;background:rgba(0,0,0,0.4);border-top:1px solid rgba(68,170,255,0.08);display:flex;justify-content:space-between;text-transform:uppercase}
-#fallback-msg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:12px;color:rgba(255,100,100,0.9);background:rgba(0,0,0,0.8);padding:20px 30px;border:1px solid rgba(255,100,100,0.3);font-family:'JetBrains Mono',monospace;display:none;z-index:20;text-align:center;line-height:2}
+*{box-sizing:border-box}
+html,body,#c{margin:0;width:100%;height:100%;overflow:hidden;background:#0a0c10}
+.cesium-viewer-bottom,.cesium-viewer .cesium-widget-credits,
+.cesium-viewer .cesium-viewer-animationContainer,
+.cesium-viewer .cesium-viewer-timelineContainer{display:none!important}
+#hud{position:absolute;top:0;left:0;right:0;bottom:0;z-index:10;pointer-events:none;
+  font-family:'JetBrains Mono','SF Mono','Consolas',monospace;-webkit-font-smoothing:antialiased}
+#top-bar{display:flex;justify-content:space-between;align-items:center;padding:7px 16px;
+  font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(160,210,255,0.75);
+  background:rgba(6,8,14,0.85);border-bottom:1px solid rgba(80,160,255,0.12)}
+#top-bar .tag{color:rgba(80,200,255,0.95);font-weight:600}
+#top-bar .sep{color:rgba(80,160,255,0.2);margin:0 8px}
+#dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle}
+#dot.ok{background:#0f0}#dot.err{background:#f44}#dot.wait{background:#fa0;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+#metrics{position:absolute;top:42px;right:12px;font-size:9px;letter-spacing:1.5px;
+  color:rgba(160,210,255,0.7);background:rgba(6,8,14,0.8);padding:8px 12px;
+  border:1px solid rgba(80,160,255,0.1);line-height:1.9;min-width:200px}
+#metrics .label{color:rgba(120,170,220,0.5)}
+#metrics .val{color:rgba(200,230,255,0.9)}
+#metrics .good{color:rgba(80,255,120,0.9)}
+#metrics .bad{color:rgba(255,80,80,0.9)}
+#feed{position:absolute;bottom:50px;right:12px;font-size:8px;letter-spacing:1px;
+  color:rgba(255,180,60,0.7);text-align:right;line-height:1.7;max-height:200px;overflow:hidden}
+#bottom-bar{position:absolute;bottom:0;left:0;right:0;padding:5px 16px;font-size:7px;
+  letter-spacing:2px;color:rgba(120,170,220,0.4);background:rgba(6,8,14,0.7);
+  border-top:1px solid rgba(80,160,255,0.08);display:flex;justify-content:space-between;
+  text-transform:uppercase}
+#fallback{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;
+  color:rgba(255,100,100,0.9);background:rgba(0,0,0,0.85);padding:24px 36px;
+  border:1px solid rgba(255,100,100,0.3);font-family:'JetBrains Mono',monospace;
+  display:none;z-index:20;text-align:center;line-height:2.2}
+#legend{position:absolute;top:42px;left:12px;font-size:8px;letter-spacing:1px;
+  color:rgba(160,210,255,0.6);background:rgba(6,8,14,0.75);padding:6px 10px;
+  border:1px solid rgba(80,160,255,0.08);line-height:1.9}
+#legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
 </style>
 </head>
 <body>
 <div id="c"></div>
 <div id="hud">
   <div id="top-bar">
-    <span><span id="status-dot" class="connecting"></span>OVERWATCH C2 LIVE | ASSETS: <span id="asset-count">0</span></span>
-    <span id="mode-label">TELEMETRY</span>
+    <span><span id="dot" class="wait"></span><span class="tag">OVERWATCH WARGAME</span>
+      <span class="sep">|</span><span id="scenario-label">--</span>
+      <span class="sep">|</span><span id="conn-label">CONNECTING</span></span>
+    <span id="tick-label">TICK --</span>
     <span>UNCLASSIFIED // FOUO</span>
   </div>
-  <div id="metrics-panel"></div>
-  <div id="engagement-log"></div>
-  <div id="bottom-bar"><span id="coord-label">--</span><span id="ws-label">--</span></div>
+  <div id="metrics"></div>
+  <div id="legend">
+    <i style="background:#f44"></i>SATURATION
+    <i style="background:#0ff;margin-left:6px"></i>PROBE
+    <i style="background:#a040ff;margin-left:6px"></i>DECOY
+    <i style="background:#f90;margin-left:6px"></i>WAVES<br>
+    <i style="background:#4af;border-radius:1px"></i>DEFENDER
+    <i style="background:#fff;margin-left:6px"></i>SITE
+  </div>
+  <div id="feed"></div>
+  <div id="bottom-bar"><span id="asset-count">-- T / -- D</span><span id="ws-label">--</span></div>
 </div>
-<div id="fallback-msg">
+<div id="fallback">
   BACKEND NOT RUNNING<br>
-  Start with: <span style="color:#4af">cd backend && python3 main.py</span>
+  Start: <span style="color:#4af">cd backend && python3 main.py</span><br>
+  Then open: <span style="color:#4af">sf-live.html?ws=ws://localhost:8765/ws/v1/wargame/probe_120</span>
 </div>
 
 <script>
-Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlOGY0MjBhYy0zZTFlLTRkNTItOGFmNS1mYmM0ZDE1ZmYxMGYiLCJpZCI6NDQ3NDY2LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODIxMTI4MjN9.uvbJwgTognrLcj79tpt-kn46yt5S288s2hWgRBIhct8";
-var viewer = new Cesium.Viewer("c", {
-  timeline: false, animation: false, shouldAnimate: true, homeButton: false,
-  sceneModePicker: false, baseLayerPicker: false, navigationHelpButton: false,
-  geocoder: false, fullscreenButton: false
+/* ---- Cesium setup ---- */
+Cesium.Ion.defaultAccessToken="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlOGY0MjBhYy0zZTFlLTRkNTItOGFmNS1mYmM0ZDE1ZmYxMGYiLCJpZCI6NDQ3NDY2LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODIxMTI4MjN9.uvbJwgTognrLcj79tpt-kn46yt5S288s2hWgRBIhct8";
+var viewer=new Cesium.Viewer("c",{
+  timeline:false,animation:false,shouldAnimate:true,homeButton:false,
+  sceneModePicker:false,baseLayerPicker:false,navigationHelpButton:false,
+  geocoder:false,fullscreenButton:false
 });
-Cesium.createWorldTerrainAsync().then(function(t) { viewer.scene.terrainProvider = t; });
-Cesium.createOsmBuildingsAsync().then(function(t) { viewer.scene.primitives.add(t); }).catch(function() {});
+Cesium.createWorldTerrainAsync().then(function(t){viewer.scene.terrainProvider=t;});
 viewer.camera.flyTo({
-  destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.793, 600),
-  orientation: { heading: Cesium.Math.toRadians(20), pitch: Cesium.Math.toRadians(-25), roll: 0 },
-  duration: 2
+  destination:Cesium.Cartesian3.fromDegrees(-117.8443,33.6405,2400),
+  orientation:{heading:Cesium.Math.toRadians(350),pitch:Cesium.Math.toRadians(-45),roll:0},
+  duration:2
 });
 
-var wsUrl = new URLSearchParams(window.location.search).get("ws") || "ws://localhost:8765/ws/v1/stream";
-var isWargame = wsUrl.indexOf("/wargame/") !== -1;
-var ws = null, reconnectTimer = null;
-var assetEntities = {}, defenderEntities = {}, assignmentEntities = {};
-var engagementLines = [];
-document.getElementById("mode-label").textContent = isWargame ? "WARGAME" : "TELEMETRY";
-document.getElementById("ws-label").textContent = wsUrl.replace("ws://", "").replace("wss://", "");
+/* ---- State ---- */
+var ORIGIN_LAT=33.6405,ORIGIN_LON=-117.8443;
+var wsUrl=new URLSearchParams(window.location.search).get("ws")||"ws://localhost:8765/ws/v1/wargame/probe_120";
+var scenarioName=wsUrl.split("/wargame/")[1]||"unknown";
+document.getElementById("scenario-label").textContent=scenarioName.toUpperCase();
+document.getElementById("ws-label").textContent=wsUrl.replace(/^wss?:\/\//,"");
 
-function upsertAsset(asset) {
-  var id = asset.id || asset.drone_id;
-  if (!id) return;
-  var lon = asset.lon || asset.longitude, lat = asset.lat || asset.latitude;
-  var alt = asset.alt_agl || asset.altitude || 30;
-  if (lon === undefined || lat === undefined) return;
-  var pos = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
-  var entity = assetEntities[id];
-  if (!entity) {
-    entity = viewer.entities.add({
-      id: "asset-" + id, name: id, position: pos,
-      model: { uri: "models/CesiumDrone.glb", minimumPixelSize: 48, scale: 4.0,
-        color: Cesium.Color.CYAN.withAlpha(0.9), colorBlendMode: Cesium.ColorBlendMode.MIX, colorBlendAmount: 0.3 },
-      path: { resolution: 1, width: 2, leadTime: 0, trailTime: 15,
-        material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.15, color: Cesium.Color.CYAN.withAlpha(0.4) }) },
-      label: { text: id, font: "9pt monospace", fillColor: Cesium.Color.WHITE.withAlpha(0.7),
-        showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.5),
-        pixelOffset: new Cesium.Cartesian2(0, -28), scale: 0.55,
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3000) }
-    });
-    assetEntities[id] = entity;
-  } else { entity.position = pos; }
+var trackEnts={},defEnts={},assignEnts={};
+var siteEnt=null;
+var feedLines=[];
+var knownTrackIds={};
+var ws=null,reconTimer=null;
+
+/* ---- Intent color map ---- */
+var INTENT_COLOR={
+  SATURATION:Cesium.Color.fromCssColorString("#ff4444"),
+  PROBE:Cesium.Color.fromCssColorString("#00ffff"),
+  DECOY:Cesium.Color.fromCssColorString("#a040ff"),
+  WAVES:Cesium.Color.fromCssColorString("#ff9900"),
+  UNKNOWN:Cesium.Color.fromCssColorString("#ff8888")
+};
+var STATUS_COLOR={
+  READY:Cesium.Color.fromCssColorString("#44aaff"),
+  ENGAGING:Cesium.Color.fromCssColorString("#00ff66"),
+  RELOADING:Cesium.Color.fromCssColorString("#ffcc00"),
+  DEPLETED:Cesium.Color.fromCssColorString("#666666"),
+  OFFLINE:Cesium.Color.fromCssColorString("#444444")
+};
+
+/* ---- ENU to lat/lon (fallback if backend omits geodetic) ---- */
+function enuToLL(e,n){
+  return{lat:ORIGIN_LAT+n/111000,lon:ORIGIN_LON+e/(111000*Math.cos(ORIGIN_LAT*Math.PI/180))};
 }
 
-function upsertTrack(track) {
-  var id = track.id, lon = track.lon, lat = track.lat;
-  var alt = (track.enu && track.enu[2]) ? track.enu[2] : 30;
-  if (lon === undefined || lat === undefined) return;
-  var color = track.intent === "STRIKE" ? Cesium.Color.RED :
-    track.intent === "RECON" ? Cesium.Color.ORANGE :
-    track.intent === "DECOY" ? Cesium.Color.YELLOW : Cesium.Color.SALMON;
-  var entity = assetEntities[id];
-  if (!entity) {
-    entity = viewer.entities.add({
-      id: "track-" + id, name: id,
-      position: Cesium.Cartesian3.fromDegrees(lon, lat, alt),
-      point: { pixelSize: 7, color: color, outlineColor: Cesium.Color.WHITE, outlineWidth: 1 },
-      label: { text: id.substring(0, 8), font: "7pt monospace", fillColor: color.withAlpha(0.8),
-        showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.5),
-        pixelOffset: new Cesium.Cartesian2(0, -14), scale: 0.5,
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5000) }
+/* ---- Entity management ---- */
+function upsertTrack(t){
+  var lat=t.lat,lon=t.lon;
+  if(lat==null&&t.enu){var ll=enuToLL(t.enu[0],t.enu[1]);lat=ll.lat;lon=ll.lon;}
+  if(lat==null||lon==null)return;
+  var alt=(t.enu&&t.enu[2])?t.enu[2]:30;
+  var col=INTENT_COLOR[t.intent]||INTENT_COLOR.UNKNOWN;
+  var sz=Math.max(5,Math.min(12,Math.round((t.confidence||0.5)*14)));
+  var ent=trackEnts[t.id];
+  if(!ent){
+    ent=viewer.entities.add({
+      id:"t-"+t.id,name:t.id,
+      position:Cesium.Cartesian3.fromDegrees(lon,lat,alt),
+      point:{pixelSize:sz,color:col,outlineColor:Cesium.Color.WHITE.withAlpha(0.5),outlineWidth:1},
+      label:{text:t.id.substring(0,7),font:"7px monospace",fillColor:col.withAlpha(0.8),
+        showBackground:true,backgroundColor:new Cesium.Color(0,0,0,0.5),
+        pixelOffset:new Cesium.Cartesian2(0,-14),scale:0.55,
+        distanceDisplayCondition:new Cesium.DistanceDisplayCondition(0,6000)}
     });
-    assetEntities[id] = entity;
-  } else {
-    entity.position = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
-    if (entity.point) entity.point.color = color;
+    trackEnts[t.id]=ent;
+  }else{
+    ent.position=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
+    if(ent.point){ent.point.color=col;ent.point.pixelSize=sz;}
+  }
+  knownTrackIds[t.id]=true;
+}
+
+function removeStaleTrack(liveIds){
+  var stale=[];
+  for(var id in trackEnts){if(!liveIds[id])stale.push(id);}
+  for(var i=0;i<stale.length;i++){
+    viewer.entities.remove(trackEnts[stale[i]]);
+    delete trackEnts[stale[i]];
   }
 }
 
-function upsertDefender(def) {
-  var id = def.id, lon = def.lon, lat = def.lat;
-  var alt = (def.enu && def.enu[2]) ? def.enu[2] : 0;
-  if (lon === undefined || lat === undefined) return;
-  var color = def.status === "ENGAGING" ? Cesium.Color.LIME : Cesium.Color.DEEPSKYBLUE;
-  var entity = defenderEntities[id];
-  if (!entity) {
-    entity = viewer.entities.add({
-      id: "def-" + id, name: id,
-      position: Cesium.Cartesian3.fromDegrees(lon, lat, alt),
-      point: { pixelSize: 10, color: color, outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
-      label: { text: def.kind + " " + id.substring(0, 6), font: "8pt monospace",
-        fillColor: Cesium.Color.DEEPSKYBLUE.withAlpha(0.8), showBackground: true,
-        backgroundColor: new Cesium.Color(0,0,0,0.5),
-        pixelOffset: new Cesium.Cartesian2(0, -18), scale: 0.5 }
+function upsertDefender(d){
+  var lat=d.lat,lon=d.lon;
+  if(lat==null&&d.enu){var ll=enuToLL(d.enu[0],d.enu[1]);lat=ll.lat;lon=ll.lon;}
+  if(lat==null||lon==null)return;
+  var alt=(d.enu&&d.enu[2])?d.enu[2]:0;
+  var col=STATUS_COLOR[d.status]||STATUS_COLOR.READY;
+  var ent=defEnts[d.id];
+  if(!ent){
+    ent=viewer.entities.add({
+      id:"d-"+d.id,name:d.id,
+      position:Cesium.Cartesian3.fromDegrees(lon,lat,alt),
+      point:{pixelSize:10,color:col,outlineColor:Cesium.Color.WHITE,outlineWidth:2},
+      label:{text:(d.kind||"DEF")+" "+d.id.substring(0,6),font:"8px monospace",
+        fillColor:Cesium.Color.DEEPSKYBLUE.withAlpha(0.8),showBackground:true,
+        backgroundColor:new Cesium.Color(0,0,0,0.5),
+        pixelOffset:new Cesium.Cartesian2(0,-18),scale:0.55}
     });
-    defenderEntities[id] = entity;
-  } else {
-    entity.position = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
-    if (entity.point) entity.point.color = color;
+    defEnts[d.id]=ent;
+  }else{
+    ent.position=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
+    if(ent.point)ent.point.color=col;
   }
 }
 
-function drawAssignments(assignments, tracks, defenders) {
-  Object.keys(assignmentEntities).forEach(function(k) { viewer.entities.remove(assignmentEntities[k]); });
-  assignmentEntities = {};
-  var tPos = {}, dPos = {};
-  tracks.forEach(function(t) { if (t.lat && t.lon) tPos[t.id] = [t.lon, t.lat, (t.enu && t.enu[2]) || 30]; });
-  defenders.forEach(function(d) { if (d.lat && d.lon) dPos[d.id] = [d.lon, d.lat, (d.enu && d.enu[2]) || 0]; });
-  (assignments || []).forEach(function(a) {
-    var dp = dPos[a.defender_id], tp = tPos[a.track_id];
-    if (!dp || !tp) return;
-    var color = a.status === "HIT" ? Cesium.Color.LIME : a.status === "MISS" ? Cesium.Color.RED : Cesium.Color.YELLOW;
-    var key = a.defender_id + "-" + a.track_id;
-    assignmentEntities[key] = viewer.entities.add({
-      id: "assign-" + key,
-      polyline: { positions: Cesium.Cartesian3.fromDegreesArrayHeights([dp[0],dp[1],dp[2],tp[0],tp[1],tp[2]]),
-        width: 1.5, material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.2, color: color.withAlpha(0.6) }) }
+function drawAssignments(assignments,tracks,defenders){
+  for(var k in assignEnts){viewer.entities.remove(assignEnts[k]);}
+  assignEnts={};
+  var tPos={},dPos={};
+  for(var i=0;i<tracks.length;i++){var t=tracks[i];if(t.lat!=null&&t.lon!=null)tPos[t.id]=[t.lon,t.lat,(t.enu&&t.enu[2])||30];}
+  for(var j=0;j<defenders.length;j++){var d=defenders[j];if(d.lat!=null&&d.lon!=null)dPos[d.id]=[d.lon,d.lat,(d.enu&&d.enu[2])||0];}
+  for(var a=0;a<assignments.length;a++){
+    var asg=assignments[a];
+    var dp=dPos[asg.defender_id],tp=tPos[asg.track_id];
+    if(!dp||!tp)continue;
+    var col=asg.status==="HIT"?Cesium.Color.LIME:asg.status==="MISS"?Cesium.Color.RED:Cesium.Color.YELLOW;
+    var key=asg.defender_id+"-"+asg.track_id;
+    assignEnts[key]=viewer.entities.add({
+      id:"a-"+key,
+      polyline:{positions:Cesium.Cartesian3.fromDegreesArrayHeights([dp[0],dp[1],dp[2],tp[0],tp[1],tp[2]]),
+        width:1.5,material:new Cesium.PolylineGlowMaterialProperty({glowPower:0.2,color:col.withAlpha(0.6)})}
     });
+  }
+}
+
+function ensureSite(site){
+  if(siteEnt||!site)return;
+  var lat=site.lat,lon=site.lon;
+  if(lat==null&&site.enu){var ll=enuToLL(site.enu[0],site.enu[1]);lat=ll.lat;lon=ll.lon;}
+  if(lat==null)return;
+  siteEnt=viewer.entities.add({
+    position:Cesium.Cartesian3.fromDegrees(lon,lat,5),
+    ellipse:{semiMajorAxis:150,semiMinorAxis:150,height:2,
+      material:Cesium.Color.WHITE.withAlpha(0.06),outline:true,
+      outlineColor:Cesium.Color.WHITE.withAlpha(0.25),outlineWidth:2},
+    label:{text:"DEFENDED SITE",font:"9px monospace",fillColor:Cesium.Color.WHITE.withAlpha(0.8),
+      showBackground:true,backgroundColor:new Cesium.Color(0,0,0,0.6),
+      pixelOffset:new Cesium.Cartesian2(0,-20),scale:0.6}
   });
 }
 
-var siteEntity = null;
-function ensureSiteMarker(site) {
-  if (siteEntity || !site || !site.lat || !site.lon) return;
-  siteEntity = viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(site.lon, site.lat, 5),
-    point: { pixelSize: 12, color: Cesium.Color.WHITE.withAlpha(0.8), outlineColor: Cesium.Color.CYAN, outlineWidth: 2 },
-    label: { text: "DEFENDED SITE", font: "9pt monospace", fillColor: Cesium.Color.CYAN.withAlpha(0.9),
-      showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.6),
-      pixelOffset: new Cesium.Cartesian2(0, -20), scale: 0.6 }
-  });
+/* ---- HUD updates ---- */
+function updateMetrics(m){
+  if(!m){document.getElementById("metrics").innerHTML="";return;}
+  var ratio=(m.cost_exchange_ratio!=null)?m.cost_exchange_ratio.toFixed(2):"--";
+  var rc=(m.cost_exchange_win===true)?"good":(m.cost_exchange_win===false)?"bad":"";
+  var iRate=(m.intercept_rate*100).toFixed(0);
+  document.getElementById("metrics").innerHTML=
+    '<span class="label">TICK</span> <span class="val">'+m.tick+'</span> <span class="label">T+</span><span class="val">'+m.sim_time_s+'s</span><br>'+
+    '<span class="label">HOSTILES</span> <span class="val">'+m.active_hostiles+'</span> <span class="label">TRACKED</span> <span class="val">'+m.tracks_held+'</span><br>'+
+    '<span class="label">LEAKERS</span> <span class="bad">'+m.leakers+'</span><br>'+
+    '<span class="label">INTERCEPTS</span> <span class="val">'+m.intercepts+'/'+m.engagements_made+' ('+iRate+'%)</span><br>'+
+    '<span class="label">COST RATIO</span> <span class="'+rc+'">'+ratio+'</span>';
+  document.getElementById("tick-label").textContent="TICK "+m.tick;
 }
 
-function updateMetricsPanel(m) {
-  if (!m) { document.getElementById("metrics-panel").innerHTML = ""; return; }
-  var ratio = m.cost_exchange_ratio !== null ? m.cost_exchange_ratio.toFixed(2) : "--";
-  var rc = m.cost_exchange_win === true ? "color:rgba(80,255,120,0.8)" :
-           m.cost_exchange_win === false ? "color:rgba(255,80,80,0.8)" : "";
-  document.getElementById("metrics-panel").innerHTML =
-    "TICK " + m.tick + " | T+" + m.sim_time_s + "s<br>" +
-    "HOSTILES: " + m.active_hostiles + " | TRACKS: " + m.tracks_held + "<br>" +
-    "LEAKERS: <span style='color:rgba(255,80,80,0.8)'>" + m.leakers + "</span><br>" +
-    "INTERCEPTS: " + m.intercepts + "/" + m.engagements_made +
-    " (" + (m.intercept_rate * 100).toFixed(0) + "%)<br>" +
-    "COST RATIO: <span style='" + rc + "'>" + ratio + "</span>";
+function addFeed(text){
+  feedLines.push(text);
+  if(feedLines.length>14)feedLines.shift();
+  document.getElementById("feed").innerHTML=feedLines.join("<br>");
 }
 
-function addEngagementLog(text) {
-  engagementLines.push(text);
-  if (engagementLines.length > 12) engagementLines.shift();
-  document.getElementById("engagement-log").innerHTML = engagementLines.join("<br>");
-}
+/* ---- WebSocket ---- */
+function setDot(cls){document.getElementById("dot").className=cls;}
+function setConn(txt){document.getElementById("conn-label").textContent=txt;}
 
-function setStatus(cls) { document.getElementById("status-dot").className = cls; }
+function connect(){
+  setDot("wait");setConn("CONNECTING");
+  document.getElementById("fallback").style.display="none";
+  try{ws=new WebSocket(wsUrl);}catch(e){onFail();return;}
 
-function connect() {
-  setStatus("connecting");
-  document.getElementById("fallback-msg").style.display = "none";
-  try { ws = new WebSocket(wsUrl); } catch(e) { onFail(); return; }
-  ws.onopen = function() {
-    setStatus("ok");
-    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  ws.onopen=function(){
+    setDot("ok");setConn("CONNECTED");
+    if(reconTimer){clearTimeout(reconTimer);reconTimer=null;}
   };
-  ws.onmessage = function(ev) {
+
+  ws.onmessage=function(ev){
     var msg;
-    try { msg = JSON.parse(ev.data); } catch(e) { return; }
-    if (msg.type === "STATE_SYNC") {
-      var assets = msg.assets || msg.drones || [];
-      assets.forEach(upsertAsset);
-      document.getElementById("asset-count").textContent = assets.length;
-      document.getElementById("coord-label").textContent = msg.formation || "--";
+    try{msg=JSON.parse(ev.data);}catch(e){return;}
+
+    if(msg.type==="WARGAME_FRAME"){
+      var tracks=msg.tracks||[],defs=msg.defenders||[],asgs=msg.assignments||[];
+      knownTrackIds={};
+      for(var i=0;i<tracks.length;i++)upsertTrack(tracks[i]);
+      removeStaleTrack(knownTrackIds);
+      for(var j=0;j<defs.length;j++)upsertDefender(defs[j]);
+      drawAssignments(asgs,tracks,defs);
+      ensureSite(msg.site);
+      document.getElementById("asset-count").textContent=tracks.length+" T / "+defs.length+" D";
+      if(msg.metrics)updateMetrics(msg.metrics);
+      for(var a=0;a<asgs.length;a++){
+        if(asgs[a].status==="HIT")addFeed(asgs[a].defender_id.substring(0,8)+" -> "+asgs[a].track_id.substring(0,8)+" HIT");
+        if(asgs[a].status==="MISS")addFeed('<span style="color:#f66">'+asgs[a].defender_id.substring(0,8)+" -> "+asgs[a].track_id.substring(0,8)+" MISS</span>");
+      }
+      if(msg.done){addFeed("--- SCENARIO COMPLETE ---");setConn("COMPLETE");}
     }
-    if (msg.type === "TELEMETRY" || msg.type === "telemetry") {
-      var items = msg.assets || msg.drones || (Array.isArray(msg) ? msg : [msg]);
-      items.forEach(upsertAsset);
-      document.getElementById("asset-count").textContent = Object.keys(assetEntities).length;
-    }
-    if (msg.type === "WARGAME_FRAME") {
-      var tracks = msg.tracks || [], defenders = msg.defenders || [];
-      tracks.forEach(upsertTrack);
-      defenders.forEach(upsertDefender);
-      drawAssignments(msg.assignments || [], tracks, defenders);
-      ensureSiteMarker(msg.site);
-      document.getElementById("asset-count").textContent = tracks.length + " T / " + defenders.length + " D";
-      if (msg.metrics) updateMetricsPanel(msg.metrics);
-      (msg.assignments || []).forEach(function(a) {
-        if (a.status === "HIT") addEngagementLog(a.defender_id.substring(0,6) + " -> " + a.track_id.substring(0,8) + " HIT");
-      });
-      if (msg.done) addEngagementLog("--- SCENARIO COMPLETE ---");
-    }
-    if (msg.type === "ERROR") addEngagementLog("ERROR: " + (msg.error || "unknown"));
+    if(msg.type==="ERROR"){addFeed("ERR: "+(msg.error||"unknown"));}
   };
-  ws.onerror = function() { onFail(); };
-  ws.onclose = function() { setStatus("err"); scheduleReconnect(); };
+
+  ws.onerror=function(){onFail();};
+  ws.onclose=function(){setDot("err");setConn("DISCONNECTED");schedRecon();};
 }
 
-function onFail() {
-  setStatus("err");
-  document.getElementById("fallback-msg").style.display = "block";
-  scheduleReconnect();
+function onFail(){
+  setDot("err");setConn("DISCONNECTED");
+  document.getElementById("fallback").style.display="block";
+  schedRecon();
 }
-function scheduleReconnect() {
-  if (reconnectTimer) return;
-  reconnectTimer = setTimeout(function() { reconnectTimer = null; connect(); }, 4000);
+function schedRecon(){
+  if(reconTimer)return;
+  reconTimer=setTimeout(function(){reconTimer=null;connect();},4000);
 }
 
 connect();
