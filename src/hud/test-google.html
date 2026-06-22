@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="cesium/Cesium.js"></script>
+<link href="cesium/Widgets/widgets.css" rel="stylesheet">
+<script>window.CESIUM_BASE_URL = "cesium/";</script>
+<style>html,body,#c{margin:0;width:100%;height:100%}</style>
+</head>
+<body>
+<div id="c"></div>
+<div id="s" style="position:absolute;top:10px;left:10px;color:lime;font-family:monospace;font-size:11px;background:rgba(0,0,0,0.9);padding:8px;z-index:10;max-width:600px">Loading...</div>
+<script>
+var s = document.getElementById("s");
+s.textContent = "Cesium version: " + Cesium.VERSION + " -- Setting up...";
+
+Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlOGY0MjBhYy0zZTFlLTRkNTItOGFmNS1mYmM0ZDE1ZmYxMGYiLCJpZCI6NDQ3NDY2LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODIxMTI4MjN9.uvbJwgTognrLcj79tpt-kn46yt5S288s2hWgRBIhct8";
+
+var viewer = new Cesium.Viewer("c", {
+  timeline: false, animation: false,
+  globe: false,
+  baseLayerPicker: false, geocoder: false,
+  sceneModePicker: false, homeButton: false,
+  navigationHelpButton: false, fullscreenButton: false
+});
+
+s.textContent = "Viewer created. Trying Google Photorealistic 3D Tiles via Cesium ion...";
+
+(async function() {
+  try {
+    // Method 1: Via Cesium ion (no Google key needed)
+    var tileset = await Cesium.createGooglePhotorealistic3DTileset();
+    viewer.scene.primitives.add(tileset);
+    s.textContent = "SUCCESS! Google Photorealistic 3D Tiles loaded via Cesium ion. Flying to SF...";
+    s.style.color = "lime";
+  } catch(e1) {
+    s.textContent = "Ion method failed: " + e1.message + ". Trying Cesium ion asset 2275207...";
+    try {
+      // Method 2: Direct ion asset
+      var tileset2 = await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
+      viewer.scene.primitives.add(tileset2);
+      s.textContent = "SUCCESS via asset 2275207! Flying to SF...";
+      s.style.color = "lime";
+    } catch(e2) {
+      s.textContent = "Both methods failed. Error 1: " + e1.message + " | Error 2: " + e2.message;
+      s.style.color = "red";
+      // Fallback: use globe with OSM buildings
+      viewer.scene.globe = new Cesium.Globe();
+      try {
+        var osm = await Cesium.createOsmBuildingsAsync();
+        viewer.scene.primitives.add(osm);
+        s.textContent += " | Fallback: OSM buildings loaded.";
+      } catch(e3) {}
+    }
+  }
+
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.793, 500),
+    orientation: { heading: Cesium.Math.toRadians(20), pitch: Cesium.Math.toRadians(-25) },
+    duration: 2
+  });
+})();
+</script>
+</body>
+</html>

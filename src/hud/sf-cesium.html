@@ -2,1092 +2,231 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>OVERWATCH C2 - SF Drone Swarm</title>
+<title>OVERWATCH C2 - SF Coordinated Strike</title>
+<script>window.CESIUM_BASE_URL = "cesium/";</script>
 <script src="cesium/Cesium.js"></script>
 <link href="cesium/Widgets/widgets.css" rel="stylesheet">
-<script>window.CESIUM_BASE_URL = "cesium/";</script>
 <style>
 html,body,#c{margin:0;width:100%;height:100%;overflow:hidden}
-#hud{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;font-family:'JetBrains Mono',monospace}
-#top-bar{padding:6px 14px;font-size:8px;color:rgba(150,200,255,0.7);letter-spacing:2.5px;background:rgba(0,0,0,0.5);border-bottom:1px solid rgba(68,170,255,0.15);text-transform:uppercase}
-#tgt-panel{position:absolute;top:34px;right:10px;font-size:8px;color:rgba(150,200,255,0.6);letter-spacing:1.5px;background:rgba(0,0,0,0.5);padding:6px 10px;border:1px solid rgba(68,170,255,0.1);line-height:1.8}
+.cesium-viewer-bottom{display:none!important}
+.cesium-viewer .cesium-widget-credits{display:none!important}
+#hud{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;font-family:'JetBrains Mono','Consolas',monospace}
+#top-bar{padding:6px 14px;font-size:8px;color:rgba(150,200,255,0.7);letter-spacing:2.5px;background:rgba(0,0,0,0.55);border-bottom:1px solid rgba(68,170,255,0.15);text-transform:uppercase}
+#tgt-panel{position:absolute;top:34px;right:10px;font-size:8px;color:rgba(150,200,255,0.6);letter-spacing:1.5px;background:rgba(0,0,0,0.55);padding:6px 10px;border:1px solid rgba(68,170,255,0.1);line-height:1.8}
 .tgt-pending{color:rgba(255,80,80,0.8)}.tgt-done{color:rgba(80,255,120,0.8)}
-#engagement-log{position:absolute;bottom:80px;right:10px;font-size:7px;color:rgba(255,180,60,0.7);letter-spacing:1px;text-align:right;line-height:1.6;pointer-events:none}
-#bottom-bar{position:absolute;bottom:32px;left:0;right:0;padding:4px 14px;font-size:7px;color:rgba(150,200,255,0.4);letter-spacing:2px;background:rgba(0,0,0,0.4);border-top:1px solid rgba(68,170,255,0.08);display:flex;justify-content:space-between;text-transform:uppercase}
-#keys{position:absolute;bottom:60px;left:10px;font-size:7px;color:rgba(255,255,255,0.2);letter-spacing:1px;line-height:1.8}
-#demo-btn{position:absolute;bottom:60px;right:10px;pointer-events:all;cursor:pointer;
-  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;
-  padding:6px 18px;background:rgba(68,170,255,0.15);color:rgba(150,200,255,0.9);
-  border:1px solid rgba(68,170,255,0.4);transition:all 0.2s}
-#demo-btn:hover{background:rgba(68,170,255,0.3);border-color:rgba(68,170,255,0.7)}
-#intro-overlay{position:absolute;top:0;left:0;right:0;bottom:0;z-index:20;pointer-events:none;
-  display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.8s}
-#intro-overlay.visible{opacity:1}
-#intro-text{font-family:'JetBrains Mono',monospace;font-size:14px;color:rgba(150,200,255,0.9);
-  letter-spacing:6px;text-transform:uppercase;text-shadow:0 0 20px rgba(68,170,255,0.4)}
+#bottom-bar{position:fixed;bottom:26px;left:0;right:0;padding:4px 14px;font-size:7px;color:rgba(150,200,255,0.4);letter-spacing:2px;background:rgba(0,0,0,0.45);border-top:1px solid rgba(68,170,255,0.08);display:flex;justify-content:space-between;text-transform:uppercase;z-index:10}
+#keys{position:absolute;top:34px;left:10px;font-size:7px;color:rgba(255,255,255,0.2);letter-spacing:1px;line-height:1.8}
 </style>
 </head>
 <body>
 <div id="c"></div>
 <div id="hud">
-  <div id="top-bar">OVERWATCH C2 | <select id="scenario-select" style="pointer-events:auto;background:rgba(0,0,0,0.6);color:rgba(150,200,255,0.7);border:1px solid rgba(68,170,255,0.2);font-family:inherit;font-size:7px;letter-spacing:1px;padding:2px 6px"><option value="strike">COORDINATED STRIKE</option><option value="recon">ISR RECONNAISSANCE</option><option value="swarm">SATURATION SWARM</option><option value="escort">VIP ESCORT</option></select> | BFT: <span id="bft-count">24</span> ASSETS | ACTIVE: <span id="active">0</span> | <span id="tgt-label">TARGETS: 4</span> | <span id="status-label">NEUTRALIZED: <span id="neutral">0</span></span></div>
+  <div id="top-bar">OVERWATCH C2 | COORDINATED STRIKE | BFT: 24 ASSETS | ACTIVE: <span id="active">0</span> | TARGETS: 4 | NEUTRALIZED: <span id="neutral">0</span></div>
   <div id="tgt-panel"></div>
-  <div id="bottom-bar"><span>37.7897N 122.3972W</span><span id="speed-display">1X</span><span>UNCLASSIFIED // FOUO</span></div>
-  <div id="engagement-log"></div>
-  <div id="keys">SPACE: pause | 1-5: speed | R: reset | D: demo | click drone: track</div>
-  <button id="demo-btn">DEMO</button>
+  <div id="keys">SPACE: pause | 1-5: speed | R: reset | click drone: track</div>
 </div>
-<div id="intro-overlay"><div id="intro-text"></div></div>
+<div id="bottom-bar"><span>37.7897N 122.3972W</span><span id="speed-display">1X</span><span>UNCLASSIFIED // FOUO</span></div>
 
 <script>
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlOGY0MjBhYy0zZTFlLTRkNTItOGFmNS1mYmM0ZDE1ZmYxMGYiLCJpZCI6NDQ3NDY2LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODIxMTI4MjN9.uvbJwgTognrLcj79tpt-kn46yt5S288s2hWgRBIhct8";
 
 var viewer = new Cesium.Viewer("c", {
-  timeline: true, animation: true, shouldAnimate: false,
-  homeButton: false, sceneModePicker: false, baseLayerPicker: false,
-  navigationHelpButton: false, geocoder: false, fullscreenButton: false
+  timeline: true, animation: true, shouldAnimate: false, globe: false,
+  baseLayerPicker: false, geocoder: false, sceneModePicker: false,
+  homeButton: false, navigationHelpButton: false, fullscreenButton: false,
+  infoBox: false, selectionIndicator: false
 });
 
-Cesium.createWorldTerrainAsync().then(function(terrain) {
-  viewer.scene.terrainProvider = terrain;
+(async function() {
+  try {
+    viewer.scene.primitives.add(await Cesium.createGooglePhotorealistic3DTileset());
+  } catch(e) {
+    viewer.scene.globe = new Cesium.Globe();
+    try { viewer.scene.primitives.add(await Cesium.createOsmBuildingsAsync()); } catch(e2) {}
+  }
+})();
+
+var LAUNCH = { lon: -122.3948, lat: 37.7878 };
+var TARGETS = [
+  { name: "EMBARCADERO", lon: -122.3936, lat: 37.7956, alt: 80 },
+  { name: "PIER 39",     lon: -122.4093, lat: 37.8087, alt: 40 },
+  { name: "SALESFORCE",  lon: -122.3972, lat: 37.7897, alt: 300 },
+  { name: "GHIRARDELLI", lon: -122.4194, lat: 37.8080, alt: 80 }
+];
+var TOTAL = 24, PER_TGT = 6;
+var COLORS = [Cesium.Color.CYAN, Cesium.Color.ORANGE, Cesium.Color.HOTPINK, Cesium.Color.LIME];
+var MKT = { lon: -122.400, lat: 37.790 };
+var startTime = Cesium.JulianDate.fromIso8601("2026-06-22T00:00:00Z");
+var stopTime = Cesium.JulianDate.addSeconds(startTime, 240, new Cesium.JulianDate());
+var arrivals = [], exploded = new Array(TOTAL).fill(false);
+var bdaShown = new Array(TARGETS.length).fill(false), missionDone = false;
+
+viewer.clock.startTime = startTime.clone();
+viewer.clock.stopTime = stopTime.clone();
+viewer.clock.currentTime = startTime.clone();
+viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
+viewer.clock.multiplier = 1;
+viewer.timeline.zoomTo(startTime, stopTime);
+
+function buildPath(tgt, di, ti) {
+  var dx = tgt.lon - LAUNCH.lon, dy = tgt.lat - LAUNCH.lat;
+  var d = Math.sqrt(dx * dx + dy * dy), px = -dy / d, py = dx / d;
+  var cAlt = 35 + ti * 7 + di * 2, fLat = 0, fBeh = 0;
+  if (di > 0) {
+    var side = (di % 2 === 1) ? 1 : -1, rank = Math.ceil(di / 2);
+    fLat = side * rank * 50; fBeh = rank * 30;
+  }
+  var fLon1 = (fLat / 85000) * px, fLat1 = (fLat / 111000) * py;
+  var bLon1 = -(fBeh / 85000) * (dx / d), bLat1 = -(fBeh / 111000) * (dy / d);
+  var lOff = (di - 2.5) * 0.0002, aAng = (di / PER_TGT) * Math.PI * 2;
+  var aLon = Math.cos(aAng) * 0.0012, aLat = Math.sin(aAng) * 0.0012 * 0.77;
+  var pts = [], steps = 20;
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps, bias = Math.sin(t * Math.PI) * 0.15;
+    var lon = (LAUNCH.lon + dx * t) * (1 - bias) + MKT.lon * bias;
+    var lat = (LAUNCH.lat + dy * t) * (1 - bias) + MKT.lat * bias;
+    var lB = 0, fB = 0, aB = 0;
+    if (t <= 0.15) lB = 1;
+    else if (t <= 0.20) { var p = (t - 0.15) / 0.05; lB = 1 - p; fB = p; }
+    else if (t <= 0.65) fB = 1;
+    else if (t <= 0.70) { var p2 = (t - 0.65) / 0.05; fB = 1 - p2; aB = p2; }
+    else aB = 1;
+    lon += lB * lOff * px + fB * (fLon1 + bLon1) + aB * aLon;
+    lat += lB * lOff * py + fB * (fLat1 + bLat1) + aB * aLat;
+    var alt = t < 0.12 ? 5 + cAlt * (t / 0.12)
+            : t > 0.85 ? cAlt + (tgt.alt - cAlt) * ((t - 0.85) / 0.15)
+            : cAlt + Math.sin(t * Math.PI * 2) * 2;
+    pts.push({ lon: lon, lat: lat, alt: alt });
+  }
+  pts[0] = { lon: LAUNCH.lon + lOff * 0.3, lat: LAUNCH.lat + lOff * 0.3, alt: 5 };
+  pts[pts.length - 1] = { lon: tgt.lon, lat: tgt.lat, alt: tgt.alt };
+  return pts;
+}
+
+// Target markers
+for (var ti = 0; ti < TARGETS.length; ti++) {
+  var tg = TARGETS[ti];
+  viewer.entities.add({
+    id: "tgt-" + ti,
+    position: Cesium.Cartesian3.fromDegrees(tg.lon, tg.lat, tg.alt + 5),
+    point: { pixelSize: 10, color: Cesium.Color.RED.withAlpha(0.85), outlineColor: Cesium.Color.WHITE, outlineWidth: 1 },
+    label: { text: tg.name, font: "10pt monospace", fillColor: Cesium.Color.RED.withAlpha(0.8),
+      showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.6),
+      pixelOffset: new Cesium.Cartesian2(0,-20), scale: 0.7, disableDepthTestDistance: Number.POSITIVE_INFINITY }
+  });
+}
+
+// Launch marker
+viewer.entities.add({
+  position: Cesium.Cartesian3.fromDegrees(LAUNCH.lon, LAUNCH.lat, 3),
+  point: { pixelSize: 8, color: Cesium.Color.WHITE.withAlpha(0.8) },
+  label: { text: "LAUNCH / VAN-01", font: "8pt monospace", fillColor: Cesium.Color.WHITE.withAlpha(0.6),
+    showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.5),
+    pixelOffset: new Cesium.Cartesian2(0,-16), scale: 0.5, disableDepthTestDistance: Number.POSITIVE_INFINITY }
 });
 
-Cesium.createOsmBuildingsAsync().then(function(tileset) {
-  viewer.scene.primitives.add(tileset);
-}).catch(function() { /* OSM buildings unavailable */ });
-
-// ==================================================================
-// SHARED STATE
-// ==================================================================
-var startTime, stopTime;
-var currentScenario = "strike";
-var scenarioState = {};
-var introRunning = false;
-var missionCompleteShown = false;
-var missionCompleteEntity = null;
-
-var METERS_PER_DEG_LAT = 111320;
-var METERS_PER_DEG_LON = METERS_PER_DEG_LAT * Math.cos(37.79 * Math.PI / 180);
-
-// ==================================================================
-// ENGAGEMENT EFFECTS (shared)
-// ==================================================================
-var flashCanvas = document.createElement("canvas");
-flashCanvas.width = 64; flashCanvas.height = 64;
-var fctx = flashCanvas.getContext("2d");
-var grad = fctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-grad.addColorStop(0, "rgba(255,255,255,1)");
-grad.addColorStop(0.4, "rgba(255,255,255,0.8)");
-grad.addColorStop(1, "rgba(255,255,255,0)");
-fctx.fillStyle = grad;
-fctx.fillRect(0, 0, 64, 64);
-var flashImageUrl = flashCanvas.toDataURL();
-
-function triggerExplosion(position) {
-  var effectStart = Cesium.JulianDate.clone(viewer.clock.currentTime);
-  var fireballEntity = viewer.entities.add({
-    position: position,
-    point: {
-      pixelSize: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, effectStart);
-        if (dt < 0 || dt > 2.0) return 0;
-        var t = dt / 2.0;
-        return t < 0.3 ? 5 + 25 * (t / 0.3) : 30 * (1 - (t - 0.3) / 0.7);
-      }, false),
-      color: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, effectStart);
-        if (dt < 0 || dt > 2.0) return Cesium.Color.TRANSPARENT;
-        return new Cesium.Color(1.0, 0.55, 0.0, 1 - dt / 2.0);
-      }, false),
-      disableDepthTestDistance: Number.POSITIVE_INFINITY
+// Create 24 drones
+for (var ti = 0; ti < TARGETS.length; ti++) {
+  for (var di = 0; di < PER_TGT; di++) {
+    var idx = ti * PER_TGT + di, lbl = "D-" + String(idx + 1).padStart(2, "0");
+    var delay = idx * 2, pts = buildPath(TARGETS[ti], di, ti);
+    var dist = 0;
+    for (var pi = 1; pi < pts.length; pi++) {
+      var ddx = (pts[pi].lon - pts[pi-1].lon) * 85000, ddy = (pts[pi].lat - pts[pi-1].lat) * 111000;
+      dist += Math.sqrt(ddx * ddx + ddy * ddy);
     }
-  });
-  var flashEntity = viewer.entities.add({
-    position: position,
-    billboard: {
-      image: flashImageUrl,
-      width: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, effectStart);
-        if (dt < 0 || dt > 0.5) return 0;
-        return 60 + 40 * (dt / 0.5);
-      }, false),
-      height: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, effectStart);
-        if (dt < 0 || dt > 0.5) return 0;
-        return 60 + 40 * (dt / 0.5);
-      }, false),
-      color: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, effectStart);
-        if (dt < 0 || dt > 0.5) return Cesium.Color.TRANSPARENT;
-        return Cesium.Color.WHITE.withAlpha(1 - dt / 0.5);
-      }, false),
-      disableDepthTestDistance: Number.POSITIVE_INFINITY
+    var dur = Math.max(50, Math.min(110, dist / 14));
+    arrivals.push({ ti: ti, arrival: delay + dur });
+    var pos = new Cesium.SampledPositionProperty();
+    for (var si = 0; si < pts.length; si++) {
+      var st = Cesium.JulianDate.addSeconds(startTime, delay + (si / (pts.length - 1)) * dur, new Cesium.JulianDate());
+      pos.addSample(st, Cesium.Cartesian3.fromDegrees(pts[si].lon, pts[si].lat, pts[si].alt));
     }
-  });
-  var shockCarto = Cesium.Cartographic.fromCartesian(position);
-  var groundPos = Cesium.Cartesian3.fromRadians(shockCarto.longitude, shockCarto.latitude, 1);
-  var shockEntity = viewer.entities.add({
-    position: groundPos,
-    ellipse: {
-      semiMajorAxis: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, effectStart);
-        if (dt < 0 || dt > 1.5) return 0;
-        return 10 + 190 * (dt / 1.5);
-      }, false),
-      semiMinorAxis: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, effectStart);
-        if (dt < 0 || dt > 1.5) return 0;
-        return 10 + 190 * (dt / 1.5);
-      }, false),
-      material: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, effectStart);
-        if (dt < 0 || dt > 1.5) return Cesium.Color.TRANSPARENT;
-        return new Cesium.Color(1.0, 0.6, 0.1, 0.6 * (1 - dt / 1.5));
-      }, false),
-      height: 1,
-      outline: true,
-      outlineColor: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, effectStart);
-        if (dt < 0 || dt > 1.5) return Cesium.Color.TRANSPARENT;
-        return Cesium.Color.ORANGE.withAlpha(0.8 * (1 - dt / 1.5));
-      }, false),
-      outlineWidth: 2
-    }
-  });
-  setTimeout(function() {
-    viewer.entities.remove(fireballEntity);
-    viewer.entities.remove(flashEntity);
-    viewer.entities.remove(shockEntity);
-  }, 3000);
-}
-
-function triggerBDA(tgt) {
-  var bdaStart = Cesium.JulianDate.clone(viewer.clock.currentTime);
-  var bdaEntity = viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(tgt.lon, tgt.lat, tgt.alt + 25),
-    label: {
-      text: "BDA: TARGET NEUTRALIZED",
-      font: "bold 11pt monospace",
-      fillColor: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, bdaStart);
-        if (dt < 0 || dt > 5.0) return Cesium.Color.TRANSPARENT;
-        var alpha = dt > 4.0 ? (5.0 - dt) : 1.0;
-        return new Cesium.Color(0.2, 1.0, 0.3, alpha);
-      }, false),
-      showBackground: true,
-      backgroundColor: new Cesium.CallbackProperty(function() {
-        var dt = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, bdaStart);
-        if (dt < 0 || dt > 5.0) return Cesium.Color.TRANSPARENT;
-        var alpha = dt > 4.0 ? 0.6 * (5.0 - dt) : 0.6;
-        return new Cesium.Color(0, 0, 0, alpha);
-      }, false),
-      pixelOffset: new Cesium.Cartesian2(0, -40),
-      scale: 0.8,
-      horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-      disableDepthTestDistance: Number.POSITIVE_INFINITY
-    }
-  });
-  setTimeout(function() { viewer.entities.remove(bdaEntity); }, 7000);
-}
-
-// ==================================================================
-// SHARED HELPERS
-// ==================================================================
-function resetClock() {
-  viewer.clock.startTime = startTime.clone();
-  viewer.clock.stopTime = stopTime.clone();
-  viewer.clock.currentTime = startTime.clone();
-  viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
-  viewer.clock.multiplier = 1;
-  viewer.clock.shouldAnimate = false;
-  viewer.timeline.zoomTo(startTime, stopTime);
-}
-
-function addDroneEntity(id, label, droneStart, droneEnd, positionProperty, trailColor, trailTime) {
-  viewer.entities.add({
-    id: id, name: label,
-    availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({ start: droneStart, stop: droneEnd })]),
-    position: positionProperty,
-    orientation: new Cesium.VelocityOrientationProperty(positionProperty),
-    model: {
-      uri: "models/CesiumDrone.glb", minimumPixelSize: 48, scale: 4.0,
-      color: trailColor.withAlpha(0.9),
-      colorBlendMode: Cesium.ColorBlendMode.MIX, colorBlendAmount: 0.3
-    },
-    path: {
-      resolution: 1,
-      material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.15, color: trailColor.withAlpha(0.5) }),
-      width: 2.5, leadTime: 0, trailTime: trailTime
-    },
-    label: {
-      text: label, font: "9pt monospace",
-      fillColor: Cesium.Color.WHITE.withAlpha(0.7),
-      showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.5),
-      pixelOffset: new Cesium.Cartesian2(0, -28), scale: 0.55,
-      distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3000)
-    }
-  });
-}
-
-function addCompassRose(center) {
-  var compassOffsetM = 1000;
-  var dirs = [
-    { label: "N", dLat:  compassOffsetM / METERS_PER_DEG_LAT, dLon: 0 },
-    { label: "S", dLat: -compassOffsetM / METERS_PER_DEG_LAT, dLon: 0 },
-    { label: "E", dLat: 0, dLon:  compassOffsetM / METERS_PER_DEG_LON },
-    { label: "W", dLat: 0, dLon: -compassOffsetM / METERS_PER_DEG_LON }
-  ];
-  for (var ci = 0; ci < dirs.length; ci++) {
-    var cd = dirs[ci];
+    pos.setInterpolationOptions({ interpolationDegree: 3, interpolationAlgorithm: Cesium.HermitePolynomialApproximation });
+    var ds = Cesium.JulianDate.addSeconds(startTime, delay, new Cesium.JulianDate()), c = COLORS[ti];
     viewer.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(center.lon + cd.dLon, center.lat + cd.dLat, 20),
-      label: {
-        text: cd.label, font: "bold 14pt monospace",
-        fillColor: Cesium.Color.WHITE.withAlpha(0.10),
-        style: Cesium.LabelStyle.FILL,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+      id: "drone-" + idx, name: lbl,
+      availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({ start: ds, stop: stopTime })]),
+      position: pos, orientation: new Cesium.VelocityOrientationProperty(pos),
+      model: { uri: "models/CesiumDrone.glb", minimumPixelSize: 80, scale: 8.0,
+        color: c.withAlpha(0.9), colorBlendMode: Cesium.ColorBlendMode.MIX, colorBlendAmount: 0.3 },
+      path: { resolution: 1, width: 2.5, leadTime: 0, trailTime: 25,
+        material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.15, color: c.withAlpha(0.5) }) },
+      label: { text: lbl, font: "9pt monospace", fillColor: Cesium.Color.WHITE.withAlpha(0.7),
+        showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.5),
+        pixelOffset: new Cesium.Cartesian2(0,-28), scale: 0.55,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3000),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY }
     });
   }
 }
 
-function addRangeRings(center, radii) {
-  for (var ri = 0; ri < radii.length; ri++) {
-    viewer.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(center.lon, center.lat, 1),
-      ellipse: {
-        semiMajorAxis: radii[ri], semiMinorAxis: radii[ri],
-        fill: false, outline: true,
-        outlineColor: Cesium.Color.WHITE.withAlpha(0.15),
-        outlineWidth: 1.5, height: 1
-      }
-    });
-  }
-}
-
-function clearScenario() {
-  viewer.trackedEntity = undefined;
-  viewer.entities.removeAll();
-  missionCompleteShown = false;
-  missionCompleteEntity = null;
-  document.getElementById("tgt-panel").innerHTML = "";
-  document.getElementById("engagement-log").innerHTML = "";
-  hideIntroText();
-}
-
-// ==================================================================
-// INTRO OVERLAY
-// ==================================================================
-function showIntroText(text) {
-  var overlay = document.getElementById("intro-overlay");
-  var textEl = document.getElementById("intro-text");
-  textEl.textContent = text;
-  overlay.classList.add("visible");
-}
-
-function hideIntroText() {
-  document.getElementById("intro-overlay").classList.remove("visible");
-}
-
-// ==================================================================
-// MISSION COMPLETE (strike/swarm only)
-// ==================================================================
-function showMissionComplete() {
-  if (missionCompleteShown) return;
-  missionCompleteShown = true;
-  viewer.trackedEntity = undefined;
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.798, 2500),
-    orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-55), roll: 0 },
-    duration: 3
-  });
-  missionCompleteEntity = viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(-122.400, 37.798, 800),
-    label: {
-      text: "MISSION COMPLETE",
-      font: "bold 28pt monospace",
-      fillColor: Cesium.Color.fromCssColorString("rgba(80,255,120,0.95)"),
-      outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
-      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-      showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
-      backgroundPadding: new Cesium.Cartesian2(20, 12),
-      horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-      verticalOrigin: Cesium.VerticalOrigin.CENTER,
-      disableDepthTestDistance: Number.POSITIVE_INFINITY, scale: 1.0
-    }
-  });
-}
-
-// ==================================================================
-// CINEMATIC INTRO (strike scenario only)
-// ==================================================================
-function runCinematicIntro() {
-  if (currentScenario !== "strike") return;
-  var st = scenarioState;
-  introRunning = true;
-  viewer.clock.shouldAnimate = false;
-  viewer.clock.currentTime = startTime.clone();
-  viewer.trackedEntity = undefined;
-  missionCompleteShown = false;
-  if (missionCompleteEntity) {
-    viewer.entities.remove(missionCompleteEntity);
-    missionCompleteEntity = null;
-  }
-  if (st.droneExploded) {
-    for (var ri = 0; ri < st.total; ri++) st.droneExploded[ri] = false;
-    for (var rb = 0; rb < st.targets.length; rb++) st.bdaShown[rb] = false;
-  }
-
-  showIntroText("OVERWATCH C2");
-
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(-122.40, 37.75, 800000),
-    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
-    duration: 0
-  });
-
-  setTimeout(function() {
-    showIntroText("SAN FRANCISCO AO");
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(-122.395, 37.793, 8000),
-      orientation: { heading: Cesium.Math.toRadians(30), pitch: Cesium.Math.toRadians(-45), roll: 0 },
-      duration: 3
-    });
-  }, 200);
-
-  setTimeout(function() {
-    showIntroText("FINANCIAL DISTRICT // 4 TARGETS");
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(-122.405, 37.798, 400),
-      orientation: { heading: Cesium.Math.toRadians(160), pitch: Cesium.Math.toRadians(-18), roll: 0 },
-      duration: 3
-    });
-  }, 3200);
-
-  var launchLon = st.launch.lon, launchLat = st.launch.lat;
-  setTimeout(function() {
-    showIntroText("LAUNCH POINT // VAN-01");
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(launchLon + 0.002, launchLat - 0.001, 100),
-      orientation: { heading: Cesium.Math.toRadians(340), pitch: Cesium.Math.toRadians(-20), roll: 0 },
-      duration: 2
-    });
-  }, 6200);
-
-  setTimeout(function() {
-    showIntroText("DEPLOYING " + st.total + " ASSETS");
-    setTimeout(hideIntroText, 1500);
-    viewer.clock.shouldAnimate = true;
-    introRunning = false;
-    setTimeout(function() {
-      var d0 = viewer.entities.getById("drone-0");
-      if (d0) viewer.trackedEntity = d0;
-      setTimeout(function() {
-        viewer.trackedEntity = undefined;
-        viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.793, 600),
-          orientation: { heading: Cesium.Math.toRadians(20), pitch: Cesium.Math.toRadians(-25), roll: 0 },
-          duration: 2
-        });
-      }, 8000);
-    }, 2000);
-  }, 8200);
-}
-
-// ==================================================================
-// SCENARIO: COORDINATED STRIKE
-// ==================================================================
-function loadStrike() {
-  var LAUNCH = { lon: -122.3948, lat: 37.7878 };
-  var TARGETS = [
-    { name: "EMBARCADERO", lon: -122.3936, lat: 37.7956, alt: 80 },
-    { name: "PIER 39",     lon: -122.4093, lat: 37.8087, alt: 40 },
-    { name: "SALESFORCE",  lon: -122.3972, lat: 37.7897, alt: 300 },
-    { name: "GHIRARDELLI", lon: -122.4194, lat: 37.8080, alt: 80 }
-  ];
-  var TOTAL = 24, PER_TGT = 6;
-  var TRAIL_COLORS = [Cesium.Color.CYAN, Cesium.Color.ORANGE, Cesium.Color.HOTPINK, Cesium.Color.LIME];
-
-  startTime = Cesium.JulianDate.fromIso8601("2026-06-22T00:00:00Z");
-  stopTime = Cesium.JulianDate.addSeconds(startTime, 240, new Cesium.JulianDate());
-  resetClock();
-
-  var droneArrivals = [];
-
-  // Formation path builder: V-formation cruise, fan attack approach
-  function buildFormationPath(tgt, droneIdx, tgtIdx) {
-    var dx = tgt.lon - LAUNCH.lon, dy = tgt.lat - LAUNCH.lat;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    var perpX = -dy / dist, perpY = dx / dist;
-    var cruiseAlt = 35 + (tgtIdx * 7) + (droneIdx * 2);
-    var steps = 20;
-    var isLeader = (droneIdx === 0);
-    var formLateral = 0, formBehind = 0;
-    if (!isLeader) {
-      var wing = droneIdx;
-      var side = (wing % 2 === 1) ? 1 : -1;
-      var rank = Math.ceil(wing / 2);
-      formLateral = side * rank * 50;
-      formBehind = rank * 30;
-    }
-    var lateralDegLon = (formLateral / 85000) * perpX;
-    var lateralDegLat = (formLateral / 111000) * perpY;
-    var behindDegLon = -(formBehind / 85000) * (dx / dist);
-    var behindDegLat = -(formBehind / 111000) * (dy / dist);
-    var launchOffset = (droneIdx - 2.5) * 0.0002;
-    var attackAngle = (droneIdx / PER_TGT) * Math.PI * 2;
-    var attackRadius = 0.0012;
-    var attackOffLon = Math.cos(attackAngle) * attackRadius;
-    var attackOffLat = Math.sin(attackAngle) * attackRadius * 0.77;
-    var pts = [];
-    for (var i = 0; i <= steps; i++) {
-      var t = i / steps;
-      var bias = Math.sin(t * Math.PI) * 0.15;
-      var marketLon = -122.400, marketLat = 37.790;
-      var bLon = LAUNCH.lon + dx * t, bLat = LAUNCH.lat + dy * t;
-      var lon = bLon * (1 - bias) + marketLon * bias;
-      var lat = bLat * (1 - bias) + marketLat * bias;
-      var launchBlend = 0, formBlend = 0, attackBlend = 0;
-      if (t <= 0.15) { launchBlend = 1.0; }
-      else if (t <= 0.20) { var p = (t - 0.15) / 0.05; launchBlend = 1 - p; formBlend = p; }
-      else if (t <= 0.65) { formBlend = 1.0; }
-      else if (t <= 0.70) { var p2 = (t - 0.65) / 0.05; formBlend = 1 - p2; attackBlend = p2; }
-      else { attackBlend = 1.0; }
-      var finalLon = lon + launchBlend * launchOffset * perpX + formBlend * (lateralDegLon + behindDegLon) + attackBlend * attackOffLon;
-      var finalLat = lat + launchBlend * launchOffset * perpY + formBlend * (lateralDegLat + behindDegLat) + attackBlend * attackOffLat;
-      var alt;
-      if (t < 0.12) alt = 5 + cruiseAlt * (t / 0.12);
-      else if (t > 0.85) alt = cruiseAlt + (tgt.alt - cruiseAlt) * ((t - 0.85) / 0.15);
-      else alt = cruiseAlt + Math.sin(t * Math.PI * 2) * 2;
-      pts.push({ lon: finalLon, lat: finalLat, alt: alt });
-    }
-    pts[0] = { lon: LAUNCH.lon + launchOffset * 0.3, lat: LAUNCH.lat + launchOffset * 0.3, alt: 5 };
-    pts[pts.length - 1] = { lon: tgt.lon, lat: tgt.lat, alt: tgt.alt };
-    return pts;
-  }
-
-  for (var ti = 0; ti < TARGETS.length; ti++) {
-    var tgt = TARGETS[ti];
-    viewer.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(tgt.lon, tgt.lat, tgt.alt + 5),
-      point: { pixelSize: 10, color: Cesium.Color.RED.withAlpha(0.85), outlineColor: Cesium.Color.WHITE, outlineWidth: 1 },
-      label: {
-        text: tgt.name, font: "10pt monospace",
-        fillColor: Cesium.Color.fromAlpha(Cesium.Color.RED, 0.8),
-        showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.6),
-        pixelOffset: new Cesium.Cartesian2(0, -20), scale: 0.7
-      }
-    });
-    // Threat engagement zone
-    viewer.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(tgt.lon, tgt.lat, tgt.alt / 2),
-      cylinder: {
-        length: tgt.alt, topRadius: 200, bottomRadius: 200,
-        material: Cesium.Color.RED.withAlpha(0.08),
-        outline: true, outlineColor: Cesium.Color.RED.withAlpha(0.12), outlineWidth: 1
-      }
-    });
-    for (var di = 0; di < PER_TGT; di++) {
-      var idx = ti * PER_TGT + di;
-      var label = "D-" + String(idx + 1).padStart(2, "0");
-      var launchDelay = idx * 2;
-      var pts = buildFormationPath(tgt, di, ti);
-      var flightDist = 0;
-      for (var pi = 1; pi < pts.length; pi++) {
-        var ddx = (pts[pi].lon - pts[pi-1].lon) * 85000;
-        var ddy = (pts[pi].lat - pts[pi-1].lat) * 111000;
-        flightDist += Math.sqrt(ddx * ddx + ddy * ddy);
-      }
-      var flightDur = Math.max(50, Math.min(110, flightDist / 14));
-      var totalDur = launchDelay + flightDur;
-      droneArrivals.push({ ti: ti, arrival: totalDur });
-      var positionProperty = new Cesium.SampledPositionProperty();
-      for (var si = 0; si < pts.length; si++) {
-        var sampleTime = Cesium.JulianDate.addSeconds(startTime, launchDelay + (si / (pts.length - 1)) * flightDur, new Cesium.JulianDate());
-        positionProperty.addSample(sampleTime, Cesium.Cartesian3.fromDegrees(pts[si].lon, pts[si].lat, pts[si].alt));
-      }
-      positionProperty.setInterpolationOptions({ interpolationDegree: 3, interpolationAlgorithm: Cesium.HermitePolynomialApproximation });
-      var droneStart = Cesium.JulianDate.addSeconds(startTime, launchDelay, new Cesium.JulianDate());
-      addDroneEntity("drone-" + idx, label, droneStart, stopTime, positionProperty, TRAIL_COLORS[ti], 25);
-    }
-  }
-
-  // Assignment lines: dashed polylines from drone to target (first 50% of flight)
-  for (var ali = 0; ali < TOTAL; ali++) {
-    (function(droneIdx) {
-      var tgtIdx = Math.floor(droneIdx / PER_TGT);
-      var atgt = TARGETS[tgtIdx];
-      var aLaunchDelay = droneIdx * 2;
-      var aArrival = droneArrivals[droneIdx].arrival;
-      var halfTime = aLaunchDelay + (aArrival - aLaunchDelay) * 0.5;
-      var droneEntity = viewer.entities.getById("drone-" + droneIdx);
-      if (!droneEntity) return;
-      viewer.entities.add({
-        polyline: {
-          positions: new Cesium.CallbackProperty(function() {
-            var el = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, startTime);
-            if (el < aLaunchDelay || el > halfTime) return [];
-            var dronePos = droneEntity.position.getValue(viewer.clock.currentTime);
-            var tgtPos = Cesium.Cartesian3.fromDegrees(atgt.lon, atgt.lat, atgt.alt);
-            if (!dronePos) return [];
-            return [dronePos, tgtPos];
-          }, false),
-          width: 1,
-          material: new Cesium.PolylineDashMaterialProperty({
-            color: Cesium.Color.WHITE.withAlpha(0.12), dashLength: 12, dashPattern: 255
-          })
-        }
-      });
-    })(ali);
-  }
-
-  // Launch marker
-  viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(LAUNCH.lon, LAUNCH.lat, 3),
-    point: { pixelSize: 8, color: Cesium.Color.WHITE.withAlpha(0.8) },
-    label: {
-      text: "LAUNCH / VAN-01", font: "8pt monospace",
-      fillColor: Cesium.Color.WHITE.withAlpha(0.6),
-      showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.5),
-      pixelOffset: new Cesium.Cartesian2(0, -16), scale: 0.5
-    }
-  });
-
-  addRangeRings(LAUNCH, [500, 1000]);
-  addCompassRose({ lon: -122.400, lat: 37.793 });
-
-  var droneExploded = new Array(TOTAL);
-  for (var ei = 0; ei < TOTAL; ei++) droneExploded[ei] = false;
-  var bdaShown = new Array(TARGETS.length);
-  for (var bsi = 0; bsi < TARGETS.length; bsi++) bdaShown[bsi] = false;
-
-  scenarioState = {
-    type: "strike", total: TOTAL, perTgt: PER_TGT, targets: TARGETS, launch: LAUNCH,
-    arrivals: droneArrivals, droneExploded: droneExploded, bdaShown: bdaShown
-  };
-  document.getElementById("bft-count").textContent = TOTAL;
-  document.getElementById("tgt-label").textContent = "TARGETS: " + TARGETS.length;
-  document.getElementById("status-label").innerHTML = 'NEUTRALIZED: <span id="neutral">0</span>';
-}
-
-// ==================================================================
-// SCENARIO: ISR RECONNAISSANCE
-// ==================================================================
-function loadRecon() {
-  var ORBITS = [
-    { name: "FINANCIAL-1", center: { lon: -122.3990, lat: 37.7920 }, radius: 200, alt: 120 },
-    { name: "FINANCIAL-2", center: { lon: -122.3990, lat: 37.7920 }, radius: 200, alt: 140 },
-    { name: "N-BEACH-1",   center: { lon: -122.4080, lat: 37.8020 }, radius: 400, alt: 160 },
-    { name: "N-BEACH-2",   center: { lon: -122.4080, lat: 37.8020 }, radius: 400, alt: 180 },
-    { name: "MISSION-1",   center: { lon: -122.4180, lat: 37.7630 }, radius: 600, alt: 200 },
-    { name: "MISSION-2",   center: { lon: -122.4180, lat: 37.7630 }, radius: 600, alt: 220 },
-    { name: "MARINA-1",    center: { lon: -122.4370, lat: 37.8030 }, radius: 400, alt: 150 },
-    { name: "MARINA-2",    center: { lon: -122.4370, lat: 37.8030 }, radius: 400, alt: 170 }
-  ];
-  var TOTAL = 8;
-  var SIM_DUR = 600;
-  var SAMPLES = 120;
-
-  startTime = Cesium.JulianDate.fromIso8601("2026-06-22T00:00:00Z");
-  stopTime = Cesium.JulianDate.addSeconds(startTime, SIM_DUR, new Cesium.JulianDate());
-  resetClock();
-
-  for (var oi = 0; oi < ORBITS.length; oi++) {
-    var orb = ORBITS[oi];
-    var label = "R-" + String(oi + 1).padStart(2, "0");
-    var orbitPeriod = 60 + (orb.radius / 100) * 20;
-    var angleOffset = (oi % 2) * Math.PI;
-
-    // Area label and orbit ring (one per pair)
-    if (oi % 2 === 0) {
-      var areaName = orb.name.replace(/-\d$/, "");
-      viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(orb.center.lon, orb.center.lat, orb.alt - 30),
-        label: {
-          text: areaName + " AO", font: "9pt monospace",
-          fillColor: Cesium.Color.CYAN.withAlpha(0.5),
-          showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.4),
-          pixelOffset: new Cesium.Cartesian2(0, 0), scale: 0.6
-        }
-      });
-      viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(orb.center.lon, orb.center.lat, orb.alt),
-        ellipse: {
-          semiMajorAxis: orb.radius, semiMinorAxis: orb.radius,
-          fill: false, outline: true,
-          outlineColor: Cesium.Color.CYAN.withAlpha(0.15),
-          outlineWidth: 1.5, height: orb.alt
-        }
-      });
-    }
-
-    var positionProperty = new Cesium.SampledPositionProperty();
-    for (var si = 0; si <= SAMPLES; si++) {
-      var t = si / SAMPLES;
-      var elapsed = t * SIM_DUR;
-      var angle = angleOffset + (elapsed / orbitPeriod) * 2 * Math.PI;
-      var lon = orb.center.lon + (Math.cos(angle) * orb.radius) / METERS_PER_DEG_LON;
-      var lat = orb.center.lat + (Math.sin(angle) * orb.radius) / METERS_PER_DEG_LAT;
-      var alt = orb.alt + Math.sin(elapsed * 0.02) * 5;
-      var sampleTime = Cesium.JulianDate.addSeconds(startTime, elapsed, new Cesium.JulianDate());
-      positionProperty.addSample(sampleTime, Cesium.Cartesian3.fromDegrees(lon, lat, alt));
-    }
-    positionProperty.setInterpolationOptions({ interpolationDegree: 3, interpolationAlgorithm: Cesium.HermitePolynomialApproximation });
-    addDroneEntity("drone-" + oi, label, startTime, stopTime, positionProperty, Cesium.Color.CYAN, 40);
-  }
-
-  addCompassRose({ lon: -122.415, lat: 37.790 });
-
-  scenarioState = { type: "recon", total: TOTAL, orbits: ORBITS };
-  document.getElementById("bft-count").textContent = TOTAL;
-  document.getElementById("tgt-label").textContent = "AO: 4 SECTORS";
-  document.getElementById("status-label").innerHTML = "MODE: PERSISTENT ISR";
-
-  viewer.clock.shouldAnimate = true;
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(-122.415, 37.790, 3500),
-    orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-45), roll: 0 },
-    duration: 3
-  });
-}
-
-// ==================================================================
-// SCENARIO: SATURATION SWARM
-// ==================================================================
-function loadSwarm() {
-  var TARGET = { name: "SALESFORCE TOWER", lon: -122.3972, lat: 37.7897, alt: 300 };
-  var WAVES = [
-    { name: "SOUTH / MISSION ST",  origin: { lon: -122.3972, lat: 37.7750 }, delay: 0 },
-    { name: "EAST / EMBARCADERO",  origin: { lon: -122.3850, lat: 37.7897 }, delay: 15 },
-    { name: "NORTH / NORTH BEACH", origin: { lon: -122.3972, lat: 37.8050 }, delay: 30 },
-    { name: "WEST / VAN NESS",     origin: { lon: -122.4200, lat: 37.7897 }, delay: 45 }
-  ];
-  var PER_WAVE = 12;
-  var TOTAL = 48;
-  var SIM_DUR = 120;
-
-  startTime = Cesium.JulianDate.fromIso8601("2026-06-22T00:00:00Z");
-  stopTime = Cesium.JulianDate.addSeconds(startTime, SIM_DUR, new Cesium.JulianDate());
-  resetClock();
-
-  // Target marker and threat zone
-  viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(TARGET.lon, TARGET.lat, TARGET.alt + 10),
-    point: { pixelSize: 14, color: Cesium.Color.RED.withAlpha(0.95), outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
-    label: {
-      text: TARGET.name, font: "10pt monospace",
-      fillColor: Cesium.Color.RED.withAlpha(0.9),
-      showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
-      pixelOffset: new Cesium.Cartesian2(0, -22), scale: 0.75
-    }
-  });
-  viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(TARGET.lon, TARGET.lat, TARGET.alt / 2),
-    cylinder: {
-      length: TARGET.alt, topRadius: 300, bottomRadius: 300,
-      material: Cesium.Color.RED.withAlpha(0.06),
-      outline: true, outlineColor: Cesium.Color.RED.withAlpha(0.10), outlineWidth: 1
-    }
-  });
-
-  var droneArrivals = [];
-  var globalIdx = 0;
-
-  for (var wi = 0; wi < WAVES.length; wi++) {
-    var wave = WAVES[wi];
-    viewer.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(wave.origin.lon, wave.origin.lat, 10),
-      point: { pixelSize: 6, color: Cesium.Color.RED.withAlpha(0.5) },
-      label: {
-        text: "WAVE " + (wi + 1) + " / " + wave.name, font: "7pt monospace",
-        fillColor: Cesium.Color.RED.withAlpha(0.5),
-        showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.4),
-        pixelOffset: new Cesium.Cartesian2(0, -14), scale: 0.5
-      }
-    });
-
-    for (var di = 0; di < PER_WAVE; di++) {
-      var label = "H-" + String(globalIdx + 1).padStart(2, "0");
-      var launchDelay = wave.delay + di * 0.8;
-      var spreadAngle = ((di / (PER_WAVE - 1)) - 0.5) * 0.6;
-      var dx = TARGET.lon - wave.origin.lon;
-      var dy = TARGET.lat - wave.origin.lat;
-      var dist = Math.sqrt(dx * dx + dy * dy);
-      var perpX = -dy / dist, perpY = dx / dist;
-      var spreadAmount = dist * 0.3;
-      var steps = 10;
-      var cruiseAlt = 30 + Math.random() * 40;
-      var flightDur = 35 + Math.random() * 20;
-      var totalDur = launchDelay + flightDur;
-      droneArrivals.push({ wi: wi, arrival: totalDur });
-
-      var positionProperty = new Cesium.SampledPositionProperty();
-      for (var si = 0; si <= steps; si++) {
-        var t = si / steps;
-        var bLon = wave.origin.lon + dx * t;
-        var bLat = wave.origin.lat + dy * t;
-        var fanFactor = Math.sin(t * Math.PI) * spreadAngle * spreadAmount;
-        var lon = bLon + perpX * fanFactor + (Math.random() - 0.5) * 0.0003;
-        var lat = bLat + perpY * fanFactor + (Math.random() - 0.5) * 0.0003;
-        var alt;
-        if (t < 0.15) alt = 5 + cruiseAlt * (t / 0.15);
-        else if (t > 0.85) alt = cruiseAlt + (TARGET.alt - cruiseAlt) * ((t - 0.85) / 0.15);
-        else alt = cruiseAlt + (Math.random() - 0.5) * 8;
-        var sampleTime = Cesium.JulianDate.addSeconds(startTime, launchDelay + t * flightDur, new Cesium.JulianDate());
-        positionProperty.addSample(sampleTime, Cesium.Cartesian3.fromDegrees(lon, lat, alt));
-      }
-      positionProperty.setInterpolationOptions({ interpolationDegree: 3, interpolationAlgorithm: Cesium.HermitePolynomialApproximation });
-      var droneStart = Cesium.JulianDate.addSeconds(startTime, launchDelay, new Cesium.JulianDate());
-      addDroneEntity("drone-" + globalIdx, label, droneStart, stopTime, positionProperty, Cesium.Color.RED, 20);
-      globalIdx++;
-    }
-  }
-
-  addRangeRings({ lon: TARGET.lon, lat: TARGET.lat }, [300, 600, 1000]);
-  addCompassRose({ lon: -122.400, lat: 37.793 });
-
-  var droneExploded = new Array(TOTAL);
-  for (var sei = 0; sei < TOTAL; sei++) droneExploded[sei] = false;
-
-  scenarioState = {
-    type: "swarm", total: TOTAL, perWave: PER_WAVE, waves: WAVES,
-    arrivals: droneArrivals, target: TARGET, droneExploded: droneExploded
-  };
-  document.getElementById("bft-count").textContent = TOTAL;
-  document.getElementById("tgt-label").textContent = "TARGET: SALESFORCE TWR";
-  document.getElementById("status-label").innerHTML = "WAVES: 4 x 12 HOSTILE";
-
-  viewer.clock.shouldAnimate = true;
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.793, 800),
-    orientation: { heading: Cesium.Math.toRadians(20), pitch: Cesium.Math.toRadians(-30), roll: 0 },
-    duration: 3
-  });
-}
-
-// ==================================================================
-// SCENARIO: VIP ESCORT
-// ==================================================================
-function loadEscort() {
-  var TOTAL = 6;
-  var SIM_DUR = 300;
-  var VIP_ALT = 2;
-  var DRONE_ALT = 50;
-  var HEX_RADIUS = 30;
-
-  // Market Street path: Ferry Building to City Hall
-  var MARKET_ST = [
-    { lon: -122.3935, lat: 37.7956 },
-    { lon: -122.3970, lat: 37.7936 },
-    { lon: -122.4010, lat: 37.7912 },
-    { lon: -122.4050, lat: 37.7890 },
-    { lon: -122.4100, lat: 37.7865 },
-    { lon: -122.4140, lat: 37.7843 },
-    { lon: -122.4180, lat: 37.7822 },
-    { lon: -122.4195, lat: 37.7790 }
-  ];
-
-  startTime = Cesium.JulianDate.fromIso8601("2026-06-22T00:00:00Z");
-  stopTime = Cesium.JulianDate.addSeconds(startTime, SIM_DUR, new Cesium.JulianDate());
-  resetClock();
-
-  var SAMPLES = 200;
-
-  // Compute total path length for uniform speed
-  var pathSegLengths = [];
-  var totalPathLen = 0;
-  for (var pi = 1; pi < MARKET_ST.length; pi++) {
-    var segDx = (MARKET_ST[pi].lon - MARKET_ST[pi-1].lon) * METERS_PER_DEG_LON;
-    var segDy = (MARKET_ST[pi].lat - MARKET_ST[pi-1].lat) * METERS_PER_DEG_LAT;
-    var segLen = Math.sqrt(segDx * segDx + segDy * segDy);
-    pathSegLengths.push(segLen);
-    totalPathLen += segLen;
-  }
-
-  function interpMarketSt(t) {
-    var targetDist = t * totalPathLen;
-    var accumulated = 0;
-    for (var si = 0; si < pathSegLengths.length; si++) {
-      if (accumulated + pathSegLengths[si] >= targetDist) {
-        var segT = (targetDist - accumulated) / pathSegLengths[si];
-        return {
-          lon: MARKET_ST[si].lon + (MARKET_ST[si+1].lon - MARKET_ST[si].lon) * segT,
-          lat: MARKET_ST[si].lat + (MARKET_ST[si+1].lat - MARKET_ST[si].lat) * segT
-        };
-      }
-      accumulated += pathSegLengths[si];
-    }
-    return MARKET_ST[MARKET_ST.length - 1];
-  }
-
-  // VIP entity (ground vehicle)
-  var vipPosition = new Cesium.SampledPositionProperty();
-  for (var vi = 0; vi <= SAMPLES; vi++) {
-    var t = vi / SAMPLES;
-    var pos = interpMarketSt(t);
-    var sampleTime = Cesium.JulianDate.addSeconds(startTime, t * SIM_DUR, new Cesium.JulianDate());
-    vipPosition.addSample(sampleTime, Cesium.Cartesian3.fromDegrees(pos.lon, pos.lat, VIP_ALT));
-  }
-  vipPosition.setInterpolationOptions({ interpolationDegree: 2, interpolationAlgorithm: Cesium.HermitePolynomialApproximation });
-
-  viewer.entities.add({
-    id: "vip-vehicle", name: "VIP-01",
-    availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({ start: startTime, stop: stopTime })]),
-    position: vipPosition,
-    point: { pixelSize: 12, color: Cesium.Color.GOLD.withAlpha(0.95), outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
-    path: {
-      resolution: 1,
-      material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.2, color: Cesium.Color.GOLD.withAlpha(0.4) }),
-      width: 3, leadTime: 0, trailTime: 60
-    },
-    label: {
-      text: "VIP-01", font: "10pt monospace",
-      fillColor: Cesium.Color.GOLD.withAlpha(0.9),
-      showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.6),
-      pixelOffset: new Cesium.Cartesian2(0, -20), scale: 0.6
-    }
-  });
-
-  // Start/end markers
-  viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(MARKET_ST[0].lon, MARKET_ST[0].lat, 5),
-    point: { pixelSize: 7, color: Cesium.Color.GREEN.withAlpha(0.7) },
-    label: {
-      text: "START / FERRY BLDG", font: "7pt monospace",
-      fillColor: Cesium.Color.GREEN.withAlpha(0.5),
-      showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.4),
-      pixelOffset: new Cesium.Cartesian2(0, -14), scale: 0.5
-    }
-  });
-  viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(MARKET_ST[MARKET_ST.length-1].lon, MARKET_ST[MARKET_ST.length-1].lat, 5),
-    point: { pixelSize: 7, color: Cesium.Color.RED.withAlpha(0.7) },
-    label: {
-      text: "END / CITY HALL", font: "7pt monospace",
-      fillColor: Cesium.Color.RED.withAlpha(0.5),
-      showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.4),
-      pixelOffset: new Cesium.Cartesian2(0, -14), scale: 0.5
-    }
-  });
-
-  // 6 escort drones in hexagonal formation
-  var HEX_COLORS = [Cesium.Color.LIME, Cesium.Color.LIME, Cesium.Color.CYAN, Cesium.Color.CYAN, Cesium.Color.LIME, Cesium.Color.CYAN];
-  for (var di = 0; di < 6; di++) {
-    var hexAngle = (di / 6) * 2 * Math.PI;
-    var offsetLon = (Math.cos(hexAngle) * HEX_RADIUS) / METERS_PER_DEG_LON;
-    var offsetLat = (Math.sin(hexAngle) * HEX_RADIUS) / METERS_PER_DEG_LAT;
-    var dlabel = "E-" + String(di + 1).padStart(2, "0");
-
-    var positionProperty = new Cesium.SampledPositionProperty();
-    for (var esi = 0; esi <= SAMPLES; esi++) {
-      var et = esi / SAMPLES;
-      var vipPos = interpMarketSt(et);
-      var bob = Math.sin(et * SIM_DUR * 0.1 + di) * 3;
-      var eSampleTime = Cesium.JulianDate.addSeconds(startTime, et * SIM_DUR, new Cesium.JulianDate());
-      positionProperty.addSample(eSampleTime, Cesium.Cartesian3.fromDegrees(
-        vipPos.lon + offsetLon, vipPos.lat + offsetLat, DRONE_ALT + bob
-      ));
-    }
-    positionProperty.setInterpolationOptions({ interpolationDegree: 2, interpolationAlgorithm: Cesium.HermitePolynomialApproximation });
-    addDroneEntity("drone-" + di, dlabel, startTime, stopTime, positionProperty, HEX_COLORS[di], 30);
-  }
-
-  // Formation ring that follows VIP
-  var vipEntity = viewer.entities.getById("vip-vehicle");
-  viewer.entities.add({
-    position: new Cesium.CallbackProperty(function() {
-      var vPos = vipEntity.position.getValue(viewer.clock.currentTime);
-      if (!vPos) return Cesium.Cartesian3.fromDegrees(-122.407, 37.790, DRONE_ALT);
-      var carto = Cesium.Cartographic.fromCartesian(vPos);
-      return Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, DRONE_ALT);
-    }, false),
-    ellipse: {
-      semiMajorAxis: HEX_RADIUS, semiMinorAxis: HEX_RADIUS,
-      fill: false, outline: true,
-      outlineColor: Cesium.Color.LIME.withAlpha(0.15),
-      outlineWidth: 1.5, height: DRONE_ALT
-    }
-  });
-
-  addCompassRose({ lon: -122.407, lat: 37.790 });
-
-  scenarioState = { type: "escort", total: TOTAL, simDur: SIM_DUR };
-  document.getElementById("bft-count").textContent = TOTAL + " + 1 VIP";
-  document.getElementById("tgt-label").textContent = "ROUTE: MARKET ST";
-  document.getElementById("status-label").innerHTML = "FORMATION: HEXAGONAL";
-
-  viewer.clock.shouldAnimate = true;
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(-122.407, 37.790, 500),
-    orientation: { heading: Cesium.Math.toRadians(45), pitch: Cesium.Math.toRadians(-30), roll: 0 },
-    duration: 3
-  });
-}
-
-// ==================================================================
-// SCENARIO LOADER
-// ==================================================================
-function loadScenario(name) {
-  introRunning = false;
-  clearScenario();
-  currentScenario = name;
-  if (name === "strike") { loadStrike(); runCinematicIntro(); }
-  else if (name === "recon") loadRecon();
-  else if (name === "swarm") loadSwarm();
-  else if (name === "escort") loadEscort();
-}
-
-document.getElementById("scenario-select").addEventListener("change", function() {
-  loadScenario(this.value);
+// Initial camera
+viewer.camera.setView({
+  destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.795, 1200),
+  orientation: { heading: Cesium.Math.toRadians(20), pitch: Cesium.Math.toRadians(-30), roll: 0 }
 });
 
-// Initial load
-loadScenario("strike");
+// Click to track
+var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+handler.setInputAction(function(click) {
+  var picked = viewer.scene.pick(click.position);
+  if (Cesium.defined(picked) && picked.id && picked.id.id && picked.id.id.startsWith("drone-"))
+    viewer.trackedEntity = picked.id;
+  else viewer.trackedEntity = undefined;
+}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-// ==================================================================
-// HUD UPDATE (multi-scenario)
-// ==================================================================
+// HUD update loop
 function updateHUD() {
-  if (!startTime) { Cesium.requestAnimationFrame(updateHUD); return; }
   var elapsed = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, startTime);
   document.getElementById("speed-display").textContent = viewer.clock.multiplier + "X";
-
-  if (scenarioState.type === "strike") {
-    var st = scenarioState;
-    var sActive = 0, neutralized = 0;
-
-    if (elapsed < 1) {
-      for (var ri = 0; ri < st.total; ri++) st.droneExploded[ri] = false;
-      for (var rb = 0; rb < st.targets.length; rb++) st.bdaShown[rb] = false;
-    }
-
-    for (var i = 0; i < st.total; i++) {
-      var launch = i * 2;
-      if (elapsed >= launch && elapsed < st.arrivals[i].arrival + 3) sActive++;
-      if (elapsed >= st.arrivals[i].arrival && !st.droneExploded[i]) {
-        st.droneExploded[i] = true;
-        var etgt = st.targets[st.arrivals[i].ti];
-        triggerExplosion(Cesium.Cartesian3.fromDegrees(etgt.lon, etgt.lat, etgt.alt));
-      }
-    }
-    var tgtHtml = "";
-    for (var t = 0; t < st.targets.length; t++) {
-      var arrived = st.arrivals.filter(function(d) { return d.ti === t && elapsed >= d.arrival; }).length;
-      var done = arrived >= st.perTgt;
-      if (done) {
-        neutralized++;
-        if (!st.bdaShown[t]) { st.bdaShown[t] = true; triggerBDA(st.targets[t]); }
-      }
-      tgtHtml += '<div class="' + (done ? "tgt-done" : "tgt-pending") + '">' +
-        st.targets[t].name + " [" + (done ? "NEUTRALIZED" : arrived + "/" + st.perTgt) + "]</div>";
-    }
-    document.getElementById("active").textContent = sActive;
-    var neutralEl = document.getElementById("neutral");
-    if (neutralEl) neutralEl.textContent = neutralized;
-    document.getElementById("tgt-panel").innerHTML = tgtHtml;
-
-    if (neutralized >= st.targets.length && !introRunning) showMissionComplete();
-
-  } else if (scenarioState.type === "recon") {
-    document.getElementById("active").textContent = scenarioState.total;
-    var reconHtml = "";
-    for (var roi = 0; roi < scenarioState.orbits.length; roi += 2) {
-      var orb = scenarioState.orbits[roi];
-      var areaName = orb.name.replace(/-\d$/, "");
-      reconHtml += '<div style="color:rgba(80,220,255,0.6)">' + areaName + ' [ORBIT R=' + orb.radius + 'M]</div>';
-    }
-    document.getElementById("tgt-panel").innerHTML = reconHtml;
-
-  } else if (scenarioState.type === "swarm") {
-    var swSt = scenarioState;
-    var swActive = 0;
-
-    if (elapsed < 1) {
-      for (var sri = 0; sri < swSt.total; sri++) swSt.droneExploded[sri] = false;
-    }
-
-    for (var si = 0; si < swSt.total; si++) {
-      var swi = Math.floor(si / swSt.perWave);
-      var diInWave = si % swSt.perWave;
-      var sLaunch = swSt.waves[swi].delay + diInWave * 0.8;
-      if (elapsed >= sLaunch && elapsed < swSt.arrivals[si].arrival + 3) swActive++;
-      if (elapsed >= swSt.arrivals[si].arrival && !swSt.droneExploded[si]) {
-        swSt.droneExploded[si] = true;
-        triggerExplosion(Cesium.Cartesian3.fromDegrees(swSt.target.lon, swSt.target.lat, swSt.target.alt));
-      }
-    }
-    document.getElementById("active").textContent = swActive;
-
-    // Check if all 48 arrived for mission complete
-    var allArrived = swSt.arrivals.every(function(d) { return elapsed >= d.arrival; });
-    if (allArrived && !introRunning) showMissionComplete();
-
-    var swarmHtml = "";
-    for (var swj = 0; swj < swSt.waves.length; swj++) {
-      var waveDelay = swSt.waves[swj].delay;
-      var waveStatus = elapsed < waveDelay ? "PENDING" : "LAUNCHED";
-      var waveArrivals = swSt.arrivals.filter(function(d) { return d.wi === swj && elapsed >= d.arrival; }).length;
-      var waveColor = elapsed < waveDelay ? "rgba(255,80,80,0.4)" : "rgba(255,80,80,0.8)";
-      swarmHtml += '<div style="color:' + waveColor + '">WAVE ' + (swj + 1) + ' [' + waveStatus + ' ' + waveArrivals + '/' + swSt.perWave + ']</div>';
-    }
-    document.getElementById("tgt-panel").innerHTML = swarmHtml;
-
-  } else if (scenarioState.type === "escort") {
-    document.getElementById("active").textContent = scenarioState.total;
-    var pct = Math.min(100, Math.max(0, Math.round((elapsed / scenarioState.simDur) * 100)));
-    var escortHtml = '<div style="color:rgba(255,215,0,0.7)">VIP PROGRESS: ' + pct + '%</div>';
-    escortHtml += '<div style="color:rgba(80,255,120,0.6)">FORMATION: INTACT</div>';
-    escortHtml += '<div style="color:rgba(150,200,255,0.5)">FERRY BLDG -> CITY HALL</div>';
-    document.getElementById("tgt-panel").innerHTML = escortHtml;
+  if (elapsed < 1) { exploded.fill(false); bdaShown.fill(false); missionDone = false; }
+  var active = 0, neutralized = 0;
+  for (var i = 0; i < TOTAL; i++) {
+    if (elapsed >= i * 2 && elapsed < arrivals[i].arrival + 3) active++;
+    if (elapsed >= arrivals[i].arrival && !exploded[i]) exploded[i] = true;
   }
-
+  var html = "";
+  for (var t = 0; t < TARGETS.length; t++) {
+    var count = 0;
+    for (var j = 0; j < arrivals.length; j++)
+      if (arrivals[j].ti === t && elapsed >= arrivals[j].arrival) count++;
+    var done = count >= PER_TGT;
+    if (done) neutralized++;
+    if (done && !bdaShown[t]) {
+      bdaShown[t] = true;
+      var te = viewer.entities.getById("tgt-" + t);
+      if (te) { te.point.color = Cesium.Color.LIME.withAlpha(0.85); te.label.fillColor = Cesium.Color.LIME.withAlpha(0.8); }
+    }
+    html += '<div class="' + (done ? "tgt-done" : "tgt-pending") + '">' +
+      TARGETS[t].name + " [" + (done ? "NEUTRALIZED" : count + "/" + PER_TGT) + "]</div>";
+  }
+  document.getElementById("active").textContent = active;
+  document.getElementById("neutral").textContent = neutralized;
+  document.getElementById("tgt-panel").innerHTML = html;
+  if (neutralized >= TARGETS.length && !missionDone) {
+    missionDone = true; viewer.trackedEntity = undefined;
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.798, 2500),
+      orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 }, duration: 3
+    });
+  }
   Cesium.requestAnimationFrame(updateHUD);
 }
 Cesium.requestAnimationFrame(updateHUD);
 
-// ==================================================================
-// DEMO BUTTON
-// ==================================================================
-document.getElementById("demo-btn").addEventListener("click", function() {
-  if (currentScenario === "strike") {
-    runCinematicIntro();
-  } else {
-    // For non-strike scenarios, just reset the clock
-    viewer.clock.currentTime = startTime.clone();
-    viewer.trackedEntity = undefined;
-  }
-});
-
-// ==================================================================
-// KEYBOARD CONTROLS
-// ==================================================================
+// Keyboard controls
 document.addEventListener("keydown", function(e) {
-  if (introRunning) return;
   if (e.key === " ") { viewer.clock.shouldAnimate = !viewer.clock.shouldAnimate; e.preventDefault(); }
-  if (e.key === "1") viewer.clock.multiplier = 1;
-  if (e.key === "2") viewer.clock.multiplier = 3;
-  if (e.key === "3") viewer.clock.multiplier = 5;
-  if (e.key === "4") viewer.clock.multiplier = 10;
-  if (e.key === "5") viewer.clock.multiplier = 20;
+  if (e.key >= "1" && e.key <= "5") viewer.clock.multiplier = [1,3,5,10,20][e.key - 1];
   if (e.key === "r" || e.key === "R") {
     viewer.clock.currentTime = startTime.clone();
     viewer.trackedEntity = undefined;
-    missionCompleteShown = false;
-    if (missionCompleteEntity) {
-      viewer.entities.remove(missionCompleteEntity);
-      missionCompleteEntity = null;
+    exploded.fill(false); bdaShown.fill(false); missionDone = false;
+    for (var i = 0; i < TARGETS.length; i++) {
+      var ent = viewer.entities.getById("tgt-" + i);
+      if (ent) { ent.point.color = Cesium.Color.RED.withAlpha(0.85); ent.label.fillColor = Cesium.Color.RED.withAlpha(0.8); }
     }
-    if (scenarioState.droneExploded) {
-      for (var ri = 0; ri < scenarioState.droneExploded.length; ri++) scenarioState.droneExploded[ri] = false;
-    }
-    if (scenarioState.bdaShown) {
-      for (var rb = 0; rb < scenarioState.bdaShown.length; rb++) scenarioState.bdaShown[rb] = false;
-    }
-  }
-  if (e.key === "d" || e.key === "D") {
-    if (currentScenario === "strike") runCinematicIntro();
   }
 });
 </script>
