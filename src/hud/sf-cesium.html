@@ -102,29 +102,21 @@ V.resolutionScale=window.devicePixelRatio>1?0.75:1.0;
 (async function(){
   var tileStatus=document.getElementById("tile-status");
   try{
-    var tileset=await Cesium.createGooglePhotorealistic3DTileset();
+    var tileset=await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
     V.scene.primitives.add(tileset);
-    console.log("Google 3D Tiles loaded successfully");
+    console.log("Google 3D Tiles loaded via asset ID 2275207");
     tileStatus.textContent="PHOTOREALISTIC";tileStatus.style.color="rgba(80,255,130,0.5)";
   }catch(e){
     console.warn("Google 3D Tiles failed:",e.message);
+    V.scene.globe=new Cesium.Globe();
+    if(V.scene.globe)V.scene.globe.maximumScreenSpaceError=2;
     try{
-      var tileset=await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
-      V.scene.primitives.add(tileset);
-      console.log("Google 3D Tiles loaded via asset ID 2275207");
-      tileStatus.textContent="PHOTOREALISTIC";tileStatus.style.color="rgba(80,255,130,0.5)";
+      V.scene.primitives.add(await Cesium.createOsmBuildingsAsync());
+      console.log("OSM Buildings loaded as fallback");
+      tileStatus.textContent="OSM BUILDINGS";tileStatus.style.color="rgba(255,200,80,0.5)";
     }catch(e2){
-      console.warn("Google 3D Tiles asset fallback failed:",e2.message);
-      V.scene.globe=new Cesium.Globe();
-      if(V.scene.globe)V.scene.globe.maximumScreenSpaceError=2;
-      try{
-        V.scene.primitives.add(await Cesium.createOsmBuildingsAsync());
-        console.log("OSM Buildings loaded as fallback");
-        tileStatus.textContent="OSM BUILDINGS";tileStatus.style.color="rgba(255,200,80,0.5)";
-      }catch(e3){
-        console.warn("OSM Buildings failed:",e3.message);
-        tileStatus.textContent="2D IMAGERY";tileStatus.style.color="rgba(255,70,70,0.5)";
-      }
+      console.warn("OSM Buildings failed:",e2.message);
+      tileStatus.textContent="2D IMAGERY";tileStatus.style.color="rgba(255,70,70,0.5)";
     }
   }
 })();
@@ -169,17 +161,17 @@ V.clock.startTime=T0.clone();V.clock.stopTime=TE.clone();V.clock.currentTime=T0.
 V.clock.clockRange=Cesium.ClockRange.LOOP_STOP;V.clock.multiplier=1;V.clock.shouldAnimate=false;
 
 /* Scenario data */
-var STRIKE_T=[{name:"EMBARCADERO",lon:-122.3936,lat:37.7956,alt:180},{name:"PIER 39",lon:-122.4093,lat:37.8087,alt:160},
-  {name:"SALESFORCE",lon:-122.3972,lat:37.7897,alt:200},{name:"GHIRARDELLI",lon:-122.4194,lat:37.8080,alt:150}];
-var RECON_A=[{name:"FINANCIAL",lon:-122.3990,lat:37.7935,alt:200,r:0.003},{name:"NORTH BEACH",lon:-122.4080,lat:37.8020,alt:180,r:0.004},
-  {name:"MISSION",lon:-122.4180,lat:37.7630,alt:170,r:0.005},{name:"MARINA",lon:-122.4370,lat:37.8010,alt:190,r:0.004}];
-var SWARM_T={name:"SALESFORCE",lon:-122.3972,lat:37.7897,alt:200};
+var STRIKE_T=[{name:"EMBARCADERO",lon:-122.3936,lat:37.7956,alt:300},{name:"PIER 39",lon:-122.4093,lat:37.8087,alt:270},
+  {name:"SALESFORCE",lon:-122.3972,lat:37.7897,alt:330},{name:"GHIRARDELLI",lon:-122.4194,lat:37.8080,alt:260}];
+var RECON_A=[{name:"FINANCIAL",lon:-122.3990,lat:37.7935,alt:320,r:0.003},{name:"NORTH BEACH",lon:-122.4080,lat:37.8020,alt:290,r:0.004},
+  {name:"MISSION",lon:-122.4180,lat:37.7630,alt:280,r:0.005},{name:"MARINA",lon:-122.4370,lat:37.8010,alt:310,r:0.004}];
+var SWARM_T={name:"SALESFORCE",lon:-122.3972,lat:37.7897,alt:330};
 var SWARM_O=[{lon:-122.3972,lat:37.8150},{lon:-122.3972,lat:37.7650},{lon:-122.4250,lat:37.7897},{lon:-122.3700,lat:37.7897}];
 
 /* Path builder */
 function buildPath(tgt,di,ti,ppt){
   var dx=tgt.lon-LAUNCH.lon,dy=tgt.lat-LAUNCH.lat,d=Math.sqrt(dx*dx+dy*dy),px=-dy/d,py=dx/d;
-  var cA=160+ti*12+di*5,s=(di%2===1)?1:-1,r=Math.ceil(di/2);
+  var cA=270+ti*12+di*5,s=(di%2===1)?1:-1,r=Math.ceil(di/2);
   var fL=di>0?s*r*50:0,fB=di>0?r*30:0;
   var f1=(fL/85000)*px,f2=(fL/111000)*py,b1=-(fB/85000)*(dx/d),b2=-(fB/111000)*(dy/d);
   var lO=(di-2.5)*0.0002,aA=(di/ppt)*Math.PI*2,aLn=Math.cos(aA)*0.001,aLt=Math.sin(aA)*0.00077;
@@ -228,11 +220,17 @@ function addDrone(idx,lbl,pos,ds,icon,col,trail){
     orientation:new Cesium.VelocityOrientationProperty(pos),
     model:{
       uri:"models/CesiumDrone.glb",
-      minimumPixelSize:36,
+      minimumPixelSize:48,
       scale:1.8,
       color:col.withAlpha(0.85),
       colorBlendMode:Cesium.ColorBlendMode.MIX,
-      colorBlendAmount:0.25,
+      colorBlendAmount:0.25
+    },
+    point:{
+      pixelSize:5,
+      color:col,
+      outlineColor:Cesium.Color.WHITE,
+      outlineWidth:1,
       disableDepthTestDistance:Number.POSITIVE_INFINITY
     },
     path:{resolution:1,width:1.2,leadTime:0,trailTime:trail||25,material:col.withAlpha(0.25)},
@@ -337,7 +335,7 @@ function loadSwarm(){
     var pos=new Cesium.SampledPositionProperty(),dur=60+Math.random()*20;
     for(var si=0;si<=20;si++){var t=si/20;
       pos.addSample(Cesium.JulianDate.addSeconds(T0,delay+t*dur,new Cesium.JulianDate()),
-        Cesium.Cartesian3.fromDegrees(orig.lon+dx*t+sp*px*(1-t),orig.lat+dy*t+sp*py*(1-t),80+Math.random()*60+t*SWARM_T.alt*0.6))}
+        Cesium.Cartesian3.fromDegrees(orig.lon+dx*t+sp*px*(1-t),orig.lat+dy*t+sp*py*(1-t),180+Math.random()*60+t*SWARM_T.alt*0.4))}
     pos.setInterpolationOptions({interpolationDegree:3,interpolationAlgorithm:Cesium.HermitePolynomialApproximation});
     arrivals.push({ti:0,arrival:delay+dur,label:lbl});
     addDrone(idx,lbl,pos,Cesium.JulianDate.addSeconds(T0,delay,new Cesium.JulianDate()),ICONS.red,rc,15)}}
@@ -361,23 +359,32 @@ function runCinematic(){
   if(cinRunning)return;cinRunning=true;clearScenario();loadScenario(curScn);V.clock.shouldAnimate=false;
   showCinText("OVERWATCH C2");
   V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.38,37.78,50000),
-    orientation:{heading:0,pitch:Cesium.Math.toRadians(-90),roll:0},duration:0.01})
-  .then(function(){return new Promise(function(r){setTimeout(r,2000)})})
-  .then(function(){hideCinText();setTimeout(function(){showCinText("SAN FRANCISCO THEATER")},400);
-    return V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.399,37.794,2000),
-      orientation:{heading:Cesium.Math.toRadians(10),pitch:Cesium.Math.toRadians(-60),roll:0},duration:3})})
-  .then(function(){var ml=curScn==="strike"?"MISSION: COORDINATED STRIKE":curScn==="recon"?"MISSION: ISR PATROL":"MISSION: SATURATION ATTACK";
-    hideCinText();setTimeout(function(){showCinText(ml)},400);
-    return V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.397,37.791,400),
-      orientation:{heading:Cesium.Math.toRadians(45),pitch:Cesium.Math.toRadians(-30),roll:0},duration:2})})
-  .then(function(){hideCinText();setTimeout(function(){showCinText(curTotal+" UAS ASSETS STAGED")},400);
-    return V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(LAUNCH.lon,LAUNCH.lat,100),
-      orientation:{heading:Cesium.Math.toRadians(30),pitch:Cesium.Math.toRadians(-25),roll:0},duration:1})})
-  .then(function(){hideCinText();cinRunning=false;V.clock.shouldAnimate=true;
-    setTimeout(function(){var f=V.entities.getById("drone-0");if(f){V.trackedEntity=f;tracking=true;
-      document.getElementById("track-info").style.display="block";document.getElementById("crosshair").style.display="block";
-      document.getElementById("track-callsign").textContent=f.name;
-      setTimeout(function(){returnToOverview()},10000)}},5000)});
+    orientation:{heading:0,pitch:Cesium.Math.toRadians(-90),roll:0},duration:0.01,
+    complete:function(){
+      setTimeout(function(){
+        hideCinText();setTimeout(function(){showCinText("SAN FRANCISCO THEATER")},400);
+        V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.399,37.794,2000),
+          orientation:{heading:Cesium.Math.toRadians(10),pitch:Cesium.Math.toRadians(-60),roll:0},duration:3,
+          complete:function(){
+            var ml=curScn==="strike"?"MISSION: COORDINATED STRIKE":curScn==="recon"?"MISSION: ISR PATROL":"MISSION: SATURATION ATTACK";
+            hideCinText();setTimeout(function(){showCinText(ml)},400);
+            V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.397,37.791,400),
+              orientation:{heading:Cesium.Math.toRadians(45),pitch:Cesium.Math.toRadians(-30),roll:0},duration:2,
+              complete:function(){
+                hideCinText();setTimeout(function(){showCinText(curTotal+" UAS ASSETS STAGED")},400);
+                V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(LAUNCH.lon,LAUNCH.lat,100),
+                  orientation:{heading:Cesium.Math.toRadians(30),pitch:Cesium.Math.toRadians(-25),roll:0},duration:1,
+                  complete:function(){
+                    hideCinText();cinRunning=false;V.clock.shouldAnimate=true;
+                    setTimeout(function(){var f=V.entities.getById("drone-0");if(f){V.trackedEntity=f;tracking=true;
+                      document.getElementById("track-info").style.display="block";document.getElementById("crosshair").style.display="block";
+                      document.getElementById("track-callsign").textContent=f.name;
+                      setTimeout(function(){returnToOverview()},10000)}},5000);
+                  }});
+              }});
+          }});
+      },2000);
+    }});
 }
 
 /* Tracking and orbit */
@@ -473,11 +480,7 @@ function spawnThreat(lon,lat,alt,id,detectTime){
       return best?[best,threatPos]:[Cesium.Cartesian3.ZERO,Cesium.Cartesian3.ZERO];
     },false),
     width:1.5,
-    material:new Cesium.CallbackProperty(function(){
-      var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0);
-      if(el<detectTime+8||el>=detectTime+10)return Cesium.Color.TRANSPARENT;
-      return Cesium.Color.fromCssColorString("rgba(80,255,130,0.6)");
-    },false),
+    material:Cesium.Color.fromCssColorString("rgba(80,255,130,0.6)"),
     disableDepthTestDistance:Number.POSITIVE_INFINITY}});
 }
 
@@ -563,7 +566,7 @@ function updateHUD(){
     var h="";for(var a=0;a<RECON_A.length;a++)h+='<div class="tgt-row"><span>'+RECON_A[a].name+'</span><span class="st" style="color:rgba(80,200,255,0.7)">ORBITING</span></div>';
     document.getElementById("tgt-list").innerHTML=h;
     document.getElementById("mission-status").innerHTML='STATUS: <span class="val" style="color:rgba(80,200,255,0.9)">PATROL</span>';
-    updateTrack();orbitTick();Cesium.requestAnimationFrame(updateHUD);return}
+    updateTrack();orbitTick();requestAnimationFrame(updateHUD);return}
   var ac=0;for(var i=0;i<arrivals.length;i++){var dd=curScn==="strike"?i*1.5:Math.max(0,arrivals[i].arrival-80);
     if(el>=dd&&el<arrivals[i].arrival+3)ac++;
     if(el>=dd)logEvent("deploy-"+i,fmtLogTime(dd)+" "+arrivals[i].label+" DEPLOYED");
@@ -591,12 +594,12 @@ function updateHUD(){
     V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.400,37.796,3000),
       orientation:{heading:0,pitch:Cesium.Math.toRadians(-80),roll:0},duration:3});
     sEl.innerHTML='STATUS: <span class="val" style="color:rgba(80,255,130,0.95)">MISSION COMPLETE</span>'}
-  updateTrack();orbitTick();Cesium.requestAnimationFrame(updateHUD);
+  updateTrack();orbitTick();requestAnimationFrame(updateHUD);
 }
 
 /* Init */
 loadScenario("strike");
-Cesium.requestAnimationFrame(updateHUD);
+requestAnimationFrame(updateHUD);
 setTimeout(runCinematic,300);
 
 /* Keyboard hints auto-hide after 5s */
