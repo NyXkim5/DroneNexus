@@ -48,10 +48,10 @@ var viewer = new Cesium.Viewer("c", {
 
 var LAUNCH = { lon: -122.3948, lat: 37.7878 };
 var TARGETS = [
-  { name: "EMBARCADERO", lon: -122.3936, lat: 37.7956, alt: 80 },
-  { name: "PIER 39",     lon: -122.4093, lat: 37.8087, alt: 40 },
-  { name: "SALESFORCE",  lon: -122.3972, lat: 37.7897, alt: 300 },
-  { name: "GHIRARDELLI", lon: -122.4194, lat: 37.8080, alt: 80 }
+  { name: "EMBARCADERO", lon: -122.3936, lat: 37.7956, alt: 150 },
+  { name: "PIER 39",     lon: -122.4093, lat: 37.8087, alt: 120 },
+  { name: "SALESFORCE",  lon: -122.3972, lat: 37.7897, alt: 340 },
+  { name: "GHIRARDELLI", lon: -122.4194, lat: 37.8080, alt: 130 }
 ];
 var TOTAL = 24, PER_TGT = 6;
 var COLORS = [Cesium.Color.CYAN, Cesium.Color.ORANGE, Cesium.Color.HOTPINK, Cesium.Color.LIME];
@@ -71,7 +71,7 @@ viewer.timeline.zoomTo(startTime, stopTime);
 function buildPath(tgt, di, ti) {
   var dx = tgt.lon - LAUNCH.lon, dy = tgt.lat - LAUNCH.lat;
   var d = Math.sqrt(dx * dx + dy * dy), px = -dy / d, py = dx / d;
-  var cAlt = 35 + ti * 7 + di * 2, fLat = 0, fBeh = 0;
+  var cAlt = 120 + ti * 15 + di * 5, fLat = 0, fBeh = 0;
   if (di > 0) {
     var side = (di % 2 === 1) ? 1 : -1, rank = Math.ceil(di / 2);
     fLat = side * rank * 50; fBeh = rank * 30;
@@ -93,12 +93,12 @@ function buildPath(tgt, di, ti) {
     else aB = 1;
     lon += lB * lOff * px + fB * (fLon1 + bLon1) + aB * aLon;
     lat += lB * lOff * py + fB * (fLat1 + bLat1) + aB * aLat;
-    var alt = t < 0.12 ? 5 + cAlt * (t / 0.12)
+    var alt = t < 0.12 ? 20 + (cAlt - 20) * (t / 0.12)
             : t > 0.85 ? cAlt + (tgt.alt - cAlt) * ((t - 0.85) / 0.15)
             : cAlt + Math.sin(t * Math.PI * 2) * 2;
     pts.push({ lon: lon, lat: lat, alt: alt });
   }
-  pts[0] = { lon: LAUNCH.lon + lOff * 0.3, lat: LAUNCH.lat + lOff * 0.3, alt: 5 };
+  pts[0] = { lon: LAUNCH.lon + lOff * 0.3, lat: LAUNCH.lat + lOff * 0.3, alt: 20 };
   pts[pts.length - 1] = { lon: tgt.lon, lat: tgt.lat, alt: tgt.alt };
   return pts;
 }
@@ -148,7 +148,7 @@ for (var ti = 0; ti < TARGETS.length; ti++) {
       id: "drone-" + idx, name: lbl,
       availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({ start: ds, stop: stopTime })]),
       position: pos, orientation: new Cesium.VelocityOrientationProperty(pos),
-      model: { uri: "models/CesiumDrone.glb", minimumPixelSize: 28, scale: 1.5 },
+      model: { uri: "models/CesiumDrone.glb", minimumPixelSize: 24, scale: 0.6 },
       path: { resolution: 1, width: 1.2, leadTime: 0, trailTime: 20,
         material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.08, color: c.withAlpha(0.35) }) },
       point: { pixelSize: 4, color: c, outlineColor: Cesium.Color.BLACK, outlineWidth: 1,
