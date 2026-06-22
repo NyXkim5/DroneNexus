@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!--
+  OVERWATCH - San Francisco Drone Swarm Visualization (Gen 10)
+  Mapbox GL JS + Three.js real-time 3D drone swarm deployment simulation.
+  24 drones launch from a van on Mission St, fly spline paths along SF corridors,
+  and strike 4 targets across the Financial District / waterfront.
+  Features: track camera, explosion FX, ambient particles, click-to-select,
+  target status indicators, mission complete overlay.
+-->
 <meta charset="UTF-8">
 <title>OVERWATCH - San Francisco Drone Swarm</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.css" rel="stylesheet">
@@ -29,6 +37,16 @@ body{background:#000;overflow:hidden;font-family:'JetBrains Mono',monospace}
 #compass{position:fixed;bottom:52px;right:100px;z-index:10;width:36px;height:36px;display:none}
 .mapboxgl-ctrl-logo,.mapboxgl-ctrl-attrib{display:none !important}
 @keyframes target-pulse{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.1);opacity:0.8}}
+@keyframes dep-flash{0%{color:rgba(80,200,255,1)}100%{color:rgba(80,150,230,0.65)}}
+.dep-flash{animation:dep-flash 0.4s ease-out}
+.tgt-status{position:absolute;top:-22px;left:50%;transform:translateX(-50%);white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:6px;letter-spacing:1.5px;color:rgba(255,100,100,0.7);background:rgba(0,0,0,0.7);padding:1px 5px;border:1px solid rgba(255,50,50,0.2);border-radius:2px;pointer-events:none}
+.tgt-status.hit{color:rgba(68,255,68,0.8);border-color:rgba(68,255,68,0.25)}
+#select-ring{position:fixed;z-index:10;width:40px;height:40px;pointer-events:none;display:none}
+#mission-complete{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0);transition:background 1.5s ease}
+#mission-complete.show{display:flex;background:rgba(0,0,0,0.6)}
+#mc-box{text-align:center;color:rgba(255,255,255,0.5);opacity:0;transition:opacity 1.5s ease}#mc-box.show{opacity:1}
+#mc-box h2{font-size:11px;letter-spacing:6px;font-weight:300;margin-bottom:16px;color:rgba(80,210,110,0.7)}
+#mc-box .mc-stat{font-size:8px;letter-spacing:2px;line-height:2.4;color:rgba(255,255,255,0.35)}#mc-box .mc-val{color:rgba(255,255,255,0.6)}
 </style>
 </head>
 <body>
@@ -56,6 +74,13 @@ body{background:#000;overflow:hidden;font-family:'JetBrains Mono',monospace}
 </div>
 <canvas id="compass" width="36" height="36"></canvas>
 <div id="tgt">SWARM OPS - EMBARCADERO / PIER 39 / SALESFORCE / GHIRARDELLI - SAN FRANCISCO</div>
+<canvas id="select-ring" width="40" height="40"></canvas>
+<div id="mission-complete"><div id="mc-box">
+  <h2>MISSION COMPLETE</h2>
+  <div class="mc-stat">ELAPSED <span class="mc-val" id="mc-time">--:--</span></div>
+  <div class="mc-stat">TARGETS HIT <span class="mc-val" id="mc-tgts">0 / 4</span></div>
+  <div class="mc-stat">STRIKE ACCURACY <span class="mc-val" id="mc-acc">0%</span></div>
+</div></div>
 
 <script>
 "use strict";
@@ -77,11 +102,13 @@ var camBearingVel = 0, camPosVelLng = 0, camPosVelLat = 0, camZoomVel = 0;
 var camShakeTimer = 0, camShakeIntensity = 0;
 var threeScene, threeCamera, threeRenderer, vanMesh = null;
 var droneMeshes = [], shadowMeshes = [], explosionPool = [], activeExplosions = [];
+var ambientParticles = [], missionEnded = false, selectedDroneIdx = -1;
+var tgtStatusEls = [];
 
 var CORRIDORS = [
-  {a:[-122.4180,37.7750],b:[-122.3930,37.7910]}, // Market
-  {a:[-122.4180,37.7735],b:[-122.3930,37.7895]}, // Mission
-  {a:[-122.3880,37.7940],b:[-122.3960,37.8090]}  // Embarcadero
+  {a:[-122.4180,37.7750],b:[-122.3930,37.7910]},
+  {a:[-122.4180,37.7735],b:[-122.3930,37.7895]},
+  {a:[-122.3880,37.7940],b:[-122.3960,37.8090]}
 ];
 
 function catmullRom(p0, p1, p2, p3, t) {
@@ -129,14 +156,21 @@ function altProfile(t, cAlt, tAlt) {
 
 function pathDistance(wp) {
   var d = 0;
-  for (var i = 1; i < wp.length; i++) { var dx=(wp[i][0]-wp[i-1][0])*87000, dy=(wp[i][1]-wp[i-1][1])*111000; d += Math.sqrt(dx*dx+dy*dy); }
+  for (var i = 1; i < wp.length; i++) {
+    var dx=(wp[i][0]-wp[i-1][0])*87000, dy=(wp[i][1]-wp[i-1][1])*111000;
+    d += Math.sqrt(dx*dx+dy*dy);
+  }
   return d;
 }
+
 function lngLatAltToWorld(lng, lat, alt) {
   var mc = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], alt);
   return { x: mc.x, y: mc.y, z: mc.z };
 }
-function meterScale(lat, alt) { return mapboxgl.MercatorCoordinate.fromLngLat([0, lat], alt).meterInMercatorCoordinateUnits(); }
+
+function meterScale(lat, alt) {
+  return mapboxgl.MercatorCoordinate.fromLngLat([0, lat], alt).meterInMercatorCoordinateUnits();
+}
 
 function noise(x) { var s = Math.sin(x * 127.1) * 43758.5453; return s - Math.floor(s); }
 function smoothNoise(x) {
@@ -144,6 +178,8 @@ function smoothNoise(x) {
   fx = fx * fx * (3 - 2 * fx);
   return noise(ix) * (1 - fx) + noise(ix + 1) * fx;
 }
+
+function safe(v) { return isFinite(v) ? v : 0; }
 
 var sharedGlowTex = null, sharedFlashTex = null;
 
@@ -174,14 +210,14 @@ function buildDrone(s) {
     new THREE.MeshStandardMaterial({color:0x2a3a55, metalness:0.6, roughness:0.3})
   );
   g.add(body);
+  g.userData.rotors = [];
+  g.userData.exhaustCones = [];
+  g.userData.detailParts = [];
   var armPos = [[1,1],[-1,1],[1,-1],[-1,-1]];
   var armMat = new THREE.MeshPhongMaterial({color:0x4a5a70});
   var motorMat = new THREE.MeshPhongMaterial({color:0x3a4a60});
   var rotorMat = new THREE.MeshBasicMaterial({color:0x44aaff, transparent:true, opacity:0.35, side:THREE.DoubleSide});
   var glowTex = makeGlowTex();
-  g.userData.rotors = [];
-  g.userData.exhaustCones = [];
-  g.userData.detailParts = [];
   for (var i = 0; i < 4; i++) {
     var ax = armPos[i][0], az = armPos[i][1];
     var arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06*s,0.06*s,1.8*s,6), armMat);
@@ -195,29 +231,19 @@ function buildDrone(s) {
     g.add(rotor); g.userData.rotors.push(rotor);
     var glow = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0x4488ff, transparent:true, opacity:0.5, blending:THREE.AdditiveBlending}));
     glow.position.set(ax*1.4*s, -0.2*s, az*1.4*s); glow.scale.set(0.8*s,0.8*s,1);
-    g.add(glow);
-    g.userData.detailParts.push(glow);
+    g.add(glow); g.userData.detailParts.push(glow);
     var exhaust = new THREE.Mesh(
       new THREE.ConeGeometry(0.15*s, 0.4*s, 6),
       new THREE.MeshBasicMaterial({color:0x4488ff, transparent:true, opacity:0.2})
     );
-    exhaust.position.set(ax*1.4*s, -0.15*s, az*1.4*s);
-    exhaust.rotation.x = Math.PI; // point downward
-    g.add(exhaust);
-    g.userData.exhaustCones.push(exhaust);
-    g.userData.detailParts.push(exhaust);
+    exhaust.position.set(ax*1.4*s, -0.15*s, az*1.4*s); exhaust.rotation.x = Math.PI;
+    g.add(exhaust); g.userData.exhaustCones.push(exhaust); g.userData.detailParts.push(exhaust);
   }
   var front = new THREE.Mesh(new THREE.SphereGeometry(0.12*s,6,6), new THREE.MeshBasicMaterial({color:0x44ff66}));
-  front.position.set(0, 0, -1.05*s); g.add(front);
-  g.userData.detailParts.push(front);
-  var strobe = new THREE.Mesh(
-    new THREE.SphereGeometry(0.08*s, 4, 4),
-    new THREE.MeshBasicMaterial({color:0xffffff})
-  );
-  strobe.position.set(0, 0.3*s, 0);
-  g.add(strobe);
-  g.userData.strobe = strobe;
-  g.userData.detailParts.push(strobe);
+  front.position.set(0, 0, -1.05*s); g.add(front); g.userData.detailParts.push(front);
+  var strobe = new THREE.Mesh(new THREE.SphereGeometry(0.08*s,4,4), new THREE.MeshBasicMaterial({color:0xffffff}));
+  strobe.position.set(0, 0.3*s, 0); g.add(strobe);
+  g.userData.strobe = strobe; g.userData.detailParts.push(strobe);
   return g;
 }
 
@@ -236,157 +262,107 @@ function initExplosionPool() {
   for (var p = 0; p < 4; p++) {
     var pool = { inUse: false, age: 0, s: 0, w: {x:0,y:0,z:0} };
     pool.flash = new THREE.PointLight(0xffaa33, 0, 80);
-    pool.flash.visible = false;
-    threeScene.add(pool.flash);
+    pool.flash.visible = false; threeScene.add(pool.flash);
     pool.flashSprite = new THREE.Sprite(new THREE.SpriteMaterial({
       map: makeFlashTex(), color:0xffffff, transparent:true, opacity:0, blending:THREE.AdditiveBlending
     }));
-    pool.flashSprite.visible = false;
-    threeScene.add(pool.flashSprite);
+    pool.flashSprite.visible = false; threeScene.add(pool.flashSprite);
     var ringGeo = new THREE.TorusGeometry(1, 0.15, 8, 32);
-    var ringMat = new THREE.MeshBasicMaterial({color:0xffcc66, transparent:true, opacity:0, side:THREE.DoubleSide});
-    pool.ring = new THREE.Mesh(ringGeo, ringMat);
-    pool.ring.visible = false;
-    threeScene.add(pool.ring);
+    pool.ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({color:0xffcc66, transparent:true, opacity:0, side:THREE.DoubleSide}));
+    pool.ring.visible = false; threeScene.add(pool.ring);
     pool.hotDebris = [];
     for (var i = 0; i < 20; i++) {
-      var hue = i % 2 === 0 ? 0xff6600 : 0xff8833;
-      var dp = new THREE.Mesh(
-        new THREE.SphereGeometry(0.3, 4, 4),
-        new THREE.MeshBasicMaterial({color:hue, transparent:true, opacity:0})
-      );
-      dp.visible = false;
-      dp.userData.vel = new THREE.Vector3();
-      dp.userData.life = 0; dp.userData.maxLife = 1.5;
-      threeScene.add(dp);
-      pool.hotDebris.push(dp);
+      var dp = new THREE.Mesh(new THREE.SphereGeometry(0.3,4,4), new THREE.MeshBasicMaterial({color:i%2===0?0xff6600:0xff8833, transparent:true, opacity:0}));
+      dp.visible = false; dp.userData.vel = new THREE.Vector3(); dp.userData.life = 0; dp.userData.maxLife = 1.5;
+      threeScene.add(dp); pool.hotDebris.push(dp);
     }
     pool.smokeWisps = [];
     for (var j = 0; j < 10; j++) {
-      var gray = 0x444444 + Math.floor((j / 10) * 0x333333);
-      var sm = new THREE.Mesh(
-        new THREE.SphereGeometry(0.4, 6, 6),
-        new THREE.MeshBasicMaterial({color:gray, transparent:true, opacity:0})
-      );
-      sm.visible = false;
-      sm.userData.vel = new THREE.Vector3();
-      sm.userData.life = 0; sm.userData.maxLife = 2.0;
-      threeScene.add(sm);
-      pool.smokeWisps.push(sm);
+      var sm = new THREE.Mesh(new THREE.SphereGeometry(0.4,6,6), new THREE.MeshBasicMaterial({color:0x444444+Math.floor((j/10)*0x333333), transparent:true, opacity:0}));
+      sm.visible = false; sm.userData.vel = new THREE.Vector3(); sm.userData.life = 0; sm.userData.maxLife = 2.0;
+      threeScene.add(sm); pool.smokeWisps.push(sm);
     }
     explosionPool.push(pool);
   }
 }
 
+function initAmbientParticles() {
+  var cw = lngLatAltToWorld(SF_CENTER[0], SF_CENTER[1], 80), ms = meterScale(SF_CENTER[1], 80);
+  for (var i = 0; i < 50; i++) {
+    var pt = new THREE.Mesh(new THREE.SphereGeometry(0.15*ms,3,3), new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.08+Math.random()*0.07}));
+    pt.position.set(cw.x+(Math.random()-0.5)*500*ms, cw.y+(Math.random()-0.5)*500*ms, cw.z+(Math.random()-0.5)*250*ms);
+    pt.userData.drift = new THREE.Vector3((Math.random()-0.5)*0.1*ms, (Math.random()-0.5)*0.1*ms, (Math.random()-0.5)*0.05*ms);
+    threeScene.add(pt); ambientParticles.push(pt);
+  }
+}
+
+function tickAmbientParticles(dt) {
+  for (var i = 0; i < ambientParticles.length; i++) {
+    var p = ambientParticles[i], dr = p.userData.drift;
+    p.position.x += dr.x*dt; p.position.y += dr.y*dt; p.position.z += dr.z*dt;
+  }
+}
+
 function spawnExplosion(lng, lat, alt) {
-  // Find a free pool slot
-  var ex = null;
-  for (var p = 0; p < explosionPool.length; p++) {
-    if (!explosionPool[p].inUse) { ex = explosionPool[p]; break; }
-  }
-  // If all in use, reclaim the oldest
-  if (!ex) {
-    var oldest = 0;
-    for (var oi = 1; oi < explosionPool.length; oi++) {
-      if (explosionPool[oi].age > explosionPool[oldest].age) oldest = oi;
-    }
-    ex = explosionPool[oldest];
-  }
+  var ex = null, p;
+  for (p = 0; p < explosionPool.length; p++) { if (!explosionPool[p].inUse) { ex = explosionPool[p]; break; } }
+  if (!ex) { var oi = 0; for (p = 1; p < explosionPool.length; p++) { if (explosionPool[p].age > explosionPool[oi].age) oi = p; } ex = explosionPool[oi]; }
   var s = meterScale(lat, alt), w = lngLatAltToWorld(lng, lat, alt);
   ex.inUse = true; ex.age = 0; ex.s = s; ex.w = w;
-  // Position and activate flash
-  ex.flash.position.set(w.x, w.y, w.z);
-  ex.flash.intensity = 5; ex.flash.distance = 80 * s; ex.flash.visible = true;
-  ex.flashSprite.position.set(w.x, w.y, w.z);
-  ex.flashSprite.scale.set(0.01, 0.01, 1);
-  ex.flashSprite.material.opacity = 1; ex.flashSprite.visible = true;
-  // Ring
-  ex.ring.position.set(w.x, w.y, w.z);
-  ex.ring.rotation.x = Math.PI/2;
-  ex.ring.scale.setScalar(s); // scale geometry to meter scale
-  ex.ring.material.opacity = 0.8; ex.ring.visible = true;
-  // Hot debris
+  ex.flash.position.set(w.x,w.y,w.z); ex.flash.intensity = 5; ex.flash.distance = 80*s; ex.flash.visible = true;
+  ex.flashSprite.position.set(w.x,w.y,w.z); ex.flashSprite.scale.set(0.01,0.01,1); ex.flashSprite.material.opacity = 1; ex.flashSprite.visible = true;
+  ex.ring.position.set(w.x,w.y,w.z); ex.ring.rotation.x = Math.PI/2; ex.ring.scale.setScalar(s); ex.ring.material.opacity = 0.8; ex.ring.visible = true;
   for (var i = 0; i < ex.hotDebris.length; i++) {
-    var dp = ex.hotDebris[i];
-    dp.position.set(w.x, w.y, w.z);
-    dp.scale.setScalar(s);
-    var spd = (0.8 + Math.random() * 2.0) * s;
-    dp.userData.vel.set((Math.random()-0.5)*spd, (Math.random()-0.5)*spd, (Math.random()-0.5)*spd*0.5);
+    var dp = ex.hotDebris[i], spd = (0.8+Math.random()*2.0)*s;
+    dp.position.set(w.x,w.y,w.z); dp.scale.setScalar(s);
+    dp.userData.vel.set((Math.random()-0.5)*spd,(Math.random()-0.5)*spd,(Math.random()-0.5)*spd*0.5);
     dp.userData.life = 1.5; dp.material.opacity = 1; dp.visible = true;
   }
-  // Smoke wisps
   for (var j = 0; j < ex.smokeWisps.length; j++) {
-    var sm = ex.smokeWisps[j];
-    sm.position.set(w.x + (Math.random()-0.5)*s*2, w.y + (Math.random()-0.5)*s*2, w.z + (Math.random()-0.5)*s);
-    sm.scale.setScalar(s);
-    sm.userData.vel.set((Math.random()-0.5)*s*0.3, s*0.5 + Math.random()*s*0.3, (Math.random()-0.5)*s*0.3);
+    var sm = ex.smokeWisps[j]; sm.scale.setScalar(s);
+    sm.position.set(w.x+(Math.random()-0.5)*s*2, w.y+(Math.random()-0.5)*s*2, w.z+(Math.random()-0.5)*s);
+    sm.userData.vel.set((Math.random()-0.5)*s*0.3, s*0.5+Math.random()*s*0.3, (Math.random()-0.5)*s*0.3);
     sm.userData.life = 2.0; sm.material.opacity = 0.6; sm.visible = true;
   }
   activeExplosions.push(ex);
 }
 
 function tickExplosions(dt) {
-  for (var i = activeExplosions.length - 1; i >= 0; i--) {
+  for (var i = activeExplosions.length-1; i >= 0; i--) {
     var ex = activeExplosions[i]; ex.age += dt;
-    ex.flash.intensity = ex.age < 0.5 ? 5 * (1 - ex.age / 0.5) : 0;
-    if (ex.age < 0.1) {
-      var fs = (ex.age / 0.1) * 30 * ex.s;
-      ex.flashSprite.scale.set(fs, fs, 1);
-      ex.flashSprite.material.opacity = 1;
-    } else if (ex.age < 0.4) {
-      ex.flashSprite.scale.set(30 * ex.s, 30 * ex.s, 1);
-      ex.flashSprite.material.opacity = Math.max(0, 1 - (ex.age - 0.1) / 0.3);
-    } else {
-      ex.flashSprite.visible = false;
-    }
-    if (ex.age < 0.5) {
-      var rf = ex.age / 0.5;
-      ex.ring.scale.setScalar((1 + rf * 49) * ex.s);
-      ex.ring.material.opacity = 0.8 * (1 - rf);
-    } else {
-      ex.ring.visible = false;
-    }
-    var grav = ex.s * 3;
-    for (var j = 0; j < ex.hotDebris.length; j++) {
-      var p = ex.hotDebris[j]; p.userData.life -= dt;
+    ex.flash.intensity = ex.age < 0.5 ? 5*(1-ex.age/0.5) : 0;
+    if (ex.age < 0.1) { var fs=(ex.age/0.1)*30*ex.s; ex.flashSprite.scale.set(fs,fs,1); ex.flashSprite.material.opacity=1; }
+    else if (ex.age < 0.4) { ex.flashSprite.scale.set(30*ex.s,30*ex.s,1); ex.flashSprite.material.opacity=Math.max(0,1-(ex.age-0.1)/0.3); }
+    else ex.flashSprite.visible = false;
+    if (ex.age < 0.5) { var rf=ex.age/0.5; ex.ring.scale.setScalar((1+rf*49)*ex.s); ex.ring.material.opacity=0.8*(1-rf); }
+    else ex.ring.visible = false;
+    var grav = ex.s*3, j, p;
+    for (j = 0; j < ex.hotDebris.length; j++) {
+      p = ex.hotDebris[j]; p.userData.life -= dt;
       if (p.userData.life <= 0) { p.visible = false; continue; }
-      p.position.x += p.userData.vel.x * dt;
-      p.position.y += p.userData.vel.y * dt;
-      p.position.z += p.userData.vel.z * dt;
-      p.userData.vel.y -= grav * dt;
-      if (p.position.y < ex.w.y - 20 * ex.s && p.userData.vel.y < 0) {
-        p.userData.vel.y *= -0.3; p.userData.vel.x *= 0.7; p.userData.vel.z *= 0.7;
-      }
-      var lifeRatio = p.userData.life / p.userData.maxLife;
-      p.scale.setScalar(Math.max(0.1, lifeRatio) * ex.s);
-      p.material.opacity = lifeRatio;
+      p.position.x+=p.userData.vel.x*dt; p.position.y+=p.userData.vel.y*dt; p.position.z+=p.userData.vel.z*dt;
+      p.userData.vel.y -= grav*dt;
+      if (p.position.y < ex.w.y-20*ex.s && p.userData.vel.y < 0) { p.userData.vel.y*=-0.3; p.userData.vel.x*=0.7; p.userData.vel.z*=0.7; }
+      var lr=p.userData.life/p.userData.maxLife; p.scale.setScalar(Math.max(0.1,lr)*ex.s); p.material.opacity=lr;
     }
-    for (var k = 0; k < ex.smokeWisps.length; k++) {
-      var sm = ex.smokeWisps[k]; sm.userData.life -= dt;
-      if (sm.userData.life <= 0) { sm.visible = false; continue; }
-      sm.position.x += sm.userData.vel.x * dt;
-      sm.position.y += sm.userData.vel.y * dt;
-      sm.position.z += sm.userData.vel.z * dt;
-      sm.userData.vel.x *= 0.98; sm.userData.vel.z *= 0.98;
-      var sLife = sm.userData.life / sm.userData.maxLife;
-      sm.scale.setScalar((1 + (1 - sLife) * 3) * ex.s);
-      sm.material.opacity = sLife * 0.6;
+    for (j = 0; j < ex.smokeWisps.length; j++) {
+      p = ex.smokeWisps[j]; p.userData.life -= dt;
+      if (p.userData.life <= 0) { p.visible = false; continue; }
+      p.position.x+=p.userData.vel.x*dt; p.position.y+=p.userData.vel.y*dt; p.position.z+=p.userData.vel.z*dt;
+      p.userData.vel.x*=0.98; p.userData.vel.z*=0.98;
+      var sl=p.userData.life/p.userData.maxLife; p.scale.setScalar((1+(1-sl)*3)*ex.s); p.material.opacity=sl*0.6;
     }
-    // Return to pool when expired
-    if (ex.age > 2.5) {
-      ex.inUse = false;
-      ex.flash.visible = false; ex.flash.intensity = 0;
-      ex.flashSprite.visible = false;
-      ex.ring.visible = false;
-      for (var ci = 0; ci < ex.hotDebris.length; ci++) ex.hotDebris[ci].visible = false;
-      for (var si = 0; si < ex.smokeWisps.length; si++) ex.smokeWisps[si].visible = false;
-      activeExplosions.splice(i, 1);
-    }
+    if (ex.age > 2.5) { resetExplosionSlot(ex); activeExplosions.splice(i, 1); }
   }
+}
+function resetExplosionSlot(ex) {
+  ex.inUse=false; ex.flash.visible=false; ex.flash.intensity=0; ex.flashSprite.visible=false; ex.ring.visible=false;
+  for (var c=0;c<ex.hotDebris.length;c++) ex.hotDebris[c].visible=false;
+  for (var s=0;s<ex.smokeWisps.length;s++) ex.smokeWisps[s].visible=false;
 }
 
 function spawnDrone(idx) {
-  var tgt = TARGETS[idx % 4], cAlt = 25 + Math.random() * 30, cSpd = 22 + Math.random() * 8;
+  var tgt = TARGETS[idx % 4], cAlt = 25 + Math.random()*30, cSpd = 22 + Math.random()*8;
   var wp = generateWaypoints(VAN_POS[0], VAN_POS[1], tgt.lng, tgt.lat, 0.001+Math.random()*0.0015);
   return { lng:VAN_POS[0], lat:VAN_POS[1], alt:0, prevLng:VAN_POS[0], prevLat:VAN_POS[1],
     heading:0, smoothHeading:0, bank:0, bankVel:0, pitch:0, targetIdx:idx%4,
@@ -402,11 +378,18 @@ for (var i = 0; i < TOTAL; i++) drones.push(spawnDrone(i));
 var map = new mapboxgl.Map({ container:"map", style:"mapbox://styles/mapbox/dark-v11", center:SF_CENTER, zoom:14.8, pitch:58, bearing:-20, antialias:true });
 
 TARGETS.forEach(function(t, idx) {
+  var wrapper = document.createElement("div");
+  wrapper.style.cssText = "position:relative";
   var el = document.createElement("div"); el.id = "tgt-marker-" + idx;
   el.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" style="animation:target-pulse 2.5s ease-in-out infinite"><circle cx="14" cy="14" r="11" fill="none" stroke="#ff3333" stroke-width="1.5" opacity="0.6"/><circle cx="14" cy="14" r="6" fill="none" stroke="#ff3333" stroke-width="1" opacity="0.4"/><circle cx="14" cy="14" r="2" fill="#ff3333" opacity="0.7"/></svg>';
   el.style.cssText = "filter:drop-shadow(0 0 8px rgba(255,50,50,0.35))";
-  var popup = new mapboxgl.Popup({offset:16,closeButton:false}).setHTML('<div style="font-family:monospace;font-size:7px;letter-spacing:1.5px;color:#ff6666;background:rgba(0,0,0,0.85);padding:3px 6px;border:1px solid rgba(255,50,50,0.25);border-radius:2px">'+t.name+'</div>');
-  new mapboxgl.Marker({element:el,anchor:"center"}).setLngLat([t.lng,t.lat]).setPopup(popup).addTo(map).togglePopup();
+  var status = document.createElement("div");
+  status.className = "tgt-status"; status.id = "tgt-status-" + idx;
+  status.textContent = t.name;
+  wrapper.appendChild(status);
+  wrapper.appendChild(el);
+  tgtStatusEls[idx] = status;
+  new mapboxgl.Marker({element:wrapper, anchor:"center"}).setLngLat([t.lng, t.lat]).addTo(map);
 });
 
 var iconCtr = document.getElementById("drone-icons"), droneIcons = [];
@@ -417,18 +400,19 @@ var targetLines = [];
 
 var droneLayer = {
   id: "drone-3d-layer", type: "custom", renderingMode: "3d",
-  onAdd: function(map, gl) {
+  onAdd: function(m, gl) {
     threeCamera = new THREE.Camera();
     threeScene = new THREE.Scene();
     threeScene.add(new THREE.AmbientLight(0x7799cc, 0.6));
     var dir = new THREE.DirectionalLight(0xffffff, 0.4); dir.position.set(1,2,1); threeScene.add(dir);
-    threeRenderer = new THREE.WebGLRenderer({ canvas:map.getCanvas(), context:gl, antialias:true });
+    threeRenderer = new THREE.WebGLRenderer({ canvas:m.getCanvas(), context:gl, antialias:true });
     threeRenderer.autoClear = false;
     var vs = meterScale(VAN_POS[1], 0);
     vanMesh = buildVan(vs);
     var vw = lngLatAltToWorld(VAN_POS[0], VAN_POS[1], 0);
     vanMesh.position.set(vw.x, vw.y, vw.z); threeScene.add(vanMesh);
     initExplosionPool();
+    initAmbientParticles();
   },
   render: function(gl, matrix) {
     threeCamera.projectionMatrix = new THREE.Matrix4().fromArray(matrix);
@@ -440,9 +424,15 @@ var droneLayer = {
 
 map.on("style.load", function() {
   map.addLayer({ id:"3d-buildings", source:"composite", "source-layer":"building", filter:["==","extrude","true"], type:"fill-extrusion", minzoom:14,
-    paint:{"fill-extrusion-color":["interpolate",["linear"],["get","height"],0,"#151c28",50,"#1a2538",100,"#202e48",200,"#283858",300,"#304268"],"fill-extrusion-height":["get","height"],"fill-extrusion-base":["get","min_height"],"fill-extrusion-opacity":0.88}});
-  map.setFog({color:"#0c1020","high-color":"#0a1028","horizon-blend":0.06,"space-color":"#040810","star-intensity":0.5});
-  map.setLight({anchor:"viewport",color:"#7799cc",intensity:0.5,position:[1.5,200,30]});
+    paint:{
+      "fill-extrusion-color":["interpolate",["linear"],["get","height"],0,"#161d28",30,"#1a2538",100,"#1e2e45",200,"#243652",300,"#2a4060"],
+      "fill-extrusion-height":["get","height"],
+      "fill-extrusion-base":["get","min_height"],
+      "fill-extrusion-opacity":0.88
+    }
+  });
+  map.setFog({color:"#0a0f1a","high-color":"#121830","horizon-blend":0.06,"space-color":"#040810","star-intensity":0.6});
+  map.setLight({anchor:"viewport",color:"#7799cc",intensity:0.4,position:[1.5,45,30]});
   map.addLayer(droneLayer);
   map.addSource("trails",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
   map.addLayer({id:"trail-glow",type:"line",source:"trails",paint:{"line-color":"#2255aa","line-opacity":0.08,"line-width":4,"line-blur":4}});
@@ -455,13 +445,50 @@ map.on("style.load", function() {
 function spawnDroneMesh(idx) {
   var s = meterScale(37.79, 50);
   var mesh = buildDrone(s); mesh.visible = false; threeScene.add(mesh); droneMeshes[idx] = mesh;
-  var shGeo = new THREE.CircleGeometry(0.5*s, 12);
-  var sh = new THREE.Mesh(shGeo, new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.3, side:THREE.DoubleSide}));
+  var sh = new THREE.Mesh(new THREE.CircleGeometry(0.5*s,12), new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.3, side:THREE.DoubleSide}));
   sh.rotation.x = -Math.PI/2; sh.visible = false; threeScene.add(sh); shadowMeshes[idx] = sh;
   var lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);
   var line = new THREE.Line(lineGeo, targetLineMat.clone());
-  line.computeLineDistances();
-  line.visible = false; threeScene.add(line); targetLines[idx] = line;
+  line.computeLineDistances(); line.visible = false; threeScene.add(line); targetLines[idx] = line;
+}
+
+function countIncomingForTarget(tIdx) {
+  var count = 0;
+  for (var i = 0; i < drones.length; i++) {
+    if (drones[i].launched && !drones[i].struck && drones[i].targetIdx === tIdx) count++;
+  }
+  return count;
+}
+
+function updateTargetStatus() {
+  for (var idx = 0; idx < TARGETS.length; idx++) {
+    var el = tgtStatusEls[idx]; if (!el) continue;
+    if (TARGETS[idx].hit) {
+      el.textContent = "NEUTRALIZED";
+      el.className = "tgt-status hit";
+    } else {
+      var inc = countIncomingForTarget(idx);
+      el.textContent = inc > 0 ? "INCOMING: " + inc : TARGETS[idx].name;
+      el.className = "tgt-status";
+    }
+  }
+}
+
+function flashDeployCounter() {
+  var el = document.getElementById("sDep");
+  el.classList.remove("dep-flash");
+  void el.offsetWidth;
+  el.classList.add("dep-flash");
+}
+
+function showMissionComplete() {
+  if (missionEnded) return; missionEnded = true;
+  var ts = Math.floor(simTime), acc = TOTAL > 0 ? Math.round((strikes/TOTAL)*100) : 0;
+  document.getElementById("mc-time").textContent = String(Math.floor(ts/60)).padStart(2,"0")+":"+String(ts%60).padStart(2,"0");
+  document.getElementById("mc-tgts").textContent = targetsHit+" / "+TARGETS.length;
+  document.getElementById("mc-acc").textContent = acc+"%";
+  setTimeout(function() { document.getElementById("mission-complete").classList.add("show"); }, 2000);
+  setTimeout(function() { document.getElementById("mc-box").classList.add("show"); }, 2500);
 }
 
 function simStep(dt) {
@@ -471,6 +498,7 @@ function simStep(dt) {
     var d = drones[deployed]; d.launched = true; d.phase = "rise"; d.launchTime = simTime; d.pathT = 0;
     spawnDroneMesh(deployed); droneMeshes[deployed].visible = true; shadowMeshes[deployed].visible = true;
     deployed++; deployTimer = 0; droneIcons[deployed-1].className = "di active";
+    flashDeployCounter();
     if (vanMesh && vanMesh.userData.light) vanMesh.userData.light.intensity = 6;
   }
   if (vanMesh && vanMesh.userData.light && vanMesh.userData.light.intensity > 2) {
@@ -479,129 +507,114 @@ function simStep(dt) {
   for (var i = 0; i < drones.length; i++) {
     var d = drones[i];
     if (!d.launched || d.struck) continue;
-    var elapsed = simTime - d.launchTime;
-    var nt = simTime + d.noiseSeed;
-    d.jX = (smoothNoise(nt * 1.7) - 0.5) * 0.6 + (smoothNoise(nt * 3.1 + 100) - 0.5) * 0.12;
-    d.jZ = (smoothNoise(nt * 1.3 + 50) - 0.5) * 0.6 + (smoothNoise(nt * 2.7 + 200) - 0.5) * 0.12;
-    d.jY = (smoothNoise(nt * 2.3 + 150) - 0.5) * 0.3 + (smoothNoise(nt * 4.1 + 300) - 0.5) * 0.06;
-    d.prevAlt = d.alt;
-    if (d.phase === "rise") {
-      var rf = Math.min(elapsed/d.riseTime, 1), e = rf*rf*(3-2*rf);
-      d.alt = e*15; d.lng = VAN_POS[0]+(Math.random()-0.5)*0.00001; d.lat = VAN_POS[1]+(Math.random()-0.5)*0.00001;
-      d.rotorSpeedMul = 1.5;
-      if (rf >= 1) { d.phase = "cruise"; d.launchTime = simTime; }
-    } else if (d.phase === "cruise") {
-      if (d.orbitPause > 0) {
-        d.orbitPause -= dt;
-        d.prevLng = d.lng; d.prevLat = d.lat;
-        var orbitR = 0.00008;
-        var orbitAngle = simTime * 1.2 + d.noiseSeed;
-        d.lng += Math.cos(orbitAngle) * orbitR * dt;
-        d.lat += Math.sin(orbitAngle) * orbitR * dt;
-      } else {
-        var rawPathT = (simTime - d.launchTime) / d.pathDuration;
-        if (rawPathT > 0.95 && !d.diving) d.diving = true;
-        if (d.diving) {
-          d.pathT = Math.min(d.pathT + (dt / d.pathDuration) * 2.0, 1);
-        } else {
-          d.pathT = Math.min(rawPathT, 1);
-        }
-        var pos = evalSpline(d.waypoints, d.pathT);
-        d.prevLng = d.lng; d.prevLat = d.lat; d.lng = pos[0]; d.lat = pos[1];
-        d.alt = altProfile(d.pathT, d.cruiseAlt, d.tAlt);
-        var wpSeg = Math.floor(d.pathT * (d.waypoints.length - 1));
-        if (wpSeg > 0 && wpSeg !== d.orbitWaypoint && wpSeg < d.waypoints.length - 2 && d.pathT > 0.3 && d.pathT < 0.7) {
-          if (Math.random() < 0.004) {
-            d.orbitPause = 0.4 + Math.random() * 0.8;
-            d.orbitWaypoint = wpSeg;
-          }
-        }
-      }
-      var dLng = d.lng-d.prevLng, dLat = d.lat-d.prevLat;
-      var turnRate = 0;
-      if (Math.abs(dLng) > 1e-9 || Math.abs(dLat) > 1e-9) {
-        var th = Math.atan2(dLng, dLat)*180/Math.PI, hd = th-d.smoothHeading;
-        while (hd > 180) hd -= 360; while (hd < -180) hd += 360;
-        turnRate = hd * Math.min(dt * 4, 1);
-        d.smoothHeading += turnRate; d.heading = d.smoothHeading;
-      }
-      var targetBank = Math.max(-35, Math.min(35, turnRate * 25)) * (Math.PI / 180);
-      d.bankVel += (targetBank - d.bank) * 8 * dt;
-      d.bankVel *= 0.85;
-      d.bank += d.bankVel * dt;
-      var tp;
-      if (d.diving) { tp = -30 * Math.PI / 180; }
-      else if (d.pathT > 0.85) { tp = -(d.pathT - 0.85) / 0.15 * 0.3; }
-      else { tp = 0; }
-      d.pitch += (tp - d.pitch) * Math.min(dt * 3, 1);
-      var altRate = (d.alt - d.prevAlt) / Math.max(dt, 0.001);
-      if (d.diving) { d.rotorSpeedMul = 2.0; }
-      else if (altRate > 1) { d.rotorSpeedMul += (1.5 - d.rotorSpeedMul) * Math.min(dt * 4, 1); }
-      else if (altRate < -1) { d.rotorSpeedMul += (0.7 - d.rotorSpeedMul) * Math.min(dt * 4, 1); }
-      else { d.rotorSpeedMul += (1.0 - d.rotorSpeedMul) * Math.min(dt * 4, 1); }
-      if (d.pathT >= 0.98) {
-        var sx = d.lng-d.tLng, sy = d.lat-d.tLat;
-        if (Math.sqrt(sx*sx+sy*sy) < 0.0003 || d.pathT >= 1.0) {
-          d.struck = true; strikes++; droneIcons[i].className = "di struck";
-          if (droneMeshes[i]) droneMeshes[i].visible = false;
-          if (shadowMeshes[i]) shadowMeshes[i].visible = false;
-          if (targetLines[i]) targetLines[i].visible = false;
-          spawnExplosion(d.tLng, d.tLat, d.tAlt);
-          triggerCameraShake(d.tLng, d.tLat);
-          var tgt = TARGETS[d.targetIdx];
-          if (!tgt.hit) { tgt.hit = true; targetsHit++; flashTarget(d.targetIdx); }
-          continue;
-        }
-      }
-    }
-    if (droneMeshes[i] && droneMeshes[i].visible) {
-      var ms = meterScale(d.lat, d.alt), w = lngLatAltToWorld(d.lng, d.lat, d.alt);
-      droneMeshes[i].position.set(w.x+d.jX*ms, w.y+d.jY*ms, w.z+d.jZ*ms);
-      droneMeshes[i].rotation.set(d.pitch, -d.heading*Math.PI/180, d.bank);
-      var rotors = droneMeshes[i].userData.rotors;
-      if (rotors) for (var r = 0; r < rotors.length; r++) rotors[r].rotation.z += (dt * 40 * d.rotorSpeedMul) + r * 0.5;
-      var strobeObj = droneMeshes[i].userData.strobe;
-      if (strobeObj) strobeObj.visible = (simTime % 1.2) < 0.1;
-      var exhaustCones = droneMeshes[i].userData.exhaustCones;
-      if (exhaustCones) {
-        var thrustScale = 0.5 + d.rotorSpeedMul * 0.4;
-        for (var ec = 0; ec < exhaustCones.length; ec++) {
-          exhaustCones[ec].scale.y = thrustScale;
-          exhaustCones[ec].material.opacity = 0.1 + d.rotorSpeedMul * 0.1;
-        }
-      }
-      var camPos = map.getCenter();
-      var dxCam = (d.lng - camPos.lng) * 87000, dyCam = (d.lat - camPos.lat) * 111000;
-      var camDist = Math.sqrt(dxCam * dxCam + dyCam * dyCam);
-      var showDetail = camDist < 400;
-      var details = droneMeshes[i].userData.detailParts;
-      if (details) for (var dp = 0; dp < details.length; dp++) details[dp].visible = showDetail;
-      if (targetLines[i]) {
-        if (d.pathT > 0.9 && d.phase === "cruise") {
-          var tw = lngLatAltToWorld(d.tLng, d.tLat, d.tAlt);
-          var posArr = targetLines[i].geometry.attributes.position.array;
-          posArr[0] = w.x; posArr[1] = w.y; posArr[2] = w.z;
-          posArr[3] = tw.x; posArr[4] = tw.y; posArr[5] = tw.z;
-          targetLines[i].geometry.attributes.position.needsUpdate = true;
-          targetLines[i].computeLineDistances();
-          targetLines[i].visible = true;
-        } else {
-          targetLines[i].visible = false;
-        }
-      }
-      if (shadowMeshes[i]) {
-        var gw = lngLatAltToWorld(d.lng, d.lat, 0);
-        shadowMeshes[i].position.set(gw.x, gw.y, gw.z);
-        shadowMeshes[i].scale.setScalar(1+d.alt*0.01);
-        shadowMeshes[i].material.opacity = Math.max(0.05, 0.3-d.alt*0.002);
-      }
-    }
+    updateDronePhysics(d, i, dt);
+    updateDroneMesh(d, i, dt);
     d.trailCoords.push([d.lng, d.lat]);
     if (d.trailCoords.length > 80) d.trailCoords.shift();
   }
   tickExplosions(dt);
+  tickAmbientParticles(dt);
   if (frameCount % 5 === 0) updateTrails();
+  if (frameCount % 10 === 0) updateTargetStatus();
   updateCamera(dt); updateHUD(); frameCount++;
+  if (deployed >= TOTAL && strikes >= TOTAL && !missionEnded) showMissionComplete();
+}
+
+function updateDronePhysics(d, i, dt) {
+  var nt = simTime + d.noiseSeed;
+  d.jX = (smoothNoise(nt*1.7)-0.5)*0.6 + (smoothNoise(nt*3.1+100)-0.5)*0.12;
+  d.jZ = (smoothNoise(nt*1.3+50)-0.5)*0.6 + (smoothNoise(nt*2.7+200)-0.5)*0.12;
+  d.jY = (smoothNoise(nt*2.3+150)-0.5)*0.3 + (smoothNoise(nt*4.1+300)-0.5)*0.06;
+  d.prevAlt = d.alt;
+  if (d.phase === "rise") {
+    var elapsed = simTime - d.launchTime;
+    var rf = Math.min(elapsed/d.riseTime, 1), e = rf*rf*(3-2*rf);
+    d.alt = e*15; d.lng = VAN_POS[0]+(Math.random()-0.5)*0.00001; d.lat = VAN_POS[1]+(Math.random()-0.5)*0.00001;
+    d.rotorSpeedMul = 1.5;
+    if (rf >= 1) { d.phase = "cruise"; d.launchTime = simTime; }
+  } else if (d.phase === "cruise") {
+    updateCruisePhase(d, i, dt);
+  }
+}
+
+function updateCruisePhase(d, i, dt) {
+  if (d.orbitPause > 0) {
+    d.orbitPause -= dt; d.prevLng = d.lng; d.prevLat = d.lat;
+    var orbitAngle = simTime * 1.2 + d.noiseSeed;
+    d.lng += Math.cos(orbitAngle) * 0.00008 * dt;
+    d.lat += Math.sin(orbitAngle) * 0.00008 * dt;
+  } else {
+    var rawPathT = (simTime - d.launchTime) / d.pathDuration;
+    if (rawPathT > 0.95 && !d.diving) d.diving = true;
+    d.pathT = d.diving ? Math.min(d.pathT + (dt/d.pathDuration)*2.0, 1) : Math.min(rawPathT, 1);
+    var pos = evalSpline(d.waypoints, d.pathT);
+    d.prevLng = d.lng; d.prevLat = d.lat;
+    d.lng = safe(pos[0]); d.lat = safe(pos[1]);
+    d.alt = safe(altProfile(d.pathT, d.cruiseAlt, d.tAlt));
+    var wpSeg = Math.floor(d.pathT * (d.waypoints.length - 1));
+    if (wpSeg > 0 && wpSeg !== d.orbitWaypoint && wpSeg < d.waypoints.length-2 && d.pathT > 0.3 && d.pathT < 0.7) {
+      if (Math.random() < 0.004) { d.orbitPause = 0.4+Math.random()*0.8; d.orbitWaypoint = wpSeg; }
+    }
+  }
+  var dLng=d.lng-d.prevLng, dLat=d.lat-d.prevLat, turnRate=0;
+  if (Math.abs(dLng)>1e-9||Math.abs(dLat)>1e-9) {
+    var hd=Math.atan2(dLng,dLat)*180/Math.PI-d.smoothHeading;
+    while(hd>180)hd-=360; while(hd<-180)hd+=360;
+    turnRate=hd*Math.min(dt*4,1); d.smoothHeading+=turnRate; d.heading=d.smoothHeading;
+  }
+  d.bankVel+=(Math.max(-35,Math.min(35,turnRate*25))*Math.PI/180-d.bank)*8*dt; d.bankVel*=0.85; d.bank+=d.bankVel*dt;
+  var tp=d.diving?-30*Math.PI/180:(d.pathT>0.85?-(d.pathT-0.85)/0.15*0.3:0);
+  d.pitch+=(tp-d.pitch)*Math.min(dt*3,1);
+  var altR=(d.alt-d.prevAlt)/Math.max(dt,0.001), rsTarget=d.diving?2.0:(altR>1?1.5:(altR<-1?0.7:1.0));
+  d.rotorSpeedMul+=d.diving?0:(rsTarget-d.rotorSpeedMul)*Math.min(dt*4,1);
+  if(d.diving)d.rotorSpeedMul=2.0;
+  if (d.pathT >= 0.98) {
+    var sx = d.lng-d.tLng, sy = d.lat-d.tLat;
+    if (Math.sqrt(sx*sx+sy*sy) < 0.0003 || d.pathT >= 1.0) {
+      d.struck = true; strikes++; droneIcons[i].className = "di struck";
+      if (droneMeshes[i]) droneMeshes[i].visible = false;
+      if (shadowMeshes[i]) shadowMeshes[i].visible = false;
+      if (targetLines[i]) targetLines[i].visible = false;
+      spawnExplosion(d.tLng, d.tLat, d.tAlt);
+      triggerCameraShake(d.tLng, d.tLat);
+      var tgt = TARGETS[d.targetIdx];
+      if (!tgt.hit) { tgt.hit = true; targetsHit++; flashTarget(d.targetIdx); }
+    }
+  }
+}
+
+function updateDroneMesh(d, i, dt) {
+  if (!droneMeshes[i] || !droneMeshes[i].visible) return;
+  var ms = meterScale(d.lat, d.alt), w = lngLatAltToWorld(d.lng, d.lat, d.alt);
+  if (!isFinite(w.x) || !isFinite(w.y) || !isFinite(w.z)) return;
+  droneMeshes[i].position.set(w.x+safe(d.jX)*ms, w.y+safe(d.jY)*ms, w.z+safe(d.jZ)*ms);
+  droneMeshes[i].rotation.set(safe(d.pitch), -safe(d.heading)*Math.PI/180, safe(d.bank));
+  var rotors = droneMeshes[i].userData.rotors;
+  if (rotors) for (var r = 0; r < rotors.length; r++) rotors[r].rotation.z += (dt*40*d.rotorSpeedMul) + r*0.5;
+  var strobeObj = droneMeshes[i].userData.strobe;
+  if (strobeObj) strobeObj.visible = (simTime % 1.2) < 0.1;
+  var exCones = droneMeshes[i].userData.exhaustCones, thr = 0.5+d.rotorSpeedMul*0.4;
+  if (exCones) for (var ec = 0; ec < exCones.length; ec++) { exCones[ec].scale.y = thr; exCones[ec].material.opacity = 0.1+d.rotorSpeedMul*0.1; }
+  var camPos = map.getCenter();
+  var dxCam = (d.lng-camPos.lng)*87000, dyCam = (d.lat-camPos.lat)*111000;
+  var showDetail = Math.sqrt(dxCam*dxCam+dyCam*dyCam) < 400;
+  var details = droneMeshes[i].userData.detailParts;
+  if (details) for (var dp = 0; dp < details.length; dp++) details[dp].visible = showDetail;
+  if (targetLines[i]) {
+    if (d.pathT > 0.9 && d.phase === "cruise" && !d.struck) {
+      var tw = lngLatAltToWorld(d.tLng, d.tLat, d.tAlt);
+      var posArr = targetLines[i].geometry.attributes.position.array;
+      posArr[0]=w.x; posArr[1]=w.y; posArr[2]=w.z; posArr[3]=tw.x; posArr[4]=tw.y; posArr[5]=tw.z;
+      targetLines[i].geometry.attributes.position.needsUpdate = true;
+      targetLines[i].computeLineDistances(); targetLines[i].visible = true;
+    } else { targetLines[i].visible = false; }
+  }
+  if (shadowMeshes[i]) {
+    var gw = lngLatAltToWorld(d.lng, d.lat, 0);
+    shadowMeshes[i].position.set(gw.x, gw.y, gw.z);
+    shadowMeshes[i].scale.setScalar(1+d.alt*0.01);
+    shadowMeshes[i].material.opacity = Math.max(0.05, 0.3-d.alt*0.002);
+  }
 }
 
 function flashTarget(idx) {
@@ -616,68 +629,20 @@ function flashTarget(idx) {
 
 function triggerCameraShake(strikeLng, strikeLat) {
   var center = map.getCenter();
-  var dx = (strikeLng - center.lng) * 87000, dy = (strikeLat - center.lat) * 111000;
-  var dist = Math.sqrt(dx * dx + dy * dy);
+  var dx = (strikeLng-center.lng)*87000, dy = (strikeLat-center.lat)*111000;
+  var dist = Math.sqrt(dx*dx+dy*dy);
   if (dist < 200 || (trackedDrone && trackedDrone.struck)) {
     camShakeTimer = 0.3;
-    camShakeIntensity = Math.max(0.3, 1.0 - dist / 200);
+    camShakeIntensity = Math.max(0.3, 1.0-dist/200);
   }
 }
 
 function updateCamera(dt) {
   if (camShakeTimer > 0) camShakeTimer -= dt;
   if (trackCam) {
-    var lead = null;
-    for (var i = 0; i < drones.length; i++) { if (drones[i].launched && !drones[i].struck && drones[i].phase==="cruise") { lead=drones[i]; break; } }
-    if (!lead) for (var j = 0; j < drones.length; j++) { if (drones[j].launched && !drones[j].struck) { lead=drones[j]; break; } }
+    var lead = findTrackedDrone();
     trackedDrone = lead;
-    if (lead) {
-      var spdLng = lead.lng - lead.prevLng, spdLat = lead.lat - lead.prevLat;
-      var groundSpd = Math.sqrt((spdLng*87000)*(spdLng*87000)+(spdLat*111000)*(spdLat*111000)) / Math.max(dt, 0.001);
-      if (!isFinite(groundSpd)) groundSpd = 0;
-      var hr = lead.heading * Math.PI / 180;
-      var lookAheadDist = 40 + Math.min(groundSpd * 1.5, 120);
-      var laLng = Math.sin(hr) * (lookAheadDist / 87000);
-      var laLat = Math.cos(hr) * (lookAheadDist / 111000);
-      var targetCenterLng = lead.lng + laLng;
-      var targetCenterLat = lead.lat + laLat;
-      var tcDiffLng = targetCenterLng - (lead.lng + camPosVelLng * 0.01);
-      var tcDiffLat = targetCenterLat - (lead.lat + camPosVelLat * 0.01);
-      camPosVelLng += tcDiffLng * 5 * dt;
-      camPosVelLat += tcDiffLat * 5 * dt;
-      camPosVelLng *= 0.92; camPosVelLat *= 0.92;
-      var finalCenterLng = lead.lng + camPosVelLng * 0.1 + laLng;
-      var finalCenterLat = lead.lat + camPosVelLat * 0.1 + laLat;
-      var targetBearing = lead.heading;
-      var bd = targetBearing - camBearing;
-      while (bd > 180) bd -= 360; while (bd < -180) bd += 360;
-      var springK = Math.abs(bd) > 20 ? 10 : 6;
-      camBearingVel += bd * springK * dt;
-      camBearingVel *= 0.88;
-      camBearing += camBearingVel * dt;
-      var tPitch = lead.pathT > 0.85 ? 55+(lead.pathT-0.85)/0.15*15 : 55;
-      camPitch += (tPitch-camPitch)*Math.min(dt*2,1);
-      var baseZoom = Math.max(14.5, Math.min(17, 17-(lead.alt/80)*2));
-      var speedFactor = Math.min(groundSpd / 60, 1);
-      var tZoom = baseZoom - speedFactor * 0.3;
-      camZoomVel += (tZoom - camZoom) * 4 * dt;
-      camZoomVel *= 0.92;
-      camZoom += camZoomVel * dt;
-      var shakeOffLng = 0, shakeOffLat = 0;
-      if (camShakeTimer > 0) {
-        var shakeAmp = camShakeIntensity * (camShakeTimer / 0.3) * 0.0001;
-        shakeOffLng = (Math.random() - 0.5) * shakeAmp;
-        shakeOffLat = (Math.random() - 0.5) * shakeAmp;
-      }
-      map.easeTo({center:[finalCenterLng + shakeOffLng, finalCenterLat + shakeOffLat], bearing:camBearing, pitch:camPitch, zoom:camZoom, duration:150, easing:function(t){return t;}});
-      document.getElementById("track-hud").style.display = "block";
-      document.getElementById("compass").style.display = "block";
-      document.getElementById("th-target").textContent = TARGETS[lead.targetIdx].name;
-      if (isFinite(groundSpd) && groundSpd < 200) document.getElementById("th-speed").textContent = groundSpd.toFixed(1);
-      document.getElementById("th-alt").textContent = lead.alt.toFixed(0);
-      document.getElementById("th-hdg").textContent = ((lead.heading%360+360)%360).toFixed(0);
-      drawCompass(lead.heading);
-    }
+    if (lead) updateTrackCamera(lead, dt);
   } else {
     trackedDrone = null;
     document.getElementById("track-hud").style.display = "none";
@@ -687,11 +652,55 @@ function updateCamera(dt) {
   }
 }
 
+function findTrackedDrone() {
+  if (selectedDroneIdx >= 0 && drones[selectedDroneIdx].launched && !drones[selectedDroneIdx].struck) {
+    return drones[selectedDroneIdx];
+  }
+  for (var i = 0; i < drones.length; i++) {
+    if (drones[i].launched && !drones[i].struck && drones[i].phase === "cruise") return drones[i];
+  }
+  for (var j = 0; j < drones.length; j++) {
+    if (drones[j].launched && !drones[j].struck) return drones[j];
+  }
+  return null;
+}
+
+function updateTrackCamera(lead, dt) {
+  var spdLng = lead.lng-lead.prevLng, spdLat = lead.lat-lead.prevLat;
+  var groundSpd = Math.sqrt((spdLng*87000)*(spdLng*87000)+(spdLat*111000)*(spdLat*111000)) / Math.max(dt,0.001);
+  groundSpd = safe(groundSpd);
+  var hr = lead.heading*Math.PI/180;
+  var lookAheadDist = 40+Math.min(groundSpd*1.5, 120);
+  var laLng = Math.sin(hr)*(lookAheadDist/87000), laLat = Math.cos(hr)*(lookAheadDist/111000);
+  var targetCLng = lead.lng+laLng, targetCLat = lead.lat+laLat;
+  camPosVelLng += (targetCLng-(lead.lng+camPosVelLng*0.01))*5*dt; camPosVelLat += (targetCLat-(lead.lat+camPosVelLat*0.01))*5*dt;
+  camPosVelLng *= 0.92; camPosVelLat *= 0.92;
+  var finalLng = lead.lng+camPosVelLng*0.1+laLng, finalLat = lead.lat+camPosVelLat*0.1+laLat;
+  var bd = lead.heading-camBearing;
+  while (bd > 180) bd -= 360; while (bd < -180) bd += 360;
+  camBearingVel += bd*(Math.abs(bd) > 20 ? 10 : 6)*dt; camBearingVel *= 0.88; camBearing += camBearingVel*dt;
+  var tPitch = lead.pathT > 0.85 ? 55+(lead.pathT-0.85)/0.15*15 : 55;
+  camPitch += (tPitch-camPitch)*Math.min(dt*2,1);
+  var baseZoom = Math.max(14.5, Math.min(17, 17-(lead.alt/80)*2));
+  var tZoom = baseZoom - Math.min(groundSpd/60,1)*0.3;
+  camZoomVel += (tZoom-camZoom)*4*dt; camZoomVel *= 0.92; camZoom += camZoomVel*dt;
+  var shakeOffLng = 0, shakeOffLat = 0;
+  if (camShakeTimer > 0) {
+    var shakeAmp = camShakeIntensity*(camShakeTimer/0.3)*0.0001;
+    shakeOffLng = (Math.random()-0.5)*shakeAmp; shakeOffLat = (Math.random()-0.5)*shakeAmp;
+  }
+  map.easeTo({center:[safe(finalLng+shakeOffLng), safe(finalLat+shakeOffLat)], bearing:safe(camBearing), pitch:safe(camPitch), zoom:safe(camZoom), duration:150, easing:function(t){return t;}});
+  document.getElementById("track-hud").style.display = "block"; document.getElementById("compass").style.display = "block";
+  document.getElementById("th-target").textContent = TARGETS[lead.targetIdx].name;
+  if (isFinite(groundSpd) && groundSpd < 200) document.getElementById("th-speed").textContent = groundSpd.toFixed(1);
+  document.getElementById("th-alt").textContent = safe(lead.alt).toFixed(0);
+  document.getElementById("th-hdg").textContent = ((lead.heading%360+360)%360).toFixed(0); drawCompass(lead.heading);
+}
+
 function drawCompass(h) {
-  var c = document.getElementById("compass"), ctx = c.getContext("2d");
+  var ctx = document.getElementById("compass").getContext("2d");
   ctx.clearRect(0,0,36,36); ctx.strokeStyle="rgba(255,255,255,0.15)"; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.arc(18,18,15,0,Math.PI*2); ctx.stroke();
-  ctx.save(); ctx.translate(18,18); ctx.rotate(-h*Math.PI/180);
+  ctx.beginPath(); ctx.arc(18,18,15,0,Math.PI*2); ctx.stroke(); ctx.save(); ctx.translate(18,18); ctx.rotate(-h*Math.PI/180);
   ctx.fillStyle="rgba(255,80,80,0.7)"; ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(-3,-6); ctx.lineTo(3,-6); ctx.closePath(); ctx.fill();
   ctx.fillStyle="rgba(255,255,255,0.2)"; ctx.beginPath(); ctx.moveTo(0,12); ctx.lineTo(-3,6); ctx.lineTo(3,6); ctx.closePath(); ctx.fill();
   ctx.restore(); ctx.fillStyle="rgba(68,170,255,0.6)"; ctx.beginPath(); ctx.arc(18,18,2,0,Math.PI*2); ctx.fill();
@@ -704,15 +713,12 @@ function updateTrails() {
     if (drones[i].trailCoords.length < 2) continue;
     var coords = drones[i].trailCoords;
     fOld.push({type:"Feature",geometry:{type:"LineString",coordinates:coords.slice()},properties:{}});
-    var recentStart = Math.max(0, coords.length - 20);
     if (coords.length > 2) {
-      fRecent.push({type:"Feature",geometry:{type:"LineString",coordinates:coords.slice(recentStart)},properties:{}});
+      fRecent.push({type:"Feature",geometry:{type:"LineString",coordinates:coords.slice(Math.max(0,coords.length-20))},properties:{}});
     }
   }
   map.getSource("trails").setData({type:"FeatureCollection", features:fOld});
-  if (map.getSource("trails-recent")) {
-    map.getSource("trails-recent").setData({type:"FeatureCollection", features:fRecent});
-  }
+  if (map.getSource("trails-recent")) map.getSource("trails-recent").setData({type:"FeatureCollection", features:fRecent});
 }
 
 var hudTimer = 0;
@@ -724,7 +730,8 @@ function updateHUD() {
   document.getElementById("sFly").textContent = inFlight;
   document.getElementById("sHit").textContent = strikes;
   document.getElementById("sTH").textContent = targetsHit+" / "+TARGETS.length;
-  var act = null; for (var j = 0; j < drones.length; j++) { if (drones[j].launched && !drones[j].struck) { act=drones[j]; break; } }
+  var act = null;
+  for (var j = 0; j < drones.length; j++) { if (drones[j].launched && !drones[j].struck) { act=drones[j]; break; } }
   if (act) document.getElementById("sTgt").textContent = TARGETS[act.targetIdx].name;
   var ts = Math.floor(simTime);
   document.getElementById("clock").textContent = String(Math.floor(ts/60)).padStart(2,"0")+":"+String(ts%60).padStart(2,"0");
@@ -737,15 +744,43 @@ function animate() {
   simStep(dt);
 }
 
-document.getElementById("bp").onclick = function() { playing=!playing; this.textContent=playing?"PAUSE":"PLAY"; this.className=playing?"on":""; };
+// Click to select drone - find closest drone to click point
+map.on("click", function(ev) {
+  var clickLng = ev.lngLat.lng, clickLat = ev.lngLat.lat;
+  var bestIdx = -1, bestDist = 0.0005;
+  for (var i = 0; i < drones.length; i++) {
+    if (!drones[i].launched || drones[i].struck) continue;
+    var dx = drones[i].lng - clickLng, dy = drones[i].lat - clickLat;
+    var dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+  }
+  selectedDroneIdx = bestIdx;
+  if (bestIdx >= 0) {
+    trackCam = true;
+    document.getElementById("bt").className = "on";
+    showSelectRing(drones[bestIdx].lng, drones[bestIdx].lat);
+  }
+});
+
+function showSelectRing(lng, lat) {
+  var ring = document.getElementById("select-ring"), ctx = ring.getContext("2d"), pt = map.project([lng, lat]);
+  ctx.clearRect(0,0,40,40);
+  ctx.strokeStyle="rgba(80,200,255,0.7)"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(20,20,16,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle="rgba(80,200,255,0.3)"; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(20,20,18,0,Math.PI*2); ctx.stroke();
+  ring.style.left=(pt.x-20)+"px"; ring.style.top=(pt.y-20)+"px"; ring.style.display="block";
+  setTimeout(function(){ring.style.display="none";}, 800);
+}
+
+document.getElementById("bp").onclick = function() {
+  playing = !playing;
+  this.textContent = playing ? "PAUSE" : "PLAY";
+  this.className = playing ? "on" : "";
+};
 
 function disposeObject(obj) {
   if (!obj) return;
   if (obj.geometry) obj.geometry.dispose();
-  if (obj.material) {
-    if (obj.material.map) obj.material.map.dispose();
-    obj.material.dispose();
-  }
+  if (obj.material) { if (obj.material.map) obj.material.map.dispose(); obj.material.dispose(); }
 }
 function disposeDroneMesh(mesh) {
   if (!mesh) return;
@@ -754,37 +789,47 @@ function disposeDroneMesh(mesh) {
 }
 
 document.getElementById("br").onclick = function() {
-  // Dispose drone meshes and shadows
   for (var i = 0; i < droneMeshes.length; i++) {
     disposeDroneMesh(droneMeshes[i]);
     if (shadowMeshes[i]) { disposeObject(shadowMeshes[i]); threeScene.remove(shadowMeshes[i]); }
     if (targetLines[i]) { disposeObject(targetLines[i]); threeScene.remove(targetLines[i]); }
   }
-  // Reset explosion pool (hide all, don't destroy)
-  for (var ei = 0; ei < activeExplosions.length; ei++) {
-    var ex = activeExplosions[ei];
-    ex.inUse = false; ex.flash.visible = false; ex.flash.intensity = 0;
-    ex.flashSprite.visible = false; ex.ring.visible = false;
-    for (var hi = 0; hi < ex.hotDebris.length; hi++) ex.hotDebris[hi].visible = false;
-    for (var si = 0; si < ex.smokeWisps.length; si++) ex.smokeWisps[si].visible = false;
-  }
+  for (var ei = 0; ei < activeExplosions.length; ei++) resetExplosionSlot(activeExplosions[ei]);
   activeExplosions = [];
   droneMeshes=[]; shadowMeshes=[]; targetLines=[]; drones=[];
   for (var n = 0; n < TOTAL; n++) drones.push(spawnDrone(n));
   deployed=0; strikes=0; targetsHit=0; simTime=0; deployTimer=0;
-  camBearingVel=0; camPosVelLng=0; camPosVelLat=0; camZoomVel=0; camShakeTimer=0; camShakeIntensity=0;
-  TARGETS.forEach(function(t){t.hit=false;}); droneIcons.forEach(function(e){e.className="di";});
+  camBearingVel=0; camPosVelLng=0; camPosVelLat=0; camZoomVel=0;
+  camShakeTimer=0; camShakeIntensity=0;
+  selectedDroneIdx=-1; missionEnded=false; trackedDrone=null;
+  TARGETS.forEach(function(t){t.hit=false;});
+  droneIcons.forEach(function(e){e.className="di";});
   TARGETS.forEach(function(t,idx) {
     var el = document.getElementById("tgt-marker-"+idx); if (!el) return;
     el.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" style="animation:target-pulse 2.5s ease-in-out infinite"><circle cx="14" cy="14" r="11" fill="none" stroke="#ff3333" stroke-width="1.5" opacity="0.6"/><circle cx="14" cy="14" r="6" fill="none" stroke="#ff3333" stroke-width="1" opacity="0.4"/><circle cx="14" cy="14" r="2" fill="#ff3333" opacity="0.7"/></svg>';
     el.style.filter = "drop-shadow(0 0 8px rgba(255,50,50,0.35))";
   });
+  for (var ti = 0; ti < tgtStatusEls.length; ti++) {
+    if (tgtStatusEls[ti]) { tgtStatusEls[ti].textContent = TARGETS[ti].name; tgtStatusEls[ti].className = "tgt-status"; }
+  }
   if (map.getSource("trails")) map.getSource("trails").setData({type:"FeatureCollection",features:[]});
   if (map.getSource("trails-recent")) map.getSource("trails-recent").setData({type:"FeatureCollection",features:[]});
+  var mcOverlay = document.getElementById("mission-complete");
+  mcOverlay.classList.remove("show");
+  document.getElementById("mc-box").classList.remove("show");
   camBearing=-20; camPitch=58; camZoom=14.8;
+  if (trackCam) { trackCam=false; document.getElementById("bt").className=""; }
   map.easeTo({center:SF_CENTER, zoom:14.8, pitch:58, bearing:-20, duration:500});
 };
-document.getElementById("bt").onclick = function() { trackCam=!trackCam; this.className=trackCam?"on":""; if(!trackCam) map.easeTo({center:SF_CENTER,zoom:14.8,pitch:58,bearing:camBearing,duration:1000}); };
+
+document.getElementById("bt").onclick = function() {
+  trackCam = !trackCam;
+  this.className = trackCam ? "on" : "";
+  if (!trackCam) {
+    selectedDroneIdx = -1;
+    map.easeTo({center:SF_CENTER, zoom:14.8, pitch:58, bearing:camBearing, duration:1000});
+  }
+};
 </script>
 </body>
 </html>
