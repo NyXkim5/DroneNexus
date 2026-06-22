@@ -112,7 +112,9 @@ html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
     </select>
     <span class="sep">|</span><span id="conn-label">CONNECTING</span>
     <span class="sep">|</span><span id="tick-label">T+00:00</span>
-    <span class="spacer"></span><span>UNCLASSIFIED // FOUO</span>
+    <span class="spacer"></span>
+    <span id="mute-btn" style="cursor:pointer;pointer-events:auto;color:rgba(80,200,255,0.7)" onclick="audioMuted=!audioMuted;this.textContent=audioMuted?'[MUTED]':'[SND]';">[SND]</span>
+    <span class="sep">|</span><span>UNCLASSIFIED // FOUO</span>
   </div>
   <div id="metrics"></div>
   <div id="legend">
@@ -164,6 +166,25 @@ function makeIcon(shape,color){
 }
 
 function enuToGeo(e,n,u){return{lat:ORIGIN_LAT+n/111000,lon:ORIGIN_LON+e/(111000*Math.cos(ORIGIN_LAT*Math.PI/180)),alt:u||50}}
+
+/* Web Audio API -- tactical sound effects */
+var audioCtx=null,audioMuted=false;
+function initAudio(){if(audioCtx)return;audioCtx=new(window.AudioContext||window.webkitAudioContext)()}
+document.addEventListener("click",function(){initAudio()},{once:true});
+function playPing(freq,duration,vol){
+  if(!audioCtx||audioMuted)return;var osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+  osc.connect(gain);gain.connect(audioCtx.destination);osc.frequency.value=freq||880;osc.type="sine";
+  gain.gain.setValueAtTime(vol||0.08,audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+(duration||0.15));
+  osc.start();osc.stop(audioCtx.currentTime+(duration||0.15))}
+function playSweep(){
+  if(!audioCtx||audioMuted)return;var osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+  osc.connect(gain);gain.connect(audioCtx.destination);osc.type="sine";
+  osc.frequency.setValueAtTime(440,audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(880,audioCtx.currentTime+0.2);
+  gain.gain.setValueAtTime(0.06,audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.2);
+  osc.start();osc.stop(audioCtx.currentTime+0.2)}
 
 /* Particle explosion system */
 var explodedSet=new Set(),activeParticles=0,MAX_PARTICLES=5;
@@ -222,7 +243,7 @@ var trackHistory={};
 var activeEngageIds=new Set();
 var leakZoomCount=0,leakZooming=false;
 var corridorEntity=null,corridorFrameCount=0;
-var orbitAngle=0,orbitActive=true,selectEl=document.getElementById("scenario-select");
+var orbitAngle=0,orbitActive=true,frameCount=0,selectEl=document.getElementById("scenario-select");
 selectEl.value=scenario;
 document.getElementById("ws-label").textContent=wsUrl.replace(/^wss?:\/\//,"");
 
@@ -233,9 +254,12 @@ viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(ORIGIN_LON,ORIGIN
 
 viewer.scene.preRender.addEventListener(function(){
   if(!orbitActive)return;orbitAngle+=0.0003;
+  var targetH=orbitAngle*1.8%6.28,curH=viewer.camera.heading;
+  var diff=targetH-curH;while(diff>Math.PI)diff-=2*Math.PI;while(diff<-Math.PI)diff+=2*Math.PI;
+  var smoothH=curH+diff*0.02;
   viewer.camera.setView({destination:Cesium.Cartesian3.fromDegrees(
     ORIGIN_LON+0.003*Math.sin(orbitAngle),ORIGIN_LAT+0.003*Math.cos(orbitAngle),CAM_ALT),
-    orientation:{heading:orbitAngle*1.8%6.28,pitch:Cesium.Math.toRadians(CAM_PITCH),roll:0}});
+    orientation:{heading:smoothH,pitch:Cesium.Math.toRadians(CAM_PITCH),roll:0}});
 });
 var idleTimer=null;
 function pauseOrbit(){orbitActive=false;if(idleTimer)clearTimeout(idleTimer);
@@ -305,7 +329,7 @@ function upsertTrack(t){
     trackEnts[t.id]=ent}
   else{ent.position=pos;
     if(ent.billboard){ent.billboard.image=makeIcon("diamond",hex);ent.billboard.width=sz;ent.billboard.height=sz}
-    if(ent.label)ent.label.text=t.id.substring(0,8)+" "+intent}
+    if(ent.label&&frameCount%5===0)ent.label.text=t.id.substring(0,8)+" "+intent}
   ent._data=t;
 }
 
@@ -330,7 +354,7 @@ function upsertDefender(d){
         outlineColor:Cesium.Color.fromCssColorString(hex).withAlpha(0.12),outlineWidth:1}})}}
   else{ent.position=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
     if(ent.billboard)ent.billboard.image=makeIcon("square",hex);
-    if(ent.label)ent.label.text=(d.kind||"DEF")+" "+d.id.substring(0,6)+" ["+status+"]";
+    if(ent.label&&frameCount%5===0)ent.label.text=(d.kind||"DEF")+" "+d.id.substring(0,6)+" ["+status+"]";
     if(rangeEnts[d.id])rangeEnts[d.id].position=Cesium.Cartesian3.fromDegrees(lon,lat,2)}
   ent._data=d;
 }
@@ -395,9 +419,12 @@ function updateMetrics(m){if(!m)return;
 
 function fmtMoney(v){return v.toLocaleString("en-US",{maximumFractionDigits:0})}
 
-/* Engagement feed */
-function addFeed(html){feedLines.push(html);if(feedLines.length>10)feedLines.shift();
-  document.getElementById("feed").innerHTML='<div id="feed-title">ENGAGEMENT FEED</div>'+feedLines.join("<br>")}
+/* Engagement feed -- append-only DOM ops */
+function addFeed(html){
+  var feed=document.getElementById("feed");
+  var line=document.createElement("div");line.innerHTML=html;
+  feed.appendChild(line);feedLines.push(line);
+  if(feedLines.length>10){var old=feedLines.shift();if(old.parentNode)old.parentNode.removeChild(old)}}
 
 /* Click entity for details */
 viewer.screenSpaceEventHandler.setInputAction(function(click){
@@ -498,7 +525,7 @@ function connect(){
     addFeed('<span class="info">CONNECTED TO '+scenario.toUpperCase()+'</span>')};
   ws.onmessage=function(ev){
     var msg;try{msg=JSON.parse(ev.data)}catch(e){return}
-    if(msg.type==="WARGAME_FRAME"){
+    if(msg.type==="WARGAME_FRAME"){frameCount++;
       var tracks=msg.tracks||[],defs=msg.defenders||[],asgs=msg.assignments||[];
       var lt={};for(var i=0;i<tracks.length;i++){upsertTrack(tracks[i]);lt[tracks[i].id]=true}
       removeStale(lt,trackEnts);
@@ -511,7 +538,8 @@ function connect(){
       /* Narration triggers */
       showNarration("init","WARGAME INITIALIZED - "+scenario.toUpperCase().replace("_"," "),3);
       var m=msg.metrics||{};
-      if(m.active_hostiles>0)showNarration("detected","HOSTILE SWARM DETECTED",3);
+      if(m.active_hostiles>0){showNarration("detected","HOSTILE SWARM DETECTED",3);
+        if(!narrationShown["detected-snd"]){narrationShown["detected-snd"]=true;playSweep()}}
       if((m.engagements_made||0)>0)showNarration("engaging","DEFENDERS ENGAGING",2);
       if((m.leakers||0)>0)showNarration("leak","WARNING: LEAKER DETECTED",2,"rgba(255,70,70,0.95)");
       var prog=(m.sim_time_s||0)/((m.total_time_s||300)*0.5);
@@ -537,10 +565,13 @@ function connect(){
       for(var a=0;a<asgs.length;a++){var ag=asgs[a],dl=ag.defender_id.substring(0,8),tl=ag.track_id.substring(0,8);
         var eKey=ag.defender_id+"-"+ag.track_id;
         if(ag.status==="HIT"){addFeed('<span class="hit">'+dl+' -> '+tl+': HIT</span>');
+          playPing(1200,0.1,0.08);
           if(!explodedSet.has(eKey)){explodedSet.add(eKey);var hp=getTrackPos(ag.track_id);
             if(hp)spawnExplosion(hp);flashDefender(ag.defender_id)}}
-        else if(ag.status==="MISS")addFeed('<span class="miss">'+dl+' -> '+tl+': MISS</span>');
+        else if(ag.status==="MISS"){addFeed('<span class="miss">'+dl+' -> '+tl+': MISS</span>');
+          playPing(400,0.08,0.05)}
         else if(ag.status==="LEAK"){addFeed('<span class="leak">'+tl+': LEAKED</span>');
+          playPing(600,0.3,0.12);
           if(!explodedSet.has("leak-"+ag.track_id)){explodedSet.add("leak-"+ag.track_id);
             var lp=getTrackPos(ag.track_id);if(lp){spawnSmoke(lp);onLeak(lp)}}}}
       if(msg.done){addFeed('<span class="info">--- SCENARIO COMPLETE ---</span>');setConn("COMPLETE");
@@ -559,6 +590,10 @@ selectEl.addEventListener("change",function(){
   document.getElementById("ws-label").textContent=wsUrl.replace(/^wss?:\/\//,"");
   if(ws){ws.onclose=null;ws.close();ws=null}
   if(reconTimer){clearTimeout(reconTimer);reconTimer=null}
+  clearAllEntities();connect()});
+
+/* Clear all entities for restart */
+function clearAllEntities(){
   for(var k in trackEnts){viewer.entities.remove(trackEnts[k]);
     var te=viewer.entities.getById("trail-"+k);if(te)viewer.entities.remove(te)}
   for(var k2 in defEnts)viewer.entities.remove(defEnts[k2]);
@@ -569,9 +604,10 @@ selectEl.addEventListener("change",function(){
   if(corridorEntity){viewer.entities.remove(corridorEntity);corridorEntity=null}
   if(siteEnt){viewer.entities.remove(siteEnt);siteEnt=null}
   if(siteRing){viewer.entities.remove(siteRing);siteRing=null}
-  trackEnts={};defEnts={};assignEnts={};rangeEnts={};feedLines=[];explodedSet.clear();activeParticles=0;lastCostWin=null;narrationShown={};
-  trackHistory={};leakZoomCount=0;leakZooming=false;corridorFrameCount=0;
   if(sitePulseRing){viewer.entities.remove(sitePulseRing);sitePulseRing=null}
+  trackEnts={};defEnts={};assignEnts={};rangeEnts={};feedLines=[];explodedSet.clear();
+  activeParticles=0;lastCostWin=null;narrationShown={};trackHistory={};
+  leakZoomCount=0;leakZooming=false;corridorFrameCount=0;frameCount=0;
   document.getElementById("feed").innerHTML='<div id="feed-title">ENGAGEMENT FEED</div>';
   document.getElementById("metrics").innerHTML="";
   document.getElementById("tick-label").textContent="T+00:00";
@@ -579,8 +615,14 @@ selectEl.addEventListener("change",function(){
   document.getElementById("completion-overlay").classList.remove("visible");
   document.getElementById("threat-warning").textContent="";
   document.getElementById("status-msg").textContent="";
-  document.getElementById("narration").style.color="rgba(140,200,255,0)";
-  connect()});
+  document.getElementById("narration").style.color="rgba(140,200,255,0)"}
+
+/* R key: restart scenario */
+document.addEventListener("keydown",function(e){
+  if(e.key==="r"||e.key==="R"){
+    if(ws){ws.onclose=null;ws.close();ws=null}
+    if(reconTimer){clearTimeout(reconTimer);reconTimer=null}
+    clearAllEntities();connect()}});
 
 connect();
 </script>
