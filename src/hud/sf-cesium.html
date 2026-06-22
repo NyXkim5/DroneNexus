@@ -224,13 +224,22 @@ function addHVec(dId,col){
 function addDrone(idx,lbl,pos,ds,icon,col,trail){
   V.entities.add({id:"drone-"+idx,name:lbl,
     availability:ds?new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({start:ds,stop:TE})]):undefined,
-    position:pos,billboard:{image:icon,width:22,height:22,color:Cesium.Color.WHITE,
-      disableDepthTestDistance:Number.POSITIVE_INFINITY,eyeOffset:new Cesium.Cartesian3(0,0,-50)},
-    path:{resolution:1,width:1,leadTime:0,trailTime:trail||25,material:col.withAlpha(0.2)},
-    label:{text:lbl,font:"7px monospace",fillColor:Cesium.Color.WHITE.withAlpha(0.4),showBackground:true,
-      backgroundColor:new Cesium.Color(0,0,0,0.35),backgroundPadding:new Cesium.Cartesian2(3,1),
-      pixelOffset:new Cesium.Cartesian2(0,-16),scale:0.65,
-      distanceDisplayCondition:new Cesium.DistanceDisplayCondition(0,3000),
+    position:pos,
+    orientation:new Cesium.VelocityOrientationProperty(pos),
+    model:{
+      uri:"models/CesiumDrone.glb",
+      minimumPixelSize:36,
+      scale:1.8,
+      color:col.withAlpha(0.85),
+      colorBlendMode:Cesium.ColorBlendMode.MIX,
+      colorBlendAmount:0.25,
+      disableDepthTestDistance:Number.POSITIVE_INFINITY
+    },
+    path:{resolution:1,width:1.2,leadTime:0,trailTime:trail||25,material:col.withAlpha(0.25)},
+    label:{text:lbl,font:"7px monospace",fillColor:Cesium.Color.WHITE.withAlpha(0.45),showBackground:true,
+      backgroundColor:new Cesium.Color(0,0,0,0.4),backgroundPadding:new Cesium.Cartesian2(3,1),
+      pixelOffset:new Cesium.Cartesian2(0,-22),scale:0.6,
+      distanceDisplayCondition:new Cesium.DistanceDisplayCondition(0,2500),
       disableDepthTestDistance:Number.POSITIVE_INFINITY}});
   addHVec("drone-"+idx,col);
 }

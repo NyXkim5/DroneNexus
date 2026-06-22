@@ -1,0 +1,887 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<link rel="shortcut icon" href="/favicon.png">
+		<title> Quadcopter Drone 3D Model in 3D - Free 3D Model - .glb .gltf - FetchCFD</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta http-equiv="Cache-Control" content="max-age=3600, public">
+		<meta name="description" content="Download free 3D models, CAD files, and simulations for Quadcopter Drone 3D Model. Explore projects in .glb/.gltf format for CFD, FEA, and 3D Modeling at FetchCFD.">
+		<meta name="keywords" content="free 3D models, Quadcopter Drone 3D Model, 3D simulations, GLB/GLTF files, Renderings, CAD files, CFD, FEA, FetchCFD">
+		
+		<meta property="fb:app_id" 		  content="138966473632425" />
+		<meta property="og:url"           content="https://fetchcfd.com/threeDViewGltf/4923-quadcopter-drone-3d-model-in-3D?autostart=1" /> 
+	 	<meta property="og:type"          content="video.other" />
+		
+		<meta property="og:title"         content="Quadcopter Drone 3D Model in 3D - GLB/GLTF File" />
+		<meta property="twitter:title" 	  content="Quadcopter Drone 3D Model in 3D - GLB/GLTF File" />
+		<meta property="tumblr:title"     content="Quadcopter Drone 3D Model in 3D - GLB/GLTF File" />
+		<meta property="og:site_name"     content="FetchCFD" />
+		<meta property="twitter:site" 	  content="@FetchCFD" />
+		<meta property="twitter:domain"   content="https://fetchcfd.com/" />
+		<meta property="twitter:card"     content="player" />
+		<meta property="twitter:description" content="3D model of a quadcopter drone. The design features a sturdy frame with four arms extending from a central hub, each equipped with a motor and propeller. The frame appears to use lightweight materials, with red structural arms and black motor mounts. The drone is supported by two landing legs for stable takeoff and landing. This type of drone is typically used for aerial photography, surveillance, and recreational flying, offering a balance of simplicity and performance. The modular design suggests easy assembly and potential for customization or upgrades. Original 3D model is by Musa (https://grabcad.com/musa-32)" />
+		<meta property="twitter:image"       content="https://s3-eu-west-1.amazonaws.com/fetchcfd/original/descriptionImage-1735252150435.jpg" />
+		<meta property="tumblr:image"        content="https://s3-eu-west-1.amazonaws.com/fetchcfd/original/descriptionImage-1735252150435.jpg" />
+
+		<meta property="og:description"   content="3D model of a quadcopter drone. The design features a sturdy frame with four arms extending from a central hub, each equipped with a motor and propeller. The frame appears to use lightweight materials, with red structural arms and black motor mounts. The drone is supported by two landing legs for stable takeoff and landing. This type of drone is typically used for aerial photography, surveillance, and recreational flying, offering a balance of simplicity and performance. The modular design suggests easy assembly and potential for customization or upgrades. Original 3D model is by Musa (https://grabcad.com/musa-32)" />
+		<meta property="og:image" 		  content="https://s3-eu-west-1.amazonaws.com/fetchcfd/original/descriptionImage-1735252150435.jpg" />
+		<meta property="og:image:alt" content="Quadcopter Drone 3D Model" />
+		<meta property="tumblr:type" 	  content="video.other" />
+		<meta property="og:video:type" 	  content="text/html" />
+		<meta property="og:video:url" 	  content="https://fetchcfd.com/threeDViewGltf/4923-quadcopter-drone-3d-model-in-3D?autostart=1" />
+		<meta property="og:video:secure_url" content="https://fetchcfd.com/threeDViewGltf/4923-quadcopter-drone-3d-model-in-3D?autostart=1" />
+		<meta property="og:video:width"      content="800" />
+		<meta property="og:video:height"     content="600" />
+		<meta name="tumblr:video:secure_url" content="https://fetchcfd.com/threeDViewGltf/4923-quadcopter-drone-3d-model-in-3D?autostart=1" />
+        <meta name="tumblr:video:type" content="text/html" />
+        <meta name="tumblr:video:width" content="800" />
+        <meta name="tumblr:video:height" content="600" />
+		<meta name="twitter:player" content="https://fetchcfd.com/threeDViewGltf/4923-quadcopter-drone-3d-model-in-3D?autostart=1" />
+        <meta name="twitter:player:stream:content_type" content="text/html" />
+        <meta name="twitter:player:width" content="800" />
+        <meta name="twitter:player:height" content="600" />
+		<link rel="canonical" href="https://fetchcfd.com/threeDViewGltf/4923-quadcopter-drone-3d-model">
+		<link rel="stylesheet" href="/user/css/layout-embedViewer.css"/>
+		
+
+		<style>
+			#info {
+        color: #090909;
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        width: 100%;
+        text-align: left;
+        z-index: 1000;
+        display:block;
+    }
+    #info a {
+        color: rgb(10, 10, 10);
+        font-weight: bold;
+        font-family: Geneva, sans-serif;
+        text-decoration:none;
+    }
+    #homeinfo {
+        color: rgb(10, 10, 10);
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        width: 100%;
+        text-align: left;
+        z-index: 100;
+        display:block;
+    }
+    #homeinfo a {
+        color: rgb(10, 10, 10);
+        font-weight: bold;
+        text-decoration:none;
+        font-family: Geneva, sans-serif;
+    }
+    html, body, .online_3d_viewer {
+        height: 100%;
+        margin: 0;
+    }
+
+    .online_3d_viewer {
+        border: none;
+    }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.popup .content,
+.popup .content p,
+.popup .content li {
+  font-family: "Open Sans", sans-serif !important;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ---------- Unified popup system (Controls / Info / Share / Embed) ---------- */
+
+/* Optional: fix invalid HTML comments inside CSS */
+.buttonR, .buttonC, .button, .buttonEmbd, .buttonInfo, .buttonShare {
+  /* border: 2px solid #06D85F; */ /* <-- replace <!-- --> comments with real CSS comments */
+}
+
+.overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.72);
+  transition: opacity 180ms ease, visibility 180ms ease;
+  visibility: hidden;
+  opacity: 0;
+  z-index: 9999 !important;
+}
+
+/* When opened via #hash */
+.overlay.is-open{
+  visibility: visible;
+  opacity: 1;
+}
+
+
+/* One popup style for everything */
+.popup{
+  position: relative;
+  width: min(560px, calc(100% - 28px));
+  margin: 10vh auto;
+  padding: 22px 22px 18px;
+  background: #0b0b0b;
+  color: #fff;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 20px 55px rgba(0,0,0,.55);
+}
+
+/* slightly wider for embed code */
+.popup.popup--wide{
+  width: min(760px, calc(100% - 28px));
+}
+
+.popup h2, .popup h3{
+  margin: 0 0 12px;
+  color: #8a9492;
+  font-family: Tahoma, Arial, sans-serif;
+  font-weight: 700;
+}
+
+.popup hr{
+  border: 0;
+  height: 1px;
+  background: rgba(255,255,255,.10);
+  margin: 10px 0 16px;
+}
+
+.popup .close{
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-size: 28px;
+  line-height: 28px;
+  font-weight: 800;
+  text-decoration: none;
+  color: #117964;
+}
+.popup .close:hover{ color: #06D85F; }
+
+.popup .content{
+  max-height: min(60vh, 520px);
+  overflow: auto;
+}
+
+/* Fields inside popups */
+.field-row{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.form-input{
+  flex: 1 1 320px;
+  height: 22px;
+  padding: 10px 12px;
+  font-family: sans-serif;
+  font-size: 15px;
+  line-height: 22px;
+  background: #f2f2f2;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  outline: none;
+}
+
+.popup button,
+.popup .btn{
+  border: none;
+  padding: 12px 14px;
+  color: #fff;
+  border-radius: 8px;
+  background-color: #117964;
+  transition: filter .15s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.popup button:hover,
+.popup .btn:hover{
+  filter: brightness(1.08);
+}
+
+/* Code block for embed */
+.code-sample{
+  margin: 8px 0 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.08);
+  overflow: auto;
+}
+.code-sample code{
+  color: #eaeaea;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.35;
+}
+	
+.buttonR {
+  font-size: 1em;
+  padding: 12px 16px;
+  color: #fff;
+  /* border: 2px solid #06D85F; */
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+   position: absolute;
+   right: 4em;
+    bottom: 8px;
+	z-index: 100;
+	border-radius: 8px;
+
+}
+.buttonR:hover {
+  color: green;
+}
+
+.buttonR a {
+  color: green;
+}
+@media only screen and (max-width: 442px) and (max-height: 626px) {
+  .buttonR {
+    display: none;
+  }
+}
+
+.buttonC a {
+}
+
+.buttonC {
+  font-size: 1em;
+  padding: 12px 16px;
+  color: #fff;
+
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+   display: block;
+   position: absolute;
+   right: 1em;
+    bottom: 1em;
+	z-index: 100;
+	border-radius: 8px;
+
+}
+.buttonC:hover {
+  
+}
+
+.button {
+  font-size: 1em;
+  padding: 12px 16px;
+  color: #fff;
+
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+   display: block;
+   position: absolute;
+   right: 7em;
+    bottom: 8px;
+	z-index: 100;
+	border-radius: 8px;
+
+}
+.button:hover {
+  
+}
+
+@media only screen and (max-width: 442px) and (max-height: 626px) {
+  .button {
+    display: none;
+  }
+}
+
+
+
+
+@media screen and (max-width: 700px){
+  .box{
+    width: 70%;
+  }
+  .popup{
+    width: 70%;
+  }
+  
+  }
+  			
+.buttonEmbd {
+  font-size: 1em;
+  padding: 12px 16px;
+  color: #fff;
+
+  text-decoration: none;
+  
+  transition: all 0.3s ease-out;
+   
+   position: absolute;
+   right: 10em;
+    bottom: 8px;
+	z-index: 100;
+	border-radius: 8px;
+
+}
+
+.buttonEmbd a{
+  
+cursor: pointer;
+z-index: 9999;
+}
+.buttonEmbd:hover {
+  
+}
+@media only screen and (max-width: 442px) and (max-height: 626px) {
+  .buttonEmbd {
+    display: none;
+  }
+}
+.buttonInfo {
+  font-size: 1em;
+  padding: 12px 16px;
+  color: #fff;
+
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+   display: block;
+   position: absolute;
+   right: 1em;
+    bottom: 8px;
+	z-index: 100;
+	border-radius: 8px;
+
+}
+.buttonInfo:hover {
+  
+}
+@media only screen and (max-width: 442px) and (max-height: 626px) {
+  .buttonInfo {
+    display: none;
+  }
+}
+
+
+@media screen and (max-width: 700px){
+  .box3{
+    width: 70%;
+  }
+  .popupInfo{
+    width: 70%;
+  }
+  
+  }
+  
+  .buttonShare {
+  font-size: 1em;
+  padding: 12px 16px;
+  color: #fff;
+
+  text-decoration: none;
+  
+  transition: all 0.3s ease-out;
+   z-index: 100;
+   position: absolute;
+   right: 13em;
+    bottom: 8px;
+	
+	border-radius: 8px;
+
+}
+
+.buttonShare a{
+  
+cursor: pointer;
+z-index: 9999;
+}
+.buttonShare:hover {
+  
+}
+@media only screen and (max-width: 442px) and (max-height: 626px) {
+  .buttonShare {
+    display: none;
+  }
+}
+
+	
+	ul.share-buttons{
+  list-style: none;
+  padding: 0;
+}
+
+ul.share-buttons li{
+  display: inline;
+}
+
+ul.share-buttons .sr-only{
+  position: absolute;
+  clip: rect(1px 1px 1px 1px);
+  clip: rect(1px, 1px, 1px, 1px);
+  padding: 0;
+  border: 0;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+}
+
+.quote-wrap-drag{
+	position:absolute;
+	width:100%;
+	height:100%;
+	margin:0 auto;
+display: block;
+z-index:100;
+top: 250px;	
+}
+.quote-wrap-drag .icon{
+	position:absolute;
+	width:100%;
+	margin:0 auto;
+	text-align:center;
+	background: url('/user/images/Click-n-Hold.png');
+	background-repeat:no-repeat;
+	background-position:center center;
+	background-size: 100px;
+	font-size:45px;
+	line-height:45px;
+	margin-bottom:40px; 
+	-webkit-animation: drag 10s ease infinite;
+	animation: drag 10s ease infinite;
+	z-index:100;
+	height:100%;
+    
+	 display: block;
+}
+@media only screen and (min-width: 319px) and (max-width: 1319px) {
+.quote-wrap-drag .icon{
+	 position:absolute;
+	width:100%;
+	margin:0 auto;
+	text-align:center;
+	background: url('/user/images/Touch-n-drag-Finger.png');
+	background-repeat:no-repeat;
+	background-position:center center;
+	background-size: 100px;
+	font-size:45px;
+	line-height:45px;
+	margin-bottom:40px; 
+	-webkit-animation: drag 10s ease infinite;
+	animation: drag 10s ease infinite;
+	z-index:100;
+	height:100%;
+    
+	 display: block;
+
+}
+} 
+@-webkit-keyframes drag {
+	0% { -webkit-transform: translate(0) ; }
+	
+	50% { -webkit-transform: translate(100px) }
+	
+	100% { -webkit-transform: translate(0); }
+	
+	50% { -webkit-transform: translate(-100px) }
+	
+	0% { -webkit-transform: translate(0) ; }
+}
+@keyframes drag {
+	0% { transform: translate(0); }
+	
+	50% { transform: translate(100px); }
+	
+	100% { transform: translate(0); }
+	
+	50% { transform: translate(-100px); }
+	
+	0% { transform: translate(0); }
+}
+
+.form-input.directlink, button {
+  display: inline-block;
+}
+button {
+  border: none;
+  padding: 15px 15px;
+  color:white;
+  border: 1px solid transparent;
+  border-style: solid;
+    border-radius: 4px;
+	background-color: #117964;
+    background-color: var(--button-primary_background-color,#117964);
+    transition: background-color .15s
+}		
+		</style>
+		
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "Quadcopter Drone 3D Model",
+  "image": "https://s3-eu-west-1.amazonaws.com/fetchcfd/original/descriptionImage-1735252150435.jpg",
+  "description": "3D model of a quadcopter drone. The design features a sturdy frame with four arms extending from a central hub, each equipped with a motor and propeller. The frame appears to use lightweight materials, with red structural arms and black motor mounts. The drone is supported by two landing legs for stable takeoff and landing. This type of drone is typically used for aerial photography, surveillance, and recreational flying, offering a balance of simplicity and performance. The modular design suggests easy assembly and potential for customization or upgrades. Original 3D model is by Musa (https://grabcad.com/musa-32)",
+  "brand": {
+    "@type": "Brand",
+    "name": "FetchCFD"
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": "0.00",
+    "priceCurrency": "USD",
+    "availability": "https://schema.org/InStock",
+    "priceValidUntil": "2099-12-31"
+  }
+}
+</script>
+
+
+	</head>
+
+	<body>
+		<h1 class="visually-hidden">Quadcopter Drone 3D Model - Explore in 3D</h1>
+
+
+		<div id="info">
+			<a href="/view-project/4923" target="_blank" rel="noopener">Quadcopter Drone 3D Model in 3D</a><br/> by
+			<a href="/profile/max" target="_blank" rel="noopener">Max Payne</a><br />
+		</div>
+		
+		<div id="homeinfo">
+			<a href="https://fetchcfd.com" target="_blank" rel="noopener">FetchCFD</a><br />
+		</div>
+		
+		
+		
+		<script type="text/javascript" src="/user/js/o3dv.min.js"></script>
+		
+
+    
+        
+    
+
+    
+        
+    
+
+    
+
+    
+
+
+		
+	<!-- <div id="dragClickRem">
+   
+		<div class="quote-wrap-drag"  > 
+						
+			<div  id="drag-msg" class="icon" ></div>
+						
+		</div>
+	</div> -->
+	<div class="buttonR">
+			
+			<span title="Spin object"> <a onclick="controls.autoRotate = !controls.autoRotate;"> <img src="/user/images/rotate-icon.png"></a> </span>
+			
+	</div>
+	<div class="box" id="controlsButton">
+	<span title="Controls Details"><a class="button" href="#popup1"><img src="/user/images/control-icon.png"></a></span>
+</div>
+		
+	<div id="popup1" class="overlay">
+	<div class="popup">
+		<h2>Controls</h2>
+		<a class="close" href="#">&times;</a>
+		<div class="content">
+			<p><strong>Orbit</strong> ➞ Left Mouse Button or 1 Finger Drag <br> <br><strong>Pan</strong> ➞ Right Mouse Button or 2-Finger Drag <br><br><strong>Zoom</strong> ➞ Mousewheel or Pinch In/Out</p>
+		</div>
+	</div>
+	</div>
+	
+	
+<div class="box3">
+	<span title="Project Details"><a class="buttonInfo" href="#popup2"><img src="/user/images/info-circle-icon.png"></a></span>
+</div>
+		
+	<div id="popup2" class="overlay">
+	<div class="popup">
+		<h2>About Quadcopter Drone 3D Model</h2>
+		<a class="close" href="#">&times;</a>
+		<div class="content">
+			<p>3D model of a quadcopter drone. The design features a sturdy frame with four arms extending from a central hub, each equipped with a motor and propeller. The frame appears to use lightweight materials, with red structural arms and black motor mounts. The drone is supported by two landing legs for stable takeoff and landing. This type of drone is typically used for aerial photography, surveillance, and recreational flying, offering a balance of simplicity and performance. The modular design suggests easy assembly and potential for customization or upgrades. Original 3D model is by Musa (https://grabcad.com/musa-32) <br><br><br>To post comments and download this project refer to the <a href="/view-project/4923-quadcopter-drone-3d-model" style="color: #117964; text-decoration: none;" target="_blank" rel="noopener"><strong>project description page</strong></a></p>
+		</div>
+	</div>
+	</div>
+	<h3 class="visually-hidden">Applications</h3>
+		<ul class="visually-hidden">
+			<li>3D Modeling</li>
+			<li>FEA Simulations</li>
+			<li>Fluid Simulations</li>
+			<li>3D Rendering</li>
+			<li>3D Printing</li>
+		</ul>
+
+	<!-- Embed starts
+	================================================== -->
+	
+<!-- Embed button -->
+<!-- Embed button -->
+<div class="buttonEmbd" id="embedButton">
+  <span title="Embed code">
+<a href="#" onclick="openPopup('embedPopup'); return false;" title="Embed code">
+  <img src="/user/images/embed-icon.png">
+</a>
+  </span>
+</div>
+
+<div id="embedPopup" class="overlay">
+  <div class="popup popup--wide">
+    <h3>Embed</h3>
+    <a class="close" href="#" onclick="closePopup('embedPopup'); return false;">&times;</a>
+    <hr>
+
+    <div class="content">
+      <h4 style="margin: 0 0 10px; color:#8a9492; font-family: Tahoma, Arial, sans-serif;">Embed code</h4>
+
+      <pre class="code-sample" id="iframe2"><code>&lt;iframe  width="640" height="480" src="https://fetchcfd.com/threeDView-embed-project/4923-quadcopter-drone-3d-model#" frameborder="0" allow="autoplay; fullscreen; vr" mozallowfullscreen="true" webkitallowfullscreen="true"&gt;&lt;/iframe&gt;
+
+&lt;p style="font-size: 13px; font-weight: normal; margin: 5px; color: #4A4A4A;"&gt;
+  &lt;a href="https://fetchcfd.com/view-project/4923" target="_blank" style="font-weight: bold; color: #16a085; text-decoration: none;"&gt;Quadcopter Drone 3D Model&lt;/a&gt;
+  by &lt;a href="https://fetchcfd.com/profile/max" target="_blank" style="font-weight: bold; color: #16a085; text-decoration: none;"&gt;Max Payne&lt;/a&gt;
+  on &lt;a href="https://fetchcfd.com/" target="_blank" style="font-weight: bold; color: #16a085; text-decoration: none;"&gt;fetchcfd&lt;/a&gt;
+&lt;/p&gt;</code></pre>
+
+      <button type="button" class="copy-btn" onclick="copyEmbedCode()">Copy Embed Code</button>
+    </div>
+  </div>
+</div>
+
+<!-- Embed Ends
+	================================================== -->
+	
+	
+	<!-- Share starts
+	================================================== -->
+	
+<div class="buttonShare" id="shareButton">
+  <span title="Share">
+	<a href="#" onclick="openPopup('sharePopup'); return false;" title="Share">
+	  <img src="/user/images/share-icon.png">
+	</a>
+  </span>
+</div>
+
+<div id="sharePopup" class="overlay">
+  <div class="popup">
+    <h3>Share Direct Link</h3>
+    <a class="close" href="#" onclick="closePopup('sharePopup'); return false;">&times;</a>
+    <hr>
+
+    <div class="content">
+      <div class="field-row">
+        <input class="form-input directlink"
+               value="https://fetchcfd.com/threeDViewGltf/4923-quadcopter-drone-3d-model#"
+               readonly>
+        <button type="button" onclick="copyLink(this)">Copy Link</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+  
+
+<!-- Share Ends
+	================================================== -->
+	
+		
+		<script type='text/javascript'>
+        window.addEventListener ('load', () => {
+            // set the location of the external libraries
+            OV.SetExternalLibLocation ('/user/js');
+
+            // get the parent element of the viewer
+            let parentDiv = document.getElementById ('viewer');
+
+            // initialize the viewer with the parent element and some parameters
+            let viewer = new OV.EmbeddedViewer (parentDiv, {
+                
+                backgroundColor : new OV.RGBAColor (255, 255, 255, 255),
+                defaultColor : new OV.RGBColor (200, 200, 200),
+                edgeSettings : new OV.EdgeSettings (false, new OV.RGBColor (0, 0, 0), 1),
+                environmentSettings : new OV.EnvironmentSettings (
+                    [
+                        '/user/envmaps/fishermans_bastion/posx.jpg',
+                        '/user/envmaps/fishermans_bastion/negx.jpg',
+                        '/user/envmaps/fishermans_bastion/posy.jpg',
+                        '/user/envmaps/fishermans_bastion/negy.jpg',
+                        '/user/envmaps/fishermans_bastion/posz.jpg',
+                        '/user/envmaps/fishermans_bastion/negz.jpg'
+                    ],
+                    false
+                )
+            });
+
+            // load a model providing model urls
+            viewer.LoadModelFromUrlList ([
+                'https://s3-eu-west-1.amazonaws.com/fetchcfd/original/file-1735252135688.glb'
+            ]);
+        });
+    </script>
+
+	
+	
+<script>
+  const POPUP_IDS = new Set(['popup1','popup2','sharePopup','embedPopup']);
+  let modelHash = "";
+
+  function syncModelHash() {
+    // If you still ever use hashes for other things, ignore popup hashes
+    const h = window.location.hash || "";
+    if (h && !POPUP_IDS.has(h.substring(1))) {
+      modelHash = h.substring(1);
+    }
+  }
+
+  function buildUrls() {
+    const slug = "quadcopter-drone-3d-model";
+    const hashPart = modelHash ? ("#" + modelHash) : "#";
+
+    // Update embed code preview
+    const iframe2 = document.getElementById("iframe2");
+    if (iframe2) {
+      iframe2.innerHTML =
+        "&lt;iframe width='640' height='480' src='https://fetchcfd.com/threeDViewGltf-embed-project/4923-" +
+        slug + hashPart +
+        "' frameborder='0' allow='autoplay; fullscreen; vr' mozallowfullscreen='true' webkitallowfullscreen='true'&gt;&lt;/iframe&gt;";
+    }
+
+    // Update share input
+    const input = document.querySelector(".form-input.directlink");
+    if (input) {
+      input.value = "https://fetchcfd.com/threeDViewGltf/4923-" + slug + hashPart;
+    }
+  }
+
+  function openPopup(id) {
+    syncModelHash();     // capture current model hash BEFORE opening popup
+    buildUrls();         // ensure share/embed include the latest hash
+    document.getElementById(id)?.classList.add("is-open");
+  }
+
+  function closePopup(id) {
+    document.getElementById(id)?.classList.remove("is-open");
+  }
+
+  // If your app changes the model hash during use, keep tracking it:
+  window.addEventListener("hashchange", () => {
+    syncModelHash();
+    buildUrls();
+  });
+
+  window.addEventListener("load", () => {
+    syncModelHash();
+    buildUrls();
+  });
+</script>
+
+
+	
+<script type="text/javascript">
+$(document).ready(function(){
+  $("#drag-msg").click(function(){
+	jQuery('.quote-wrap-drag').hide();
+  });
+});
+</script>
+			
+	
+<script type="text/javascript">
+			
+	$("#dragClickRem").fadeIn(200);
+	    $(".icon").click(function() {
+        $("#dragClickRem").fadeOut(200);
+    });
+			function getCookieData( name ) {
+				var x = document.getElementById('dragClickRem');
+				var pairs = document.cookie.split("; "),
+				   	count = pairs.length, parts; 
+				while ( count-- ) {
+					parts = pairs[count].split("=");
+					
+					if ( parts[0] === name )
+					{x.style.display = 'none';
+					
+						return parts[1];}
+				}
+				
+				return false;
+			}
+			var cga = getCookieData("_dragClickRem");
+			console.log(cga);
+			
+			
+			function setCookieData(cname,cvalue,exdays) {
+				var d = new Date();
+				d.setTime(d.getTime() + (exdays*24*60*60*1000));
+				var expires = "expires=" + d.toGMTString();
+				document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+			}
+			//var co = setCookieData("_cookiepc3","1","365");
+			//console.log(co);
+			document.getElementById('dragClickRem').addEventListener('click', function(){
+				setCookieData("_dragClickRem","1","365");
+			});
+			
+	</script>
+
+<script>
+async function copyLink(button) {
+  const linkInput = document.querySelector(".directlink");
+  linkInput.select();
+  linkInput.setSelectionRange(0, 99999);
+
+  try {
+    await navigator.clipboard.writeText(linkInput.value);
+  } catch {
+    document.execCommand("copy");
+  }
+
+  button.textContent = "Copied!";
+  setTimeout(() => button.textContent = "Copy Link", 2000);
+}
+</script>
+	
+	
+	<script>
+function copyEmbedCode() {
+    const embedCode = document.querySelector(".code-sample").textContent.trim();
+    navigator.clipboard.writeText(embedCode);
+    const copyBtn = document.querySelector(".copy-btn");
+    copyBtn.innerHTML = "Copied!";
+    setTimeout(() => {
+      copyBtn.innerHTML = "Copy Embed Code";
+    }, 2000);
+}
+
+</script>
+		
+		<div class="online_3d_viewer" id="viewer">
+</div>
+	</body>
+</html>
