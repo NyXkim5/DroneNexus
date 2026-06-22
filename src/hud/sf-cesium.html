@@ -147,7 +147,7 @@ function buildPath(tgt,di,ti,ppt){
 function clearScenario(){
   var rm=[];V.entities.values.forEach(function(e){if(e.id&&(e.id.indexOf("drone-")===0||e.id.indexOf("tgt-")===0||
     e.id.indexOf("hvec-")===0||e.id.indexOf("fline-")===0||e.id.indexOf("ops-")===0||
-    e.id==="launch-marker"||e.id==="boundary-ring"))rm.push(e)});
+    e.id.indexOf("ering-")===0||e.id==="launch-marker"||e.id==="boundary-ring"))rm.push(e)});
   rm.forEach(function(e){V.entities.remove(e)});arrivals=[];bdaShown=[];missionDone=false;flashTimers=[];
   V.trackedEntity=undefined;tracking=false;
   document.getElementById("track-info").style.display="none";document.getElementById("crosshair").style.display="none";
@@ -301,10 +301,11 @@ function runCinematic(){
   .then(function(){hideCinText();setTimeout(function(){showCinText("SAN FRANCISCO THEATER")},400);
     return V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.399,37.794,2000),
       orientation:{heading:Cesium.Math.toRadians(10),pitch:Cesium.Math.toRadians(-60),roll:0},duration:3})})
-  .then(function(){hideCinText();setTimeout(function(){showCinText("MISSION: COORDINATED STRIKE")},400);
+  .then(function(){var ml=curScn==="strike"?"MISSION: COORDINATED STRIKE":curScn==="recon"?"MISSION: ISR PATROL":"MISSION: SATURATION ATTACK";
+    hideCinText();setTimeout(function(){showCinText(ml)},400);
     return V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.397,37.791,400),
       orientation:{heading:Cesium.Math.toRadians(45),pitch:Cesium.Math.toRadians(-30),roll:0},duration:2})})
-  .then(function(){hideCinText();setTimeout(function(){showCinText("24 UAS ASSETS STAGED")},400);
+  .then(function(){hideCinText();setTimeout(function(){showCinText(curTotal+" UAS ASSETS STAGED")},400);
     return V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(LAUNCH.lon,LAUNCH.lat,100),
       orientation:{heading:Cesium.Math.toRadians(30),pitch:Cesium.Math.toRadians(-25),roll:0},duration:1})})
   .then(function(){hideCinText();cinRunning=false;V.clock.shouldAnimate=true;
@@ -328,8 +329,27 @@ handler.setInputAction(function(click){var p=V.scene.pick(click.position);
   else{returnToOverview()}},Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
 function orbitTick(){if(!tracking&&V.clock.shouldAnimate&&!missionDone){orbitAngle+=0.015;
-  V.camera.setView({destination:Cesium.Cartesian3.fromDegrees(-122.401,37.796,1500),
-    orientation:{heading:Cesium.Math.toRadians(orbitAngle),pitch:Cesium.Math.toRadians(-35),roll:0}})}}
+  var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0);
+  var pitchDeg=-35+10*Math.sin(el*Math.PI*2/30); /* -25 to -45 over 30s period */
+  var altM=1500+300*Math.sin(el*Math.PI*2/45);   /* 1200 to 1800 over 45s period */
+  V.camera.setView({destination:Cesium.Cartesian3.fromDegrees(-122.401,37.796,altM),
+    orientation:{heading:Cesium.Math.toRadians(orbitAngle),pitch:Cesium.Math.toRadians(pitchDeg),roll:0}})}}
+
+/* Engagement pulse ring */
+var engRingIdx=0;
+function spawnEngagementRing(tgt,arrTime){
+  var tPos=Cesium.Cartesian3.fromDegrees(tgt.lon,tgt.lat,tgt.alt);
+  var ring=V.entities.add({id:"ering-"+(engRingIdx++),position:tPos,ellipse:{
+    semiMajorAxis:new Cesium.CallbackProperty(function(){
+      var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0),t=(el-arrTime)/2;
+      return 50+Math.min(1,Math.max(0,t))*450},false),
+    semiMinorAxis:new Cesium.CallbackProperty(function(){
+      var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0),t=(el-arrTime)/2;
+      return 50+Math.min(1,Math.max(0,t))*450},false),
+    height:tgt.alt,material:Cesium.Color.fromCssColorString("rgba(80,255,130,0.15)"),
+    outline:true,outlineColor:Cesium.Color.fromCssColorString("rgba(80,255,130,0.4)"),outlineWidth:1}});
+  setTimeout(function(){V.entities.remove(ring)},3000);
+}
 
 /* Timer: T+01:23.5 */
 function fmtTime(el){var s=Math.max(0,el),mn=Math.floor(s/60),sc=Math.floor(s%60),ds=Math.floor((s%1)*10);
@@ -366,7 +386,7 @@ function updateHUD(){
   var neut=0,h="";
   for(var t=0;t<curTgts.length;t++){var cnt=0,need=curPer;
     for(var j=0;j<arrivals.length;j++)if(arrivals[j].ti===t&&el>=arrivals[j].arrival)cnt++;
-    var done=cnt>=need;if(done)neut++;if(done&&!bdaShown[t]){bdaShown[t]=true;flashTimers[t]=el}
+    var done=cnt>=need;if(done)neut++;if(done&&!bdaShown[t]){bdaShown[t]=true;flashTimers[t]=el;spawnEngagementRing(curTgts[t],el)}
     var te=V.entities.getById("tgt-"+t);
     if(te&&te.point){if(flashTimers[t]>0&&el-flashTimers[t]<0.5){te.point.pixelSize=20;te.point.color=Cesium.Color.WHITE.withAlpha(0.95);
       te.point.outlineColor=Cesium.Color.WHITE.withAlpha(0.5)}else if(done){te.point.pixelSize=8;
@@ -376,13 +396,14 @@ function updateHUD(){
   document.getElementById("active").textContent=ac;document.getElementById("neutral").textContent=neut;
   document.getElementById("tgt-list").innerHTML=h;
   var sEl=document.getElementById("mission-status");
-  if(neut>=curTgts.length)sEl.innerHTML='STATUS: <span class="val" style="color:rgba(80,255,130,0.95)">COMPLETE</span>';
+  if(neut>=curTgts.length)sEl.innerHTML='STATUS: <span class="val" style="color:rgba(80,255,130,0.95)">MISSION COMPLETE</span>';
   else if(ac>0)sEl.innerHTML='STATUS: <span class="val" style="color:rgba(255,200,80,0.9)">ACTIVE</span>';
   else sEl.innerHTML='STATUS: <span class="val">STAGING</span>';
   if(neut>=curTgts.length&&!missionDone){missionDone=true;tracking=false;V.trackedEntity=undefined;
     document.getElementById("track-info").style.display="none";document.getElementById("crosshair").style.display="none";
-    V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.400,37.798,2200),
-      orientation:{heading:0,pitch:Cesium.Math.toRadians(-50),roll:0},duration:3})}
+    V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.400,37.796,3000),
+      orientation:{heading:0,pitch:Cesium.Math.toRadians(-80),roll:0},duration:3});
+    sEl.innerHTML='STATUS: <span class="val" style="color:rgba(80,255,130,0.95)">MISSION COMPLETE</span>'}
   updateTrack();orbitTick();Cesium.requestAnimationFrame(updateHUD);
 }
 
