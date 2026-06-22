@@ -105,6 +105,17 @@ html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
 
 /* AI CONFIRM flash on tracks */
 @keyframes ai-confirm-pulse{0%{opacity:1}100%{opacity:0}}
+
+/* Camera PiP */
+#camera-pip{position:absolute;bottom:36px;left:12px;width:280px;z-index:12;pointer-events:auto;
+  background:rgba(4,8,16,0.92);border:1px solid rgba(60,120,200,0.15);overflow:hidden;display:none}
+#camera-pip .pip-header{padding:4px 8px;font-size:7px;letter-spacing:2px;color:rgba(80,200,255,0.7);
+  text-transform:uppercase;border-bottom:1px solid rgba(60,120,200,0.1);display:flex;
+  justify-content:space-between;align-items:center}
+#camera-pip .pip-header .pip-fps{color:rgba(70,255,130,0.7)}
+#camera-pip canvas{width:100%;display:block;background:#000}
+#camera-pip .pip-dets{padding:3px 8px;font-size:7px;color:rgba(140,200,255,0.5);letter-spacing:1px;
+  max-height:40px;overflow:hidden;border-top:1px solid rgba(60,120,200,0.08)}
 </style>
 </head>
 <body>
@@ -129,6 +140,8 @@ html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
     <span class="sep">|</span><span id="tick-label">T+00:00</span>
     <span class="spacer"></span>
     <span id="mute-btn" style="cursor:pointer;pointer-events:auto;color:rgba(80,200,255,0.7)" onclick="audioMuted=!audioMuted;this.textContent=audioMuted?'[MUTED]':'[SND]';">[SND]</span>
+    <span class="sep">|</span>
+    <span id="cam-btn" style="cursor:pointer;pointer-events:auto;color:rgba(80,200,255,0.7)" onclick="toggleCameraPip()">[CAM]</span>
     <span class="sep">|</span><span id="ai-banner">OVERWATCH AI <span class="sep">|</span> MODEL: YOLOv11-SERAPHIM <span class="sep">|</span> mAP50: 94.9% <span class="sep">|</span> DETECTOR: <span class="ai-active">ACTIVE</span></span>
     <span class="sep">|</span><span>UNCLASSIFIED // FOUO</span>
   </div>
@@ -147,7 +160,12 @@ html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
     letter-spacing:3px;font-weight:700;text-transform:uppercase;pointer-events:none"></div>
   <div id="status-msg" style="position:absolute;bottom:28px;left:50%;transform:translateX(-50%);font-size:8px;
     letter-spacing:2px;text-transform:uppercase;pointer-events:none;color:rgba(70,255,130,0.9)"></div>
-  <div id="bottom-bar"><span id="asset-count">-- TRACKS / -- DEFENDERS</span><span id="ws-label">--</span></div>
+  <div id="camera-pip">
+    <div class="pip-header"><span>LIVE DETECTION FEED</span><span class="pip-fps" id="pip-fps">--</span></div>
+    <canvas id="pip-canvas" width="640" height="480"></canvas>
+    <div class="pip-dets" id="pip-dets">NO FEED</div>
+  </div>
+  <div id="bottom-bar"><span id="asset-count">-- TRACKS / -- DEFENDERS</span><span>R: restart | C: camera</span><span id="ws-label">--</span></div>
 </div>
 <div id="fallback">BACKEND NOT RUNNING<br>
   <span style="color:rgba(80,180,255,0.9)">cd backend && python3 main.py</span><br>Then reload this page.</div>
@@ -686,12 +704,45 @@ function clearAllEntities(){
   document.getElementById("narration").style.color="rgba(140,200,255,0)";
   document.getElementById("pq-list").innerHTML=""}
 
-/* R key: restart scenario */
+/* Camera PiP -- live YOLOv11 webcam detection feed */
+var camWs=null;
+function toggleCameraPip(){
+  var pip=document.getElementById("camera-pip");
+  pip.style.display=pip.style.display==="none"?"block":"none";
+  if(pip.style.display==="block")connectCamera()}
+function connectCamera(){
+  if(camWs&&camWs.readyState<=1)return;
+  camWs=new WebSocket("ws://localhost:8766");
+  var canvas=document.getElementById("pip-canvas"),ctx=canvas.getContext("2d"),img=new Image();
+  var offMsg="Camera offline. Start: python3 -m scripts.webcam_detect";
+  camWs.onmessage=function(ev){
+    var msg;try{msg=JSON.parse(ev.data)}catch(_){return}
+    if(msg.type!=="WEBCAM_FRAME")return;
+    document.getElementById("pip-fps").textContent=msg.inference_ms+"ms | "+msg.detection_count+" det";
+    img.onload=function(){canvas.width=msg.width||640;canvas.height=msg.height||480;
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      var dets=msg.detections||[];ctx.lineWidth=2;ctx.font="11px monospace";
+      for(var i=0;i<dets.length;i++){var d=dets[i],b=d.bbox;ctx.strokeStyle="#3B82C4";
+        ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]);
+        var label=d.class+" "+(d.confidence*100).toFixed(0)+"%";
+        ctx.fillStyle="rgba(4,8,16,0.7)";ctx.fillRect(b[0],b[1]-14,ctx.measureText(label).width+6,14);
+        ctx.fillStyle="#3B82C4";ctx.fillText(label,b[0]+3,b[1]-3)}};
+    img.src="data:image/jpeg;base64,"+msg.frame;
+    var el=document.getElementById("pip-dets"),dets=msg.detections||[];
+    el.textContent=dets.length?dets.slice(0,3).map(function(d){
+      return d.class+" "+(d.confidence*100).toFixed(0)+"%"}).join(" | "):"NO DETECTIONS"};
+  camWs.onclose=function(){document.getElementById("pip-fps").textContent="DISCONNECTED";
+    document.getElementById("pip-dets").textContent=offMsg};
+  camWs.onerror=function(){document.getElementById("pip-fps").textContent="DISCONNECTED";
+    document.getElementById("pip-dets").textContent=offMsg}}
+
+/* Keyboard shortcuts: R restart, C camera */
 document.addEventListener("keydown",function(e){
   if(e.key==="r"||e.key==="R"){
     if(ws){ws.onclose=null;ws.close();ws=null}
     if(reconTimer){clearTimeout(reconTimer);reconTimer=null}
-    clearAllEntities();connect()}});
+    clearAllEntities();connect()}
+  if(e.key==="c"||e.key==="C")toggleCameraPip()});
 
 connect();
 </script>
