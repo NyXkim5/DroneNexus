@@ -121,20 +121,32 @@ V.resolutionScale=window.devicePixelRatio>1?0.75:1.0;
   }
 })();
 
-/* 64x64 anti-aliased drone icon */
-function createDroneIcon(hex){
-  var c=document.createElement("canvas");c.width=64;c.height=64;
-  var g=c.getContext("2d");g.imageSmoothingEnabled=true;g.imageSmoothingQuality="high";
-  g.strokeStyle=hex;g.lineWidth=2;g.lineCap="round";
-  g.beginPath();g.moveTo(10,10);g.lineTo(54,54);g.stroke();
-  g.beginPath();g.moveTo(54,10);g.lineTo(10,54);g.stroke();
-  g.fillStyle=hex;g.fillRect(24,24,16,16);
-  [10,54].forEach(function(x){[10,54].forEach(function(y){g.beginPath();g.arc(x,y,6,0,Math.PI*2);g.stroke()})});
-  g.fillStyle="rgba(100,255,100,0.85)";g.beginPath();g.arc(32,8,4,0,Math.PI*2);g.fill();
-  return c.toDataURL();
-}
-var ICONS={cyan:createDroneIcon("rgba(80,200,255,0.9)"),orange:createDroneIcon("rgba(255,160,60,0.9)"),
-  magenta:createDroneIcon("rgba(255,80,180,0.9)"),lime:createDroneIcon("rgba(100,255,80,0.9)"),red:createDroneIcon("rgba(255,70,70,0.9)")};
+/* DOM cache */
+var DOM={
+  active:document.getElementById("active"),
+  neutral:document.getElementById("neutral"),
+  tgtList:document.getElementById("tgt-list"),
+  topTime:document.getElementById("top-time"),
+  clockDisplay:document.getElementById("clock-display"),
+  speedDisplay:document.getElementById("speed-display"),
+  missionStatus:document.getElementById("mission-status"),
+  threatCount:document.getElementById("threat-count"),
+  trackInfo:document.getElementById("track-info"),
+  crosshair:document.getElementById("crosshair"),
+  trackCallsign:document.getElementById("track-callsign"),
+  trackDetail:document.getElementById("track-detail"),
+  trackExtra:document.getElementById("track-extra"),
+  replayProgress:document.getElementById("replay-progress"),
+  eventLog:document.getElementById("event-log"),
+  tileStatus:document.getElementById("tile-status"),
+  scenarioLabel:document.getElementById("scenario-label"),
+  bftCount:document.getElementById("bft-count"),
+  tgtCount:document.getElementById("tgt-count"),
+  cinText:document.getElementById("cin-text"),
+  keys:document.getElementById("keys"),
+  replayBar:document.getElementById("replay-bar"),
+  scenario:document.getElementById("scenario")
+};
 
 /* Red diamond threat icon */
 function createThreatIcon(){
@@ -146,7 +158,6 @@ function createThreatIcon(){
   return c.toDataURL();
 }
 var THREAT_ICON=createThreatIcon();
-var IK=["cyan","orange","magenta","lime"];
 var CC=[Cesium.Color.fromCssColorString("rgba(80,200,255,0.7)"),Cesium.Color.fromCssColorString("rgba(255,160,60,0.7)"),
   Cesium.Color.fromCssColorString("rgba(255,80,180,0.7)"),Cesium.Color.fromCssColorString("rgba(100,255,80,0.7)")];
 
@@ -161,17 +172,17 @@ V.clock.startTime=T0.clone();V.clock.stopTime=TE.clone();V.clock.currentTime=T0.
 V.clock.clockRange=Cesium.ClockRange.LOOP_STOP;V.clock.multiplier=1;V.clock.shouldAnimate=false;
 
 /* Scenario data */
-var STRIKE_T=[{name:"EMBARCADERO",lon:-122.3936,lat:37.7956,alt:300},{name:"PIER 39",lon:-122.4093,lat:37.8087,alt:270},
-  {name:"SALESFORCE",lon:-122.3972,lat:37.7897,alt:330},{name:"GHIRARDELLI",lon:-122.4194,lat:37.8080,alt:260}];
+var STRIKE_T=[{name:"EMBARCADERO",lon:-122.3936,lat:37.7956,alt:150},{name:"PIER 39",lon:-122.4093,lat:37.8087,alt:120},
+  {name:"SALESFORCE",lon:-122.3972,lat:37.7897,alt:250},{name:"GHIRARDELLI",lon:-122.4194,lat:37.8080,alt:130}];
 var RECON_A=[{name:"FINANCIAL",lon:-122.3990,lat:37.7935,alt:320,r:0.003},{name:"NORTH BEACH",lon:-122.4080,lat:37.8020,alt:290,r:0.004},
   {name:"MISSION",lon:-122.4180,lat:37.7630,alt:280,r:0.005},{name:"MARINA",lon:-122.4370,lat:37.8010,alt:310,r:0.004}];
-var SWARM_T={name:"SALESFORCE",lon:-122.3972,lat:37.7897,alt:330};
+var SWARM_T={name:"SALESFORCE",lon:-122.3972,lat:37.7897,alt:250};
 var SWARM_O=[{lon:-122.3972,lat:37.8150},{lon:-122.3972,lat:37.7650},{lon:-122.4250,lat:37.7897},{lon:-122.3700,lat:37.7897}];
 
 /* Path builder */
 function buildPath(tgt,di,ti,ppt){
   var dx=tgt.lon-LAUNCH.lon,dy=tgt.lat-LAUNCH.lat,d=Math.sqrt(dx*dx+dy*dy),px=-dy/d,py=dx/d;
-  var cA=270+ti*12+di*5,s=(di%2===1)?1:-1,r=Math.ceil(di/2);
+  var cA=150+ti*12+di*5,s=(di%2===1)?1:-1,r=Math.ceil(di/2);
   var fL=di>0?s*r*50:0,fB=di>0?r*30:0;
   var f1=(fL/85000)*px,f2=(fL/111000)*py,b1=-(fB/85000)*(dx/d),b2=-(fB/111000)*(dy/d);
   var lO=(di-2.5)*0.0002,aA=(di/ppt)*Math.PI*2,aLn=Math.cos(aA)*0.001,aLt=Math.sin(aA)*0.00077;
@@ -194,11 +205,11 @@ function clearScenario(){
     e.id.indexOf("hvec-")===0||e.id.indexOf("fline-")===0||e.id.indexOf("ops-")===0||
     e.id.indexOf("ering-")===0||e.id.indexOf("threat-")===0||e.id.indexOf("engline-")===0||
     e.id==="launch-marker"||e.id==="boundary-ring"))rm.push(e)});
-  rm.forEach(function(e){V.entities.remove(e)});arrivals=[];bdaShown=[];missionDone=false;flashTimers=[];clearEventLog();
+  rm.forEach(function(e){V.entities.remove(e)});arrivals=[];bdaShown=[];missionDone=false;flashTimers=[];engRingIdx=0;lastTgtHtml="";clearEventLog();
   threatIds=[];threatsSpawned=false;threatCount=0;
-  document.getElementById("threat-count").textContent="0";
+  DOM.threatCount.textContent="0";
   V.trackedEntity=undefined;tracking=false;
-  document.getElementById("track-info").style.display="none";document.getElementById("crosshair").style.display="none";
+  DOM.trackInfo.style.display="none";DOM.crosshair.style.display="none";
   V.clock.currentTime=T0.clone();V.clock.shouldAnimate=true;
 }
 
@@ -213,7 +224,7 @@ function addHVec(dId,col){
     width:1,material:col.withAlpha(0.4),disableDepthTestDistance:Number.POSITIVE_INFINITY}});
 }
 
-function addDrone(idx,lbl,pos,ds,icon,col,trail){
+function addDrone(idx,lbl,pos,ds,col,trail){
   V.entities.add({id:"drone-"+idx,name:lbl,
     availability:ds?new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({start:ds,stop:TE})]):undefined,
     position:pos,
@@ -291,7 +302,7 @@ function loadStrike(){
     for(var si=0;si<pts.length;si++){var st=Cesium.JulianDate.addSeconds(T0,delay+(si/(pts.length-1))*dur,new Cesium.JulianDate());
       pos.addSample(st,Cesium.Cartesian3.fromDegrees(pts[si].lon,pts[si].lat,pts[si].alt))}
     pos.setInterpolationOptions({interpolationDegree:3,interpolationAlgorithm:Cesium.HermitePolynomialApproximation});
-    addDrone(idx,lbl,pos,Cesium.JulianDate.addSeconds(T0,delay,new Cesium.JulianDate()),ICONS[IK[ti]],CC[ti],25)}
+    addDrone(idx,lbl,pos,Cesium.JulianDate.addSeconds(T0,delay,new Cesium.JulianDate()),CC[ti],25)}
   for(var ti=0;ti<4;ti++)for(var di=1;di<6;di++){var lI=ti*6,wI=ti*6+di;
     (function(lI,wI,ti,di){V.entities.add({id:"fline-"+ti+"-"+di,polyline:{positions:new Cesium.CallbackProperty(function(){
       var now=V.clock.currentTime,el=Cesium.JulianDate.secondsDifference(now,T0),ld=lI*1.5;
@@ -321,7 +332,7 @@ function loadRecon(){
         pos.addSample(Cesium.JulianDate.addSeconds(T0,t*300,new Cesium.JulianDate()),
           Cesium.Cartesian3.fromDegrees(a.lon+Math.cos(ang)*a.r,a.lat+Math.sin(ang)*a.r,a.alt+Math.sin(ang*3)*5))}
       pos.setInterpolationOptions({interpolationDegree:3,interpolationAlgorithm:Cesium.HermitePolynomialApproximation});
-      addDrone(idx,lbl,pos,null,ICONS.cyan,cy,40)}}
+      addDrone(idx,lbl,pos,null,cy,40)}}
 }
 
 function loadSwarm(){
@@ -338,22 +349,22 @@ function loadSwarm(){
         Cesium.Cartesian3.fromDegrees(orig.lon+dx*t+sp*px*(1-t),orig.lat+dy*t+sp*py*(1-t),180+Math.random()*60+t*SWARM_T.alt*0.4))}
     pos.setInterpolationOptions({interpolationDegree:3,interpolationAlgorithm:Cesium.HermitePolynomialApproximation});
     arrivals.push({ti:0,arrival:delay+dur,label:lbl});
-    addDrone(idx,lbl,pos,Cesium.JulianDate.addSeconds(T0,delay,new Cesium.JulianDate()),ICONS.red,rc,15)}}
+    addDrone(idx,lbl,pos,Cesium.JulianDate.addSeconds(T0,delay,new Cesium.JulianDate()),rc,15)}}
 }
 
 function loadScenario(name){curScn=name;var ss=name==="recon"?300:240;
   TE=Cesium.JulianDate.addSeconds(T0,ss,new Cesium.JulianDate());V.clock.stopTime=TE.clone();
   if(name==="strike")loadStrike();else if(name==="recon")loadRecon();else loadSwarm();
-  document.getElementById("scenario-label").textContent=name==="strike"?"COORDINATED STRIKE":name==="recon"?"ISR PATROL":"SATURATION";
-  document.getElementById("bft-count").textContent=curTotal;
-  document.getElementById("tgt-count").textContent=curTgts.length||RECON_A.length;
+  DOM.scenarioLabel.textContent=name==="strike"?"COORDINATED STRIKE":name==="recon"?"ISR PATROL":"SATURATION";
+  DOM.bftCount.textContent=curTotal;
+  DOM.tgtCount.textContent=curTgts.length||RECON_A.length;
   V.camera.setView({destination:OV.dest,orientation:OV.orient});
 }
 
 /* Cinematic intro */
 var cinRunning=false;
-function showCinText(t){var e=document.getElementById("cin-text");e.className="";e.textContent=t;void e.offsetWidth;e.className="visible"}
-function hideCinText(){document.getElementById("cin-text").className=""}
+function showCinText(t){DOM.cinText.className="";DOM.cinText.textContent=t;void DOM.cinText.offsetWidth;DOM.cinText.className="visible"}
+function hideCinText(){DOM.cinText.className=""}
 
 function runCinematic(){
   if(cinRunning)return;cinRunning=true;clearScenario();loadScenario(curScn);V.clock.shouldAnimate=false;
@@ -377,8 +388,8 @@ function runCinematic(){
                   complete:function(){
                     hideCinText();cinRunning=false;V.clock.shouldAnimate=true;
                     setTimeout(function(){var f=V.entities.getById("drone-0");if(f){V.trackedEntity=f;tracking=true;
-                      document.getElementById("track-info").style.display="block";document.getElementById("crosshair").style.display="block";
-                      document.getElementById("track-callsign").textContent=f.name;
+                      DOM.trackInfo.style.display="block";DOM.crosshair.style.display="block";
+                      DOM.trackCallsign.textContent=f.name;
                       setTimeout(function(){returnToOverview()},10000)}},5000);
                   }});
               }});
@@ -389,18 +400,22 @@ function runCinematic(){
 
 /* Tracking and orbit */
 var tracking=false,orbitAngle=15;
+var userInteracting=false,lastInteraction=0;
+V.scene.canvas.addEventListener("mousedown",function(){userInteracting=true;lastInteraction=Date.now()});
 function returnToOverview(){V.trackedEntity=undefined;tracking=false;
-  document.getElementById("track-info").style.display="none";document.getElementById("crosshair").style.display="none";
+  DOM.trackInfo.style.display="none";DOM.crosshair.style.display="none";
   V.camera.flyTo({destination:OV.dest,orientation:OV.orient,duration:1.5})}
 
 var handler=new Cesium.ScreenSpaceEventHandler(V.scene.canvas);
 handler.setInputAction(function(click){var p=V.scene.pick(click.position);
   if(Cesium.defined(p)&&p.id&&p.id.id&&p.id.id.indexOf("drone-")===0){
-    V.trackedEntity=p.id;tracking=true;document.getElementById("track-info").style.display="block";
-    document.getElementById("crosshair").style.display="block";document.getElementById("track-callsign").textContent=p.id.name}
+    V.trackedEntity=p.id;tracking=true;DOM.trackInfo.style.display="block";
+    DOM.crosshair.style.display="block";DOM.trackCallsign.textContent=p.id.name}
   else{returnToOverview()}},Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-function orbitTick(){if(!tracking&&V.clock.shouldAnimate&&!missionDone){orbitAngle+=0.015;
+function orbitTick(){
+  if(Date.now()-lastInteraction>5000)userInteracting=false;
+  if(!tracking&&!userInteracting&&V.clock.shouldAnimate&&!missionDone){orbitAngle+=0.015;
   var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0);
   var pitchDeg=-35+10*Math.sin(el*Math.PI*2/30); /* -25 to -45 over 30s period */
   var altM=1500+300*Math.sin(el*Math.PI*2/45);   /* 1200 to 1800 over 45s period */
@@ -517,13 +532,13 @@ function fmtLogTime(el){var s=Math.max(0,el),mn=Math.floor(s/60),sc=Math.floor(s
   return "T+"+String(mn).padStart(2,"0")+":"+String(sc).padStart(2,"0")}
 function logEvent(key,text){
   if(loggedEvents.has(key))return;loggedEvents.add(key);
-  var log=document.getElementById("event-log"),div=document.createElement("div");
+  var log=DOM.eventLog,div=document.createElement("div");
   div.textContent=text;log.appendChild(div);log.scrollTop=log.scrollHeight;
 }
-function clearEventLog(){document.getElementById("event-log").innerHTML="";loggedEvents.clear()}
+function clearEventLog(){DOM.eventLog.innerHTML="";loggedEvents.clear()}
 
 /* Replay bar seek */
-document.getElementById("replay-bar").addEventListener("click",function(e){
+DOM.replayBar.addEventListener("click",function(e){
   var rect=this.getBoundingClientRect();
   var pct=(e.clientX-rect.left)/rect.width;
   var totalDur=Cesium.JulianDate.secondsDifference(TE,T0);
@@ -535,37 +550,38 @@ document.getElementById("replay-bar").addEventListener("click",function(e){
 function updateTrack(){if(!tracking)return;var te=V.trackedEntity;if(!te||!te.position)return;
   var now=V.clock.currentTime,c=te.position.getValue(now);if(!c)return;
   var cr=Cesium.Cartographic.fromCartesian(c);
-  document.getElementById("track-detail").textContent=Math.round(cr.height)+"m AGL | "+
+  DOM.trackDetail.textContent=Math.round(cr.height)+"m HAE | "+
     Cesium.Math.toDegrees(cr.latitude).toFixed(4)+"N "+Math.abs(Cesium.Math.toDegrees(cr.longitude)).toFixed(4)+"W";
   var extra="";
   if(te.id&&te.id.indexOf("drone-")===0){var dIdx=parseInt(te.id.replace("drone-",""));var aI=arrivals[dIdx];
     if(aI&&curTgts[aI.ti]){var el=Cesium.JulianDate.secondsDifference(now,T0),eta=aI.arrival-el;
       extra="TGT: "+curTgts[aI.ti].name+(eta>0?" | ETA "+eta.toFixed(1)+"s":" | ON STATION")}}
-  document.getElementById("track-extra").textContent=extra;
+  DOM.trackExtra.textContent=extra;
 }
 
 /* HUD update loop */
+var lastTgtHtml="";
 function updateHUD(){
   var el=Cesium.JulianDate.secondsDifference(V.clock.currentTime,T0),ts=fmtTime(el);
-  document.getElementById("top-time").textContent=ts;document.getElementById("clock-display").textContent=ts;
-  document.getElementById("speed-display").textContent=V.clock.multiplier+"X";
+  DOM.topTime.textContent=ts;DOM.clockDisplay.textContent=ts;
+  DOM.speedDisplay.textContent=V.clock.multiplier+"X";
   var totalDuration=Cesium.JulianDate.secondsDifference(TE,T0);
   var rpct=Math.min(100,Math.max(0,(el/totalDuration)*100));
-  document.getElementById("replay-progress").style.width=rpct+"%";
+  DOM.replayProgress.style.width=rpct+"%";
   if(el<1){bdaShown.fill(false);if(flashTimers.length)flashTimers.fill(0);missionDone=false;clearEventLog();
     if(threatsSpawned){for(var ti2=0;ti2<threatIds.length;ti2++){var te2=V.entities.getById(threatIds[ti2]);if(te2)V.entities.remove(te2)}
       threatIds=[];threatsSpawned=false;threatCount=0}}
   if(curScn==="strike"&&el>=30&&!threatsSpawned)spawnThreats();
-  if(curScn==="strike"&&threatsSpawned){threatCount=countActiveThreats();document.getElementById("threat-count").textContent=threatCount}
-  else{document.getElementById("threat-count").textContent="0"}
+  if(curScn==="strike"&&threatsSpawned){threatCount=countActiveThreats();DOM.threatCount.textContent=threatCount}
+  else{DOM.threatCount.textContent="0"}
   if(curScn==="recon"){var ac=0;
     for(var i=0;i<curTotal;i++){var de=V.entities.getById("drone-"+i);if(de&&de.position.getValue(V.clock.currentTime))ac++;
       if(de&&el>=0)logEvent("recon-deploy-"+i,fmtLogTime(0)+" SCOUT-"+String(i+1).padStart(2,"0")+" DEPLOYED")}
     if(el>=5)for(var ri=0;ri<RECON_A.length;ri++)logEvent("recon-orbit-"+ri,fmtLogTime(5)+" "+RECON_A[ri].name+" AO: ON STATION");
-    document.getElementById("active").textContent=ac;document.getElementById("neutral").textContent="---";
+    DOM.active.textContent=ac;DOM.neutral.textContent="---";
     var h="";for(var a=0;a<RECON_A.length;a++)h+='<div class="tgt-row"><span>'+RECON_A[a].name+'</span><span class="st" style="color:rgba(80,200,255,0.7)">ORBITING</span></div>';
-    document.getElementById("tgt-list").innerHTML=h;
-    document.getElementById("mission-status").innerHTML='STATUS: <span class="val" style="color:rgba(80,200,255,0.9)">PATROL</span>';
+    if(h!==lastTgtHtml){DOM.tgtList.innerHTML=h;lastTgtHtml=h}
+    DOM.missionStatus.innerHTML='STATUS: <span class="val" style="color:rgba(80,200,255,0.9)">PATROL</span>';
     updateTrack();orbitTick();requestAnimationFrame(updateHUD);return}
   var ac=0;for(var i=0;i<arrivals.length;i++){var dd=curScn==="strike"?i*1.5:Math.max(0,arrivals[i].arrival-80);
     if(el>=dd&&el<arrivals[i].arrival+3)ac++;
@@ -582,15 +598,15 @@ function updateHUD(){
       te.point.color=Cesium.Color.fromCssColorString("rgba(80,255,130,0.9)");te.point.outlineColor=Cesium.Color.fromCssColorString("rgba(80,255,130,0.25)");
       if(te.label)te.label.fillColor=Cesium.Color.fromCssColorString("rgba(80,255,130,0.9)")}}
     h+='<div class="tgt-row '+(done?"tgt-done":"tgt-pending")+'"><span>'+curTgts[t].name+'</span><span class="st">'+(done?"BDA CONFIRM":cnt+"/"+need+" INBOUND")+'</span></div>'}
-  document.getElementById("active").textContent=ac;document.getElementById("neutral").textContent=neut;
-  document.getElementById("tgt-list").innerHTML=h;
-  var sEl=document.getElementById("mission-status");
+  DOM.active.textContent=ac;DOM.neutral.textContent=neut;
+  if(h!==lastTgtHtml){DOM.tgtList.innerHTML=h;lastTgtHtml=h}
+  var sEl=DOM.missionStatus;
   if(neut>=curTgts.length)sEl.innerHTML='STATUS: <span class="val" style="color:rgba(80,255,130,0.95)">MISSION COMPLETE</span>';
   else if(ac>0)sEl.innerHTML='STATUS: <span class="val" style="color:rgba(255,200,80,0.9)">ACTIVE</span>';
   else sEl.innerHTML='STATUS: <span class="val">STAGING</span>';
   if(neut>=curTgts.length&&!missionDone){missionDone=true;logEvent("complete",fmtLogTime(el)+" MISSION COMPLETE");
     tracking=false;V.trackedEntity=undefined;
-    document.getElementById("track-info").style.display="none";document.getElementById("crosshair").style.display="none";
+    DOM.trackInfo.style.display="none";DOM.crosshair.style.display="none";
     V.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(-122.400,37.796,3000),
       orientation:{heading:0,pitch:Cesium.Math.toRadians(-80),roll:0},duration:3});
     sEl.innerHTML='STATUS: <span class="val" style="color:rgba(80,255,130,0.95)">MISSION COMPLETE</span>'}
@@ -604,16 +620,16 @@ setTimeout(runCinematic,300);
 
 /* Keyboard hints auto-hide after 5s */
 var keysVisible=true;
-setTimeout(function(){document.getElementById("keys").style.opacity="0";keysVisible=false},5000);
+setTimeout(function(){DOM.keys.style.opacity="0";keysVisible=false},5000);
 
-document.getElementById("scenario").addEventListener("change",function(){clearScenario();loadScenario(this.value)});
+DOM.scenario.addEventListener("change",function(){clearScenario();loadScenario(this.value)});
 document.addEventListener("keydown",function(e){
   if(e.key===" "){V.clock.shouldAnimate=!V.clock.shouldAnimate;e.preventDefault()}
   if(e.key>="1"&&e.key<="5")V.clock.multiplier=[1,3,5,10,20][parseInt(e.key)-1];
   if(e.key==="Escape")returnToOverview();
   if(e.key==="r"||e.key==="R"){clearScenario();loadScenario(curScn);orbitAngle=15}
   if(e.key==="d"||e.key==="D"){clearScenario();loadScenario(curScn);runCinematic()}
-  if(e.key==="h"||e.key==="H"){keysVisible=!keysVisible;document.getElementById("keys").style.opacity=keysVisible?"1":"0"}
+  if(e.key==="h"||e.key==="H"){keysVisible=!keysVisible;DOM.keys.style.opacity=keysVisible?"1":"0"}
   if(e.key==="p"||e.key==="P"){document.body.classList.toggle("screenshot")}
 });
 </script></body></html>

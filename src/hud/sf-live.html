@@ -7,288 +7,325 @@
 <script src="cesium/Cesium.js"></script>
 <link href="cesium/Widgets/widgets.css" rel="stylesheet">
 <style>
-*{box-sizing:border-box}
-html,body,#c{margin:0;width:100%;height:100%;overflow:hidden;background:#0a0c10}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
 .cesium-viewer-bottom,.cesium-viewer .cesium-widget-credits,
 .cesium-viewer .cesium-viewer-animationContainer,
 .cesium-viewer .cesium-viewer-timelineContainer{display:none!important}
-#hud{position:absolute;top:0;left:0;right:0;bottom:0;z-index:10;pointer-events:none;
+#hud{position:absolute;inset:0;z-index:10;pointer-events:none;
   font-family:'JetBrains Mono','SF Mono','Consolas',monospace;-webkit-font-smoothing:antialiased}
-#top-bar{display:flex;justify-content:space-between;align-items:center;padding:7px 16px;
-  font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(160,210,255,0.75);
-  background:rgba(6,8,14,0.85);border-bottom:1px solid rgba(80,160,255,0.12)}
-#top-bar .tag{color:rgba(80,200,255,0.95);font-weight:600}
-#top-bar .sep{color:rgba(80,160,255,0.2);margin:0 8px}
-#dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle}
-#dot.ok{background:#0f0}#dot.err{background:#f44}#dot.wait{background:#fa0;animation:pulse 1s infinite}
+#top-bar{display:flex;align-items:center;gap:10px;padding:6px 14px;font-size:9px;letter-spacing:2.5px;
+  text-transform:uppercase;color:rgba(160,210,255,0.75);background:rgba(6,8,14,0.88);
+  border-bottom:1px solid rgba(80,160,255,0.15);pointer-events:auto}
+#top-bar .tag{color:rgba(80,210,255,0.95);font-weight:700}
+#top-bar .sep{color:rgba(80,160,255,0.2);margin:0 4px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.dot.ok{background:#0f0}.dot.err{background:#f44}.dot.wait{background:#fa0;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-#metrics{position:absolute;top:42px;right:12px;font-size:9px;letter-spacing:1.5px;
-  color:rgba(160,210,255,0.7);background:rgba(6,8,14,0.8);padding:8px 12px;
-  border:1px solid rgba(80,160,255,0.1);line-height:1.9;min-width:200px}
-#metrics .label{color:rgba(120,170,220,0.5)}
-#metrics .val{color:rgba(200,230,255,0.9)}
-#metrics .good{color:rgba(80,255,120,0.9)}
-#metrics .bad{color:rgba(255,80,80,0.9)}
+#scenario-select{background:rgba(20,24,32,0.9);border:1px solid rgba(80,160,255,0.2);
+  color:rgba(200,230,255,0.9);font-family:inherit;font-size:8px;letter-spacing:1.5px;
+  padding:3px 6px;pointer-events:auto;cursor:pointer;text-transform:uppercase}
+#top-bar .spacer{flex:1}
+#metrics{position:absolute;top:42px;left:12px;font-size:9px;letter-spacing:1.5px;
+  color:rgba(160,210,255,0.75);background:rgba(6,8,14,0.82);padding:10px 14px;
+  border:1px solid rgba(80,160,255,0.1);line-height:2;min-width:240px}
+#metrics .row{display:flex;justify-content:space-between}
+#metrics .label{color:rgba(100,150,200,0.55)}
+#metrics .val{color:rgba(200,230,255,0.9);font-weight:600}
+#metrics .good{color:rgba(80,255,120,0.95)}
+#metrics .bad{color:rgba(255,80,80,0.95)}
+#metrics .warn{color:rgba(255,200,60,0.9)}
+#metrics .divider{border-top:1px solid rgba(80,160,255,0.1);margin:4px 0}
+#legend{position:absolute;top:42px;right:12px;font-size:8px;letter-spacing:1px;
+  color:rgba(160,210,255,0.6);background:rgba(6,8,14,0.78);padding:8px 10px;
+  border:1px solid rgba(80,160,255,0.08);line-height:2}
+#legend i{display:inline-block;width:8px;height:8px;margin-right:4px;vertical-align:middle}
 #feed{position:absolute;bottom:50px;right:12px;font-size:8px;letter-spacing:1px;
-  color:rgba(255,180,60,0.7);text-align:right;line-height:1.7;max-height:200px;overflow:hidden}
-#bottom-bar{position:absolute;bottom:0;left:0;right:0;padding:5px 16px;font-size:7px;
-  letter-spacing:2px;color:rgba(120,170,220,0.4);background:rgba(6,8,14,0.7);
-  border-top:1px solid rgba(80,160,255,0.08);display:flex;justify-content:space-between;
-  text-transform:uppercase}
+  color:rgba(200,220,240,0.7);text-align:right;line-height:1.8;max-height:220px;overflow:hidden;
+  background:rgba(6,8,14,0.7);padding:6px 10px;border:1px solid rgba(80,160,255,0.06);min-width:200px}
+.hit{color:rgba(80,255,120,0.9)}.miss{color:rgba(255,80,80,0.9)}
+.leak{color:rgba(255,40,40,1);font-weight:700}.info{color:rgba(100,180,255,0.7)}
+#feed-title{color:rgba(100,150,200,0.5);font-size:7px;letter-spacing:2px;margin-bottom:4px}
+#detail{position:absolute;top:42px;left:50%;transform:translateX(-50%);font-size:9px;
+  letter-spacing:1px;color:rgba(200,230,255,0.85);background:rgba(6,8,14,0.9);padding:10px 16px;
+  border:1px solid rgba(80,160,255,0.15);display:none;pointer-events:auto;min-width:220px;
+  text-align:center;line-height:1.9}
+#detail .close{position:absolute;top:4px;right:8px;cursor:pointer;color:rgba(255,100,100,0.7)}
+#bottom-bar{position:absolute;bottom:0;left:0;right:0;padding:5px 14px;font-size:7px;
+  letter-spacing:2px;color:rgba(120,170,220,0.4);background:rgba(6,8,14,0.75);
+  border-top:1px solid rgba(80,160,255,0.08);display:flex;justify-content:space-between;text-transform:uppercase}
 #fallback{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;
-  color:rgba(255,100,100,0.9);background:rgba(0,0,0,0.85);padding:24px 36px;
-  border:1px solid rgba(255,100,100,0.3);font-family:'JetBrains Mono',monospace;
-  display:none;z-index:20;text-align:center;line-height:2.2}
-#legend{position:absolute;top:42px;left:12px;font-size:8px;letter-spacing:1px;
-  color:rgba(160,210,255,0.6);background:rgba(6,8,14,0.75);padding:6px 10px;
-  border:1px solid rgba(80,160,255,0.08);line-height:1.9}
-#legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+  color:rgba(255,100,100,0.9);background:rgba(0,0,0,0.9);padding:28px 40px;
+  border:1px solid rgba(255,100,100,0.3);font-family:inherit;display:none;z-index:20;
+  text-align:center;line-height:2.4;letter-spacing:1px}
 </style>
 </head>
 <body>
 <div id="c"></div>
 <div id="hud">
   <div id="top-bar">
-    <span><span id="dot" class="wait"></span><span class="tag">OVERWATCH WARGAME</span>
-      <span class="sep">|</span><span id="scenario-label">--</span>
-      <span class="sep">|</span><span id="conn-label">CONNECTING</span></span>
-    <span id="tick-label">TICK --</span>
-    <span>UNCLASSIFIED // FOUO</span>
+    <span class="dot wait" id="dot"></span><span class="tag">OVERWATCH WARGAME</span>
+    <span class="sep">|</span>
+    <select id="scenario-select">
+      <option value="probe_120">PROBE 120</option><option value="skirmish_80">SKIRMISH 80</option>
+      <option value="decoy_300">DECOY 300</option><option value="contested_500">CONTESTED 500</option>
+      <option value="saturation_1000">SATURATION 1000</option>
+      <option value="combined_saturation_strike">COMBINED SAT STRIKE</option>
+    </select>
+    <span class="sep">|</span><span id="conn-label">CONNECTING</span>
+    <span class="sep">|</span><span id="tick-label">T+00:00</span>
+    <span class="spacer"></span><span>UNCLASSIFIED // FOUO</span>
   </div>
   <div id="metrics"></div>
   <div id="legend">
-    <i style="background:#f44"></i>SATURATION
-    <i style="background:#0ff;margin-left:6px"></i>PROBE
-    <i style="background:#a040ff;margin-left:6px"></i>DECOY
-    <i style="background:#f90;margin-left:6px"></i>WAVES<br>
-    <i style="background:#4af;border-radius:1px"></i>DEFENDER
-    <i style="background:#fff;margin-left:6px"></i>SITE
+    <i style="background:#ff4444"></i>SATURATION <i style="background:#0ff;margin-left:6px"></i>PROBE
+    <i style="background:#a040ff;margin-left:6px"></i>DECOY <i style="background:#fa0;margin-left:6px"></i>UNKNOWN<br>
+    <i style="background:#48f;border-radius:1px"></i>DEFENDER
+    <i style="background:#0f6;border-radius:1px;margin-left:6px"></i>ENGAGING
+    <i style="background:#fff;border-radius:50%;margin-left:6px"></i>SITE
   </div>
-  <div id="feed"></div>
-  <div id="bottom-bar"><span id="asset-count">-- T / -- D</span><span id="ws-label">--</span></div>
+  <div id="feed"><div id="feed-title">ENGAGEMENT FEED</div></div>
+  <div id="detail"><span class="close" onclick="closeDetail()">X</span><div id="detail-body"></div></div>
+  <div id="bottom-bar"><span id="asset-count">-- TRACKS / -- DEFENDERS</span><span id="ws-label">--</span></div>
 </div>
-<div id="fallback">
-  BACKEND NOT RUNNING<br>
-  Start: <span style="color:#4af">cd backend && python3 main.py</span><br>
-  Then open: <span style="color:#4af">sf-live.html?ws=ws://localhost:8765/ws/v1/wargame/probe_120</span>
-</div>
+<div id="fallback">BACKEND NOT RUNNING<br>
+  <span style="color:rgba(80,180,255,0.9)">cd backend && python3 main.py</span><br>Then reload this page.</div>
 
 <script>
-/* ---- Cesium setup ---- */
-Cesium.Ion.defaultAccessToken="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlOGY0MjBhYy0zZTFlLTRkNTItOGFmNS1mYmM0ZDE1ZmYxMGYiLCJpZCI6NDQ3NDY2LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODIxMTI4MjN9.uvbJwgTognrLcj79tpt-kn46yt5S288s2hWgRBIhct8";
-var viewer=new Cesium.Viewer("c",{
-  timeline:false,animation:false,shouldAnimate:true,homeButton:false,
-  sceneModePicker:false,baseLayerPicker:false,navigationHelpButton:false,
-  geocoder:false,fullscreenButton:false
-});
-Cesium.createWorldTerrainAsync().then(function(t){viewer.scene.terrainProvider=t;});
-viewer.camera.flyTo({
-  destination:Cesium.Cartesian3.fromDegrees(-117.8443,33.6405,2400),
-  orientation:{heading:Cesium.Math.toRadians(350),pitch:Cesium.Math.toRadians(-45),roll:0},
-  duration:2
-});
+/* OVERWATCH WARGAME -- Live Counter-Drone Engagement Viewer
+   Connects to BULWARK wargame engine via WebSocket. Renders hostile tracks,
+   defender assets, engagement lines, and real-time metrics on CesiumJS. */
 
-/* ---- State ---- */
+Cesium.Ion.defaultAccessToken="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlOGY0MjBhYy0zZTFlLTRkNTItOGFmNS1mYmM0ZDE1ZmYxMGYiLCJpZCI6NDQ3NDY2LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODIxMTI4MjN9.uvbJwgTognrLcj79tpt-kn46yt5S288s2hWgRBIhct8";
+var viewer=new Cesium.Viewer("c",{timeline:false,animation:false,shouldAnimate:true,homeButton:false,
+  sceneModePicker:false,baseLayerPicker:false,navigationHelpButton:false,geocoder:false,
+  fullscreenButton:false,infoBox:false,selectionIndicator:false});
+
+/* Google 3D Tiles with globe+terrain fallback */
+(async function(){try{viewer.scene.primitives.add(await Cesium.Cesium3DTileset.fromIonAssetId(2275207))}
+catch(e){viewer.scene.globe=new Cesium.Globe();
+  try{Cesium.createWorldTerrainAsync().then(function(t){viewer.scene.terrainProvider=t})}catch(e2){}}})();
+
 var ORIGIN_LAT=33.6405,ORIGIN_LON=-117.8443;
-var wsUrl=new URLSearchParams(window.location.search).get("ws")||"ws://localhost:8765/ws/v1/wargame/probe_120";
-var scenarioName=wsUrl.split("/wargame/")[1]||"unknown";
-document.getElementById("scenario-label").textContent=scenarioName.toUpperCase();
+var INTENT_COL={SATURATION:"#ff4444",PROBE:"#00ffff",DECOY:"#a040ff",STRIKE:"#ff6600",UNKNOWN:"#ffaa00"};
+var STATUS_COL={READY:"#4488ff",ENGAGING:"#00ff66",RELOADING:"#ffcc00",DEPLETED:"#666",SPENT:"#666",OFFLINE:"#444"};
+
+/* Canvas icon factory */
+var iconCache={};
+function makeIcon(shape,color){
+  var key=shape+color;if(iconCache[key])return iconCache[key];
+  var c=document.createElement("canvas");c.width=32;c.height=32;var g=c.getContext("2d");
+  g.fillStyle=color;g.strokeStyle="rgba(255,255,255,0.5)";g.lineWidth=1;
+  if(shape==="diamond"){g.beginPath();g.moveTo(16,2);g.lineTo(30,16);g.lineTo(16,30);g.lineTo(2,16);g.closePath();g.fill();g.stroke()}
+  else{g.fillRect(4,4,24,24);g.strokeRect(4,4,24,24)}
+  iconCache[key]=c.toDataURL();return iconCache[key];
+}
+
+function enuToGeo(e,n,u){return{lat:ORIGIN_LAT+n/111000,lon:ORIGIN_LON+e/(111000*Math.cos(ORIGIN_LAT*Math.PI/180)),alt:u||50}}
+
+/* State */
+var scenario=new URLSearchParams(window.location.search).get("scenario")||"probe_120";
+var wsUrl="ws://localhost:8765/ws/v1/wargame/"+scenario;
+var trackEnts={},defEnts={},assignEnts={},rangeEnts={};
+var siteEnt=null,siteRing=null,feedLines=[],ws=null,reconTimer=null;
+var orbitAngle=0,orbitActive=true,selectEl=document.getElementById("scenario-select");
+selectEl.value=scenario;
 document.getElementById("ws-label").textContent=wsUrl.replace(/^wss?:\/\//,"");
 
-var trackEnts={},defEnts={},assignEnts={};
-var siteEnt=null;
-var feedLines=[];
-var knownTrackIds={};
-var ws=null,reconTimer=null;
+/* Camera: 800m altitude, slow orbit over origin */
+viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(ORIGIN_LON,ORIGIN_LAT,800),
+  orientation:{heading:0,pitch:Cesium.Math.toRadians(-60),roll:0},duration:2});
 
-/* ---- Intent color map ---- */
-var INTENT_COLOR={
-  SATURATION:Cesium.Color.fromCssColorString("#ff4444"),
-  PROBE:Cesium.Color.fromCssColorString("#00ffff"),
-  DECOY:Cesium.Color.fromCssColorString("#a040ff"),
-  WAVES:Cesium.Color.fromCssColorString("#ff9900"),
-  UNKNOWN:Cesium.Color.fromCssColorString("#ff8888")
-};
-var STATUS_COLOR={
-  READY:Cesium.Color.fromCssColorString("#44aaff"),
-  ENGAGING:Cesium.Color.fromCssColorString("#00ff66"),
-  RELOADING:Cesium.Color.fromCssColorString("#ffcc00"),
-  DEPLETED:Cesium.Color.fromCssColorString("#666666"),
-  OFFLINE:Cesium.Color.fromCssColorString("#444444")
-};
+viewer.scene.preRender.addEventListener(function(){
+  if(!orbitActive)return;orbitAngle+=0.0003;
+  viewer.camera.setView({destination:Cesium.Cartesian3.fromDegrees(
+    ORIGIN_LON+0.003*Math.sin(orbitAngle),ORIGIN_LAT+0.003*Math.cos(orbitAngle),800),
+    orientation:{heading:orbitAngle*1.8%6.28,pitch:Cesium.Math.toRadians(-60),roll:0}});
+});
+var idleTimer=null;
+function pauseOrbit(){orbitActive=false;if(idleTimer)clearTimeout(idleTimer);
+  idleTimer=setTimeout(function(){orbitActive=true},15000)}
+viewer.scene.canvas.addEventListener("mousedown",pauseOrbit);
+viewer.scene.canvas.addEventListener("wheel",pauseOrbit);
 
-/* ---- ENU to lat/lon (fallback if backend omits geodetic) ---- */
-function enuToLL(e,n){
-  return{lat:ORIGIN_LAT+n/111000,lon:ORIGIN_LON+e/(111000*Math.cos(ORIGIN_LAT*Math.PI/180))};
-}
-
-/* ---- Entity management ---- */
-function upsertTrack(t){
-  var lat=t.lat,lon=t.lon;
-  if(lat==null&&t.enu){var ll=enuToLL(t.enu[0],t.enu[1]);lat=ll.lat;lon=ll.lon;}
-  if(lat==null||lon==null)return;
-  var alt=(t.enu&&t.enu[2])?t.enu[2]:30;
-  var col=INTENT_COLOR[t.intent]||INTENT_COLOR.UNKNOWN;
-  var sz=Math.max(5,Math.min(12,Math.round((t.confidence||0.5)*14)));
-  var ent=trackEnts[t.id];
-  if(!ent){
-    ent=viewer.entities.add({
-      id:"t-"+t.id,name:t.id,
-      position:Cesium.Cartesian3.fromDegrees(lon,lat,alt),
-      point:{pixelSize:sz,color:col,outlineColor:Cesium.Color.WHITE.withAlpha(0.5),outlineWidth:1},
-      label:{text:t.id.substring(0,7),font:"7px monospace",fillColor:col.withAlpha(0.8),
-        showBackground:true,backgroundColor:new Cesium.Color(0,0,0,0.5),
-        pixelOffset:new Cesium.Cartesian2(0,-14),scale:0.55,
-        distanceDisplayCondition:new Cesium.DistanceDisplayCondition(0,6000)}
-    });
-    trackEnts[t.id]=ent;
-  }else{
-    ent.position=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
-    if(ent.point){ent.point.color=col;ent.point.pixelSize=sz;}
-  }
-  knownTrackIds[t.id]=true;
-}
-
-function removeStaleTrack(liveIds){
-  var stale=[];
-  for(var id in trackEnts){if(!liveIds[id])stale.push(id);}
-  for(var i=0;i<stale.length;i++){
-    viewer.entities.remove(trackEnts[stale[i]]);
-    delete trackEnts[stale[i]];
-  }
-}
-
-function upsertDefender(d){
-  var lat=d.lat,lon=d.lon;
-  if(lat==null&&d.enu){var ll=enuToLL(d.enu[0],d.enu[1]);lat=ll.lat;lon=ll.lon;}
-  if(lat==null||lon==null)return;
-  var alt=(d.enu&&d.enu[2])?d.enu[2]:0;
-  var col=STATUS_COLOR[d.status]||STATUS_COLOR.READY;
-  var ent=defEnts[d.id];
-  if(!ent){
-    ent=viewer.entities.add({
-      id:"d-"+d.id,name:d.id,
-      position:Cesium.Cartesian3.fromDegrees(lon,lat,alt),
-      point:{pixelSize:10,color:col,outlineColor:Cesium.Color.WHITE,outlineWidth:2},
-      label:{text:(d.kind||"DEF")+" "+d.id.substring(0,6),font:"8px monospace",
-        fillColor:Cesium.Color.DEEPSKYBLUE.withAlpha(0.8),showBackground:true,
-        backgroundColor:new Cesium.Color(0,0,0,0.5),
-        pixelOffset:new Cesium.Cartesian2(0,-18),scale:0.55}
-    });
-    defEnts[d.id]=ent;
-  }else{
-    ent.position=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
-    if(ent.point)ent.point.color=col;
-  }
-}
-
-function drawAssignments(assignments,tracks,defenders){
-  for(var k in assignEnts){viewer.entities.remove(assignEnts[k]);}
-  assignEnts={};
-  var tPos={},dPos={};
-  for(var i=0;i<tracks.length;i++){var t=tracks[i];if(t.lat!=null&&t.lon!=null)tPos[t.id]=[t.lon,t.lat,(t.enu&&t.enu[2])||30];}
-  for(var j=0;j<defenders.length;j++){var d=defenders[j];if(d.lat!=null&&d.lon!=null)dPos[d.id]=[d.lon,d.lat,(d.enu&&d.enu[2])||0];}
-  for(var a=0;a<assignments.length;a++){
-    var asg=assignments[a];
-    var dp=dPos[asg.defender_id],tp=tPos[asg.track_id];
-    if(!dp||!tp)continue;
-    var col=asg.status==="HIT"?Cesium.Color.LIME:asg.status==="MISS"?Cesium.Color.RED:Cesium.Color.YELLOW;
-    var key=asg.defender_id+"-"+asg.track_id;
-    assignEnts[key]=viewer.entities.add({
-      id:"a-"+key,
-      polyline:{positions:Cesium.Cartesian3.fromDegreesArrayHeights([dp[0],dp[1],dp[2],tp[0],tp[1],tp[2]]),
-        width:1.5,material:new Cesium.PolylineGlowMaterialProperty({glowPower:0.2,color:col.withAlpha(0.6)})}
-    });
-  }
-}
-
-function ensureSite(site){
-  if(siteEnt||!site)return;
-  var lat=site.lat,lon=site.lon;
-  if(lat==null&&site.enu){var ll=enuToLL(site.enu[0],site.enu[1]);lat=ll.lat;lon=ll.lon;}
-  if(lat==null)return;
-  siteEnt=viewer.entities.add({
-    position:Cesium.Cartesian3.fromDegrees(lon,lat,5),
-    ellipse:{semiMajorAxis:150,semiMinorAxis:150,height:2,
-      material:Cesium.Color.WHITE.withAlpha(0.06),outline:true,
-      outlineColor:Cesium.Color.WHITE.withAlpha(0.25),outlineWidth:2},
-    label:{text:"DEFENDED SITE",font:"9px monospace",fillColor:Cesium.Color.WHITE.withAlpha(0.8),
+/* Defended site */
+function ensureSite(s){if(siteEnt)return;
+  var lat=s?s.lat:ORIGIN_LAT,lon=s?s.lon:ORIGIN_LON;
+  siteEnt=viewer.entities.add({id:"site",position:Cesium.Cartesian3.fromDegrees(lon,lat,5),
+    point:{pixelSize:12,color:Cesium.Color.WHITE.withAlpha(0.9),outlineColor:Cesium.Color.WHITE.withAlpha(0.4),
+      outlineWidth:3,disableDepthTestDistance:Number.POSITIVE_INFINITY},
+    label:{text:"DEFENDED SITE",font:"10px monospace",fillColor:Cesium.Color.WHITE.withAlpha(0.9),
       showBackground:true,backgroundColor:new Cesium.Color(0,0,0,0.6),
-      pixelOffset:new Cesium.Cartesian2(0,-20),scale:0.6}
-  });
+      pixelOffset:new Cesium.Cartesian2(0,-22),scale:0.6,disableDepthTestDistance:Number.POSITIVE_INFINITY}});
+  siteRing=viewer.entities.add({id:"site-ring",position:Cesium.Cartesian3.fromDegrees(lon,lat,2),
+    ellipse:{semiMajorAxis:200,semiMinorAxis:200,height:2,material:Cesium.Color.WHITE.withAlpha(0.04),
+      outline:true,outlineColor:Cesium.Color.WHITE.withAlpha(0.2),outlineWidth:2}});
 }
 
-/* ---- HUD updates ---- */
-function updateMetrics(m){
-  if(!m){document.getElementById("metrics").innerHTML="";return;}
-  var ratio=(m.cost_exchange_ratio!=null)?m.cost_exchange_ratio.toFixed(2):"--";
-  var rc=(m.cost_exchange_win===true)?"good":(m.cost_exchange_win===false)?"bad":"";
-  var iRate=(m.intercept_rate*100).toFixed(0);
+/* Track upsert */
+function upsertTrack(t){
+  var lat=t.lat,lon=t.lon,alt=50;
+  if(lat==null&&t.enu){var g=enuToGeo(t.enu[0],t.enu[1],t.enu[2]);lat=g.lat;lon=g.lon;alt=g.alt}
+  if(t.enu&&t.enu[2])alt=t.enu[2]; if(lat==null||lon==null)return;
+  var intent=t.intent||"UNKNOWN",hex=INTENT_COL[intent]||INTENT_COL.UNKNOWN;
+  var col=Cesium.Color.fromCssColorString(hex),sz=Math.round(12+((t.confidence||0.5)-0.3)*23);
+  var ent=trackEnts[t.id];
+  if(!ent){ent=viewer.entities.add({id:"t-"+t.id,name:t.id,
+    position:Cesium.Cartesian3.fromDegrees(lon,lat,alt),
+    billboard:{image:makeIcon("diamond",hex),width:sz,height:sz,disableDepthTestDistance:Number.POSITIVE_INFINITY},
+    label:{text:t.id.substring(0,8)+" "+intent,font:"8px monospace",fillColor:col.withAlpha(0.85),
+      showBackground:true,backgroundColor:new Cesium.Color(0,0,0,0.55),
+      pixelOffset:new Cesium.Cartesian2(0,-20),scale:0.55,
+      disableDepthTestDistance:Number.POSITIVE_INFINITY,
+      distanceDisplayCondition:new Cesium.DistanceDisplayCondition(0,5000)}});
+    trackEnts[t.id]=ent}
+  else{ent.position=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
+    if(ent.billboard){ent.billboard.image=makeIcon("diamond",hex);ent.billboard.width=sz;ent.billboard.height=sz}
+    if(ent.label)ent.label.text=t.id.substring(0,8)+" "+intent}
+  ent._data=t;
+}
+
+/* Defender upsert */
+function upsertDefender(d){
+  var lat=d.lat,lon=d.lon,alt=0;
+  if(lat==null&&d.enu){var g=enuToGeo(d.enu[0],d.enu[1],d.enu[2]);lat=g.lat;lon=g.lon;alt=g.alt}
+  if(d.enu&&d.enu[2])alt=d.enu[2]; if(lat==null||lon==null)return;
+  var status=d.status||"READY",hex=STATUS_COL[status]||STATUS_COL.READY;
+  var col=Cesium.Color.fromCssColorString(hex),ent=defEnts[d.id];
+  if(!ent){ent=viewer.entities.add({id:"d-"+d.id,name:d.id,
+    position:Cesium.Cartesian3.fromDegrees(lon,lat,alt),
+    billboard:{image:makeIcon("square",hex),width:28,height:28,disableDepthTestDistance:Number.POSITIVE_INFINITY},
+    label:{text:(d.kind||"DEF")+" "+d.id.substring(0,6)+" ["+status+"]",font:"8px monospace",
+      fillColor:col.withAlpha(0.85),showBackground:true,backgroundColor:new Cesium.Color(0,0,0,0.55),
+      pixelOffset:new Cesium.Cartesian2(0,-22),scale:0.55,disableDepthTestDistance:Number.POSITIVE_INFINITY}});
+    defEnts[d.id]=ent;
+    if(d.range_m){rangeEnts[d.id]=viewer.entities.add({id:"r-"+d.id,
+      position:Cesium.Cartesian3.fromDegrees(lon,lat,2),
+      ellipse:{semiMajorAxis:d.range_m,semiMinorAxis:d.range_m,height:2,
+        material:Cesium.Color.fromCssColorString(hex).withAlpha(0.03),outline:true,
+        outlineColor:Cesium.Color.fromCssColorString(hex).withAlpha(0.12),outlineWidth:1}})}}
+  else{ent.position=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
+    if(ent.billboard)ent.billboard.image=makeIcon("square",hex);
+    if(ent.label)ent.label.text=(d.kind||"DEF")+" "+d.id.substring(0,6)+" ["+status+"]";
+    if(rangeEnts[d.id])rangeEnts[d.id].position=Cesium.Cartesian3.fromDegrees(lon,lat,2)}
+  ent._data=d;
+}
+
+/* Remove entities no longer in current frame */
+function removeStale(live,ents){
+  var rm=[];for(var id in ents)if(!live[id])rm.push(id);
+  for(var i=0;i<rm.length;i++){viewer.entities.remove(ents[rm[i]]);delete ents[rm[i]];
+    if(rangeEnts[rm[i]]){viewer.entities.remove(rangeEnts[rm[i]]);delete rangeEnts[rm[i]]}}
+}
+
+/* Assignment lines */
+function drawAssignments(asgs){
+  for(var k in assignEnts)viewer.entities.remove(assignEnts[k]);assignEnts={};
+  var now=Cesium.JulianDate.now();
+  for(var i=0;i<asgs.length;i++){var a=asgs[i];
+    var dE=defEnts[a.defender_id],tE=trackEnts[a.track_id];if(!dE||!tE)continue;
+    var dp=dE.position.getValue(now),tp=tE.position.getValue(now);if(!dp||!tp)continue;
+    var col=a.status==="HIT"?Cesium.Color.LIME.withAlpha(0.6):a.status==="MISS"?Cesium.Color.RED.withAlpha(0.6):Cesium.Color.ORANGE.withAlpha(0.5);
+    var key=a.defender_id+"-"+a.track_id;
+    assignEnts[key]=viewer.entities.add({id:"a-"+key,
+      polyline:{positions:[dp,tp],width:1.5,
+        material:new Cesium.PolylineGlowMaterialProperty({glowPower:0.15,color:col}),
+        disableDepthTestDistance:Number.POSITIVE_INFINITY}})}
+}
+
+/* HUD metrics */
+function fmtTime(s){var m=Math.floor(s/60),sec=Math.floor(s%60);
+  return"T+"+(m<10?"0":"")+m+":"+(sec<10?"0":"")+sec}
+
+function updateMetrics(m){if(!m)return;
+  var iR=(m.intercept_rate*100).toFixed(0);
+  var r=m.cost_exchange_ratio!=null?m.cost_exchange_ratio.toFixed(2):"--";
+  var rc=m.cost_exchange_win===true?"good":m.cost_exchange_win===false?"bad":"val";
+  var rl=m.cost_exchange_win===true?" (FAVORABLE)":m.cost_exchange_win===false?" (UNFAVORABLE)":"";
+  document.getElementById("tick-label").textContent=fmtTime(m.sim_time_s||0);
   document.getElementById("metrics").innerHTML=
-    '<span class="label">TICK</span> <span class="val">'+m.tick+'</span> <span class="label">T+</span><span class="val">'+m.sim_time_s+'s</span><br>'+
-    '<span class="label">HOSTILES</span> <span class="val">'+m.active_hostiles+'</span> <span class="label">TRACKED</span> <span class="val">'+m.tracks_held+'</span><br>'+
-    '<span class="label">LEAKERS</span> <span class="bad">'+m.leakers+'</span><br>'+
-    '<span class="label">INTERCEPTS</span> <span class="val">'+m.intercepts+'/'+m.engagements_made+' ('+iRate+'%)</span><br>'+
-    '<span class="label">COST RATIO</span> <span class="'+rc+'">'+ratio+'</span>';
-  document.getElementById("tick-label").textContent="TICK "+m.tick;
-}
+    '<div class="row"><span class="label">HOSTILES</span><span class="val">'+m.active_hostiles+'</span></div>'+
+    '<div class="row"><span class="label">TRACKED</span><span class="val">'+m.tracks_held+'</span></div>'+
+    '<div class="row"><span class="label">LEAKERS</span><span class="'+(m.leakers>0?"bad":"good")+'">'+m.leakers+'</span></div>'+
+    '<div class="divider"></div>'+
+    '<div class="row"><span class="label">INTERCEPTS</span><span class="val">'+m.intercepts+' / '+m.engagements_made+'</span></div>'+
+    '<div class="row"><span class="label">RATE</span><span class="'+(iR>=80?"good":iR>=50?"warn":"bad")+'">'+iR+'%</span></div>'+
+    '<div class="divider"></div>'+
+    '<div class="row"><span class="label">COST RATIO</span><span class="'+rc+'">'+r+rl+'</span></div>'+
+    '<div class="row"><span class="label">DEF SPENT</span><span class="val">$'+(m.defender_spent||0).toFixed(0)+'</span></div>'+
+    '<div class="row"><span class="label">ATK DESTROYED</span><span class="val">$'+(m.attacker_destroyed||0).toFixed(0)+'</span></div>'}
 
-function addFeed(text){
-  feedLines.push(text);
-  if(feedLines.length>14)feedLines.shift();
-  document.getElementById("feed").innerHTML=feedLines.join("<br>");
-}
+/* Engagement feed */
+function addFeed(html){feedLines.push(html);if(feedLines.length>10)feedLines.shift();
+  document.getElementById("feed").innerHTML='<div id="feed-title">ENGAGEMENT FEED</div>'+feedLines.join("<br>")}
 
-/* ---- WebSocket ---- */
-function setDot(cls){document.getElementById("dot").className=cls;}
-function setConn(txt){document.getElementById("conn-label").textContent=txt;}
+/* Click entity for details */
+viewer.screenSpaceEventHandler.setInputAction(function(click){
+  var p=viewer.scene.pick(click.position);
+  if(!Cesium.defined(p)||!p.id){closeDetail();return}
+  var ent=p.id,d=ent._data,body=document.getElementById("detail-body");
+  if(d&&d.intent!=null){body.innerHTML='TRACK '+d.id+'<br>INTENT: '+d.intent+'<br>CONF: '+
+    ((d.confidence||0)*100).toFixed(0)+'%<br>TTI: '+(d.time_to_impact_s!=null?d.time_to_impact_s.toFixed(1)+'s':'--')+
+    '<br>THREAT: '+(d.threat_score!=null?d.threat_score.toFixed(2):'--');
+    document.getElementById("detail").style.display="block"}
+  else if(d&&d.kind!=null){body.innerHTML='DEFENDER '+d.id+'<br>TYPE: '+(d.kind||'?')+'<br>STATUS: '+
+    (d.status||'?')+'<br>CAP: '+(d.capacity!=null?d.capacity:'--')+'<br>RANGE: '+(d.range_m||'--')+
+    'm<br>COST: $'+(d.unit_cost||0).toFixed(0);document.getElementById("detail").style.display="block"}
+},Cesium.ScreenSpaceEventType.LEFT_CLICK);
+function closeDetail(){document.getElementById("detail").style.display="none"}
+
+/* WebSocket */
+function setDot(c){document.getElementById("dot").className="dot "+c}
+function setConn(t){document.getElementById("conn-label").textContent=t}
 
 function connect(){
-  setDot("wait");setConn("CONNECTING");
-  document.getElementById("fallback").style.display="none";
-  try{ws=new WebSocket(wsUrl);}catch(e){onFail();return;}
-
-  ws.onopen=function(){
-    setDot("ok");setConn("CONNECTED");
-    if(reconTimer){clearTimeout(reconTimer);reconTimer=null;}
-  };
-
+  setDot("wait");setConn("CONNECTING");document.getElementById("fallback").style.display="none";
+  try{ws=new WebSocket(wsUrl)}catch(e){onFail();return}
+  ws.onopen=function(){setDot("ok");setConn("CONNECTED");
+    if(reconTimer){clearTimeout(reconTimer);reconTimer=null}
+    addFeed('<span class="info">CONNECTED TO '+scenario.toUpperCase()+'</span>')};
   ws.onmessage=function(ev){
-    var msg;
-    try{msg=JSON.parse(ev.data);}catch(e){return;}
-
+    var msg;try{msg=JSON.parse(ev.data)}catch(e){return}
     if(msg.type==="WARGAME_FRAME"){
       var tracks=msg.tracks||[],defs=msg.defenders||[],asgs=msg.assignments||[];
-      knownTrackIds={};
-      for(var i=0;i<tracks.length;i++)upsertTrack(tracks[i]);
-      removeStaleTrack(knownTrackIds);
-      for(var j=0;j<defs.length;j++)upsertDefender(defs[j]);
-      drawAssignments(asgs,tracks,defs);
-      ensureSite(msg.site);
-      document.getElementById("asset-count").textContent=tracks.length+" T / "+defs.length+" D";
+      var lt={};for(var i=0;i<tracks.length;i++){upsertTrack(tracks[i]);lt[tracks[i].id]=true}
+      removeStale(lt,trackEnts);
+      var ld={};for(var j=0;j<defs.length;j++){upsertDefender(defs[j]);ld[defs[j].id]=true}
+      removeStale(ld,defEnts);
+      drawAssignments(asgs);ensureSite(msg.site);
       if(msg.metrics)updateMetrics(msg.metrics);
-      for(var a=0;a<asgs.length;a++){
-        if(asgs[a].status==="HIT")addFeed(asgs[a].defender_id.substring(0,8)+" -> "+asgs[a].track_id.substring(0,8)+" HIT");
-        if(asgs[a].status==="MISS")addFeed('<span style="color:#f66">'+asgs[a].defender_id.substring(0,8)+" -> "+asgs[a].track_id.substring(0,8)+" MISS</span>");
-      }
-      if(msg.done){addFeed("--- SCENARIO COMPLETE ---");setConn("COMPLETE");}
-    }
-    if(msg.type==="ERROR"){addFeed("ERR: "+(msg.error||"unknown"));}
-  };
+      document.getElementById("asset-count").textContent=tracks.length+" TRACKS / "+defs.length+" DEFENDERS";
+      for(var a=0;a<asgs.length;a++){var ag=asgs[a],dl=ag.defender_id.substring(0,8),tl=ag.track_id.substring(0,8);
+        if(ag.status==="HIT")addFeed('<span class="hit">'+dl+' -> '+tl+': HIT</span>');
+        else if(ag.status==="MISS")addFeed('<span class="miss">'+dl+' -> '+tl+': MISS</span>');
+        else if(ag.status==="LEAK")addFeed('<span class="leak">'+tl+': LEAKED</span>')}
+      if(msg.done){addFeed('<span class="info">--- SCENARIO COMPLETE ---</span>');setConn("COMPLETE")}}
+    if(msg.type==="ERROR")addFeed('<span class="miss">ERR: '+(msg.error||"unknown")+'</span>')};
+  ws.onerror=function(){onFail()};
+  ws.onclose=function(){setDot("err");setConn("DISCONNECTED");schedRecon()}}
 
-  ws.onerror=function(){onFail();};
-  ws.onclose=function(){setDot("err");setConn("DISCONNECTED");schedRecon();};
-}
+function onFail(){setDot("err");setConn("DISCONNECTED");
+  document.getElementById("fallback").style.display="block";schedRecon()}
+function schedRecon(){if(reconTimer)return;reconTimer=setTimeout(function(){reconTimer=null;connect()},4000)}
 
-function onFail(){
-  setDot("err");setConn("DISCONNECTED");
-  document.getElementById("fallback").style.display="block";
-  schedRecon();
-}
-function schedRecon(){
-  if(reconTimer)return;
-  reconTimer=setTimeout(function(){reconTimer=null;connect();},4000);
-}
+/* Scenario switcher */
+selectEl.addEventListener("change",function(){
+  scenario=selectEl.value;wsUrl="ws://localhost:8765/ws/v1/wargame/"+scenario;
+  document.getElementById("ws-label").textContent=wsUrl.replace(/^wss?:\/\//,"");
+  if(ws){ws.onclose=null;ws.close();ws=null}
+  if(reconTimer){clearTimeout(reconTimer);reconTimer=null}
+  for(var k in trackEnts)viewer.entities.remove(trackEnts[k]);
+  for(var k2 in defEnts)viewer.entities.remove(defEnts[k2]);
+  for(var k3 in assignEnts)viewer.entities.remove(assignEnts[k3]);
+  for(var k4 in rangeEnts)viewer.entities.remove(rangeEnts[k4]);
+  if(siteEnt){viewer.entities.remove(siteEnt);siteEnt=null}
+  if(siteRing){viewer.entities.remove(siteRing);siteRing=null}
+  trackEnts={};defEnts={};assignEnts={};rangeEnts={};feedLines=[];
+  document.getElementById("feed").innerHTML='<div id="feed-title">ENGAGEMENT FEED</div>';
+  document.getElementById("metrics").innerHTML="";
+  document.getElementById("tick-label").textContent="T+00:00";
+  document.getElementById("asset-count").textContent="-- TRACKS / -- DEFENDERS";
+  connect()});
 
 connect();
 </script>
