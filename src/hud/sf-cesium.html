@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OVERWATCH C2 - SF Theater</title>
-<script src="https://cesium.com/downloads/cesiumjs/releases/1.128/Cesium.js"></script>
-<link href="https://cesium.com/downloads/cesiumjs/releases/1.128/Widgets/widgets.css" rel="stylesheet">
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.142/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.142/Widgets/widgets.css" rel="stylesheet">
 <style>
   html, body, #cesiumContainer { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000; }
   #hud { position:absolute; top:0; left:0; right:0; bottom:0; z-index:10; pointer-events:none; font-family:'Courier New',monospace; }
@@ -49,8 +49,13 @@
     geocoder: Cesium.IonGeocodeProviderType.GOOGLE,
     globe: false, sceneModePicker: false, baseLayerPicker: false
   });
-  const tileset = await Cesium.createGooglePhotorealistic3DTileset();
-  viewer.scene.primitives.add(tileset);
+  try {
+    const tileset = await Cesium.createGooglePhotorealistic3DTileset();
+    viewer.scene.primitives.add(tileset);
+  } catch(e) {
+    console.warn("Google 3D tiles failed, using Bing imagery:", e);
+    viewer.scene.globe = new Cesium.Globe();
+  }
 
   const LAUNCH = { lon: -122.3948, lat: 37.7878, alt: 5 };
   const TARGETS = [
@@ -153,7 +158,7 @@
         position: {
           epoch: Cesium.JulianDate.toIso8601(dStart),
           cartographicDegrees: coords,
-          interpolationAlgorithm: "LAGRANGE", interpolationDegree: 3
+          interpolationAlgorithm: "HERMITE", interpolationDegree: 1
         },
         orientation: { velocityReference: "#position" },
         model: {
@@ -211,7 +216,7 @@
 
   // Fly camera to SF overview
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(-122.405, 37.795, 2500),
+    destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.792, 800),
     orientation: {
       heading: Cesium.Math.toRadians(15),
       pitch: Cesium.Math.toRadians(-35),
@@ -258,6 +263,20 @@
     Cesium.requestAnimationFrame(updateHUD);
   }
   Cesium.requestAnimationFrame(updateHUD);
+
+  // Keyboard controls: 1-5 for speed, Space for pause
+  document.addEventListener("keydown", function(e) {
+    if (e.key === " ") { viewer.clock.shouldAnimate = !viewer.clock.shouldAnimate; e.preventDefault(); }
+    if (e.key === "1") viewer.clock.multiplier = 1;
+    if (e.key === "2") viewer.clock.multiplier = 2;
+    if (e.key === "3") viewer.clock.multiplier = 5;
+    if (e.key === "4") viewer.clock.multiplier = 10;
+    if (e.key === "5") viewer.clock.multiplier = 20;
+    if (e.key === "r" || e.key === "R") {
+      viewer.clock.currentTime = now.clone();
+      viewer.trackedEntity = undefined;
+    }
+  });
 
 })();
 </script>
