@@ -15,56 +15,91 @@ html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
 #hud{position:absolute;inset:0;z-index:10;pointer-events:none;
   font-family:'JetBrains Mono','SF Mono','Consolas',monospace;-webkit-font-smoothing:antialiased}
 #top-bar{display:flex;align-items:center;gap:10px;padding:6px 14px;font-size:9px;letter-spacing:2.5px;
-  text-transform:uppercase;color:rgba(160,210,255,0.75);background:rgba(6,8,14,0.88);
-  border-bottom:1px solid rgba(80,160,255,0.15);pointer-events:auto}
-#top-bar .tag{color:rgba(80,210,255,0.95);font-weight:700}
-#top-bar .sep{color:rgba(80,160,255,0.2);margin:0 4px}
+  text-transform:uppercase;color:rgba(140,200,255,0.7);background:rgba(4,8,16,0.85);
+  border-bottom:1px solid rgba(60,120,200,0.12);pointer-events:auto}
+#top-bar .tag{color:rgba(80,200,255,0.9);font-weight:700}
+#top-bar .sep{color:rgba(60,120,200,0.12);margin:0 4px}
 .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}
 .dot.ok{background:#0f0}.dot.err{background:#f44}.dot.wait{background:#fa0;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-#scenario-select{background:rgba(20,24,32,0.9);border:1px solid rgba(80,160,255,0.2);
-  color:rgba(200,230,255,0.9);font-family:inherit;font-size:8px;letter-spacing:1.5px;
+#scenario-select{background:rgba(4,8,16,0.9);border:1px solid rgba(60,120,200,0.12);
+  color:rgba(80,200,255,0.9);font-family:inherit;font-size:8px;letter-spacing:1.5px;
   padding:3px 6px;pointer-events:auto;cursor:pointer;text-transform:uppercase}
 #top-bar .spacer{flex:1}
 #metrics{position:absolute;top:42px;left:12px;font-size:9px;letter-spacing:1.5px;
-  color:rgba(160,210,255,0.75);background:rgba(6,8,14,0.82);padding:10px 14px;
-  border:1px solid rgba(80,160,255,0.1);line-height:2;min-width:240px}
+  color:rgba(140,200,255,0.7);background:rgba(4,8,16,0.85);padding:10px 14px;
+  border:1px solid rgba(60,120,200,0.12);line-height:2;min-width:240px}
 #metrics .row{display:flex;justify-content:space-between}
 #metrics .label{color:rgba(100,150,200,0.55)}
-#metrics .val{color:rgba(200,230,255,0.9);font-weight:600}
-#metrics .good{color:rgba(80,255,120,0.95)}
-#metrics .bad{color:rgba(255,80,80,0.95)}
-#metrics .warn{color:rgba(255,200,60,0.9)}
-#metrics .divider{border-top:1px solid rgba(80,160,255,0.1);margin:4px 0}
+#metrics .val{color:rgba(80,200,255,0.9);font-weight:600}
+#metrics .good{color:rgba(70,255,130,0.9)}
+#metrics .bad{color:rgba(255,70,70,0.9)}
+#metrics .warn{color:rgba(255,200,70,0.9)}
+#metrics .divider{border-top:1px solid rgba(60,120,200,0.12);margin:4px 0}
 #legend{position:absolute;top:42px;right:12px;font-size:8px;letter-spacing:1px;
-  color:rgba(160,210,255,0.6);background:rgba(6,8,14,0.78);padding:8px 10px;
-  border:1px solid rgba(80,160,255,0.08);line-height:2}
+  color:rgba(140,200,255,0.7);background:rgba(4,8,16,0.85);padding:8px 10px;
+  border:1px solid rgba(60,120,200,0.12);line-height:2}
 #legend i{display:inline-block;width:8px;height:8px;margin-right:4px;vertical-align:middle}
 #feed{position:absolute;bottom:50px;right:12px;font-size:8px;letter-spacing:1px;
-  color:rgba(200,220,240,0.7);text-align:right;line-height:1.8;max-height:220px;overflow:hidden;
-  background:rgba(6,8,14,0.7);padding:6px 10px;border:1px solid rgba(80,160,255,0.06);min-width:200px}
-.hit{color:rgba(80,255,120,0.9)}.miss{color:rgba(255,80,80,0.9)}
-.leak{color:rgba(255,40,40,1);font-weight:700}.info{color:rgba(100,180,255,0.7)}
+  color:rgba(140,200,255,0.7);text-align:right;line-height:1.8;max-height:220px;overflow:hidden;
+  background:rgba(4,8,16,0.85);padding:6px 10px;border:1px solid rgba(60,120,200,0.12);min-width:200px}
+.hit{color:rgba(70,255,130,0.9)}.miss{color:rgba(255,70,70,0.9)}
+.leak{color:rgba(255,70,70,1);font-weight:700}.info{color:rgba(70,150,255,0.9)}
 #feed-title{color:rgba(100,150,200,0.5);font-size:7px;letter-spacing:2px;margin-bottom:4px}
 #detail{position:absolute;top:42px;left:50%;transform:translateX(-50%);font-size:9px;
-  letter-spacing:1px;color:rgba(200,230,255,0.85);background:rgba(6,8,14,0.9);padding:10px 16px;
-  border:1px solid rgba(80,160,255,0.15);display:none;pointer-events:auto;min-width:220px;
+  letter-spacing:1px;color:rgba(140,200,255,0.7);background:rgba(4,8,16,0.85);padding:10px 16px;
+  border:1px solid rgba(60,120,200,0.12);display:none;pointer-events:auto;min-width:220px;
   text-align:center;line-height:1.9}
-#detail .close{position:absolute;top:4px;right:8px;cursor:pointer;color:rgba(255,100,100,0.7)}
+#detail .close{position:absolute;top:4px;right:8px;cursor:pointer;color:rgba(255,70,70,0.7)}
 #bottom-bar{position:absolute;bottom:0;left:0;right:0;padding:5px 14px;font-size:7px;
-  letter-spacing:2px;color:rgba(120,170,220,0.4);background:rgba(6,8,14,0.75);
-  border-top:1px solid rgba(80,160,255,0.08);display:flex;justify-content:space-between;text-transform:uppercase}
+  letter-spacing:2px;color:rgba(140,200,255,0.4);background:rgba(4,8,16,0.85);
+  border-top:1px solid rgba(60,120,200,0.12);display:flex;justify-content:space-between;text-transform:uppercase}
 #fallback{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;
   color:rgba(255,100,100,0.9);background:rgba(0,0,0,0.9);padding:28px 40px;
   border:1px solid rgba(255,100,100,0.3);font-family:inherit;display:none;z-index:20;
   text-align:center;line-height:2.4;letter-spacing:1px}
+
+/* CRT scan line overlay */
+#scanlines{position:absolute;inset:0;z-index:5;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,20,40,0.03) 2px,rgba(0,20,40,0.03) 4px)}
+
+/* Vignette overlay */
+#vignette{position:absolute;inset:0;z-index:4;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,0.35) 100%)}
+
+/* Connection status dot */
+.status-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+.status-dot.connected{background:rgba(80,255,130,0.8);animation:pulse-dot 2s ease-in-out infinite}
+.status-dot.disconnected{background:rgba(255,70,70,0.8);animation:pulse-dot 1s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:0.6}50%{opacity:1}}
+
+/* Cost ratio flash */
+@keyframes flash-metric{0%{color:rgba(255,255,255,1)}100%{color:inherit}}
+.flash-metric{animation:flash-metric 0.6s ease-out}
+
+/* Scenario completion overlay */
+#completion-overlay{position:absolute;inset:0;z-index:15;pointer-events:none;display:none;
+  background:rgba(4,8,16,0.8);justify-content:center;align-items:center}
+#completion-overlay.visible{display:flex;animation:fade-in-overlay 1.5s ease-out}
+@keyframes fade-in-overlay{0%{opacity:0}100%{opacity:1}}
+#completion-box{text-align:center;font-size:11px;letter-spacing:2px;line-height:2.4;
+  color:rgba(140,200,255,0.9);padding:36px 52px;border:1px solid rgba(60,120,200,0.25);
+  background:rgba(4,8,16,0.92)}
+#completion-box .title{font-size:14px;font-weight:700;color:rgba(80,200,255,0.95);margin-bottom:4px}
+#completion-box .divider{color:rgba(60,120,200,0.3);letter-spacing:0}
+#completion-box .favorable{color:rgba(70,255,130,0.9)}
+#completion-box .unfavorable{color:rgba(255,70,70,0.9)}
+#completion-box .stat-value{color:rgba(80,200,255,0.9);font-weight:600}
 </style>
 </head>
 <body>
 <div id="c"></div>
+<div id="scanlines"></div>
+<div id="vignette"></div>
+<div id="completion-overlay"><div id="completion-box"></div></div>
 <div id="hud">
   <div id="top-bar">
-    <span class="dot wait" id="dot"></span><span class="tag">OVERWATCH WARGAME</span>
+    <span class="status-dot disconnected" id="status-dot"></span><span class="dot wait" id="dot"></span><span class="tag">OVERWATCH WARGAME</span>
     <span class="sep">|</span>
     <select id="scenario-select">
       <option value="probe_120">PROBE 120</option><option value="skirmish_80">SKIRMISH 80</option>
@@ -123,6 +158,54 @@ function makeIcon(shape,color){
 
 function enuToGeo(e,n,u){return{lat:ORIGIN_LAT+n/111000,lon:ORIGIN_LON+e/(111000*Math.cos(ORIGIN_LAT*Math.PI/180)),alt:u||50}}
 
+/* Particle explosion system */
+var explodedSet=new Set(),activeParticles=0,MAX_PARTICLES=5;
+function createExplosionImage(){
+  var c=document.createElement("canvas");c.width=16;c.height=16;var g=c.getContext("2d");
+  var grad=g.createRadialGradient(8,8,0,8,8,8);
+  grad.addColorStop(0,"rgba(255,200,50,1)");grad.addColorStop(0.4,"rgba(255,120,20,0.8)");
+  grad.addColorStop(1,"rgba(200,50,0,0)");g.fillStyle=grad;g.fillRect(0,0,16,16);return c}
+function createSmokeImage(){
+  var c=document.createElement("canvas");c.width=16;c.height=16;var g=c.getContext("2d");
+  var grad=g.createRadialGradient(8,8,0,8,8,8);
+  grad.addColorStop(0,"rgba(255,60,40,1)");grad.addColorStop(0.5,"rgba(180,30,20,0.6)");
+  grad.addColorStop(1,"rgba(80,10,0,0)");g.fillStyle=grad;g.fillRect(0,0,16,16);return c}
+function spawnExplosion(pos){
+  if(activeParticles>=MAX_PARTICLES)return;activeParticles++;
+  var ps=new Cesium.ParticleSystem({image:createExplosionImage(),
+    startColor:Cesium.Color.fromCssColorString("rgba(255,180,50,1)"),
+    endColor:Cesium.Color.fromCssColorString("rgba(255,50,0,0)"),
+    startScale:1.0,endScale:4.0,minimumParticleLife:0.3,maximumParticleLife:1.2,
+    minimumSpeed:5.0,maximumSpeed:20.0,emissionRate:200,lifetime:0.8,
+    emitter:new Cesium.SphereEmitter(2.0),
+    modelMatrix:Cesium.Transforms.eastNorthUpToFixedFrame(pos),
+    sizeInMeters:true,minimumImageSize:new Cesium.Cartesian2(2,2),
+    maximumImageSize:new Cesium.Cartesian2(6,6)});
+  viewer.scene.primitives.add(ps);
+  setTimeout(function(){viewer.scene.primitives.remove(ps);activeParticles--},2000)}
+function spawnSmoke(pos){
+  if(activeParticles>=MAX_PARTICLES)return;activeParticles++;
+  var ps=new Cesium.ParticleSystem({image:createSmokeImage(),
+    startColor:Cesium.Color.fromCssColorString("rgba(255,40,40,1)"),
+    endColor:Cesium.Color.fromCssColorString("rgba(100,10,0,0)"),
+    startScale:0.8,endScale:3.0,minimumParticleLife:0.2,maximumParticleLife:0.8,
+    minimumSpeed:3.0,maximumSpeed:10.0,emissionRate:120,lifetime:0.5,
+    emitter:new Cesium.SphereEmitter(1.5),
+    modelMatrix:Cesium.Transforms.eastNorthUpToFixedFrame(pos),
+    sizeInMeters:true,minimumImageSize:new Cesium.Cartesian2(1,1),
+    maximumImageSize:new Cesium.Cartesian2(4,4)});
+  viewer.scene.primitives.add(ps);
+  setTimeout(function(){viewer.scene.primitives.remove(ps);activeParticles--},1500)}
+function flashDefender(defId){
+  var ent=defEnts[defId];if(!ent||!ent.billboard)return;
+  ent.billboard.image=makeIcon("square","#00ff66");ent.billboard.width=38;ent.billboard.height=38;
+  setTimeout(function(){if(!ent.billboard)return;var st=(ent._data&&ent._data.status)||"READY";
+    var hex=STATUS_COL[st]||STATUS_COL.READY;ent.billboard.image=makeIcon("square",hex);
+    ent.billboard.width=28;ent.billboard.height=28},500)}
+function getTrackPos(tid){
+  var ent=trackEnts[tid];if(!ent)return null;
+  return ent.position.getValue(Cesium.JulianDate.now())}
+
 /* State */
 var scenario=new URLSearchParams(window.location.search).get("scenario")||"probe_120";
 var wsUrl="ws://localhost:8765/ws/v1/wargame/"+scenario;
@@ -149,9 +232,11 @@ viewer.scene.canvas.addEventListener("mousedown",pauseOrbit);
 viewer.scene.canvas.addEventListener("wheel",pauseOrbit);
 
 /* Defended site */
+var sitePulseRing=null,sitePulseGrowing=true,sitePulseRadius=200;
 function ensureSite(s){if(siteEnt)return;
   var lat=s?s.lat:ORIGIN_LAT,lon=s?s.lon:ORIGIN_LON;
-  siteEnt=viewer.entities.add({id:"site",position:Cesium.Cartesian3.fromDegrees(lon,lat,5),
+  var sitePos=Cesium.Cartesian3.fromDegrees(lon,lat,5);
+  siteEnt=viewer.entities.add({id:"site",position:sitePos,
     point:{pixelSize:12,color:Cesium.Color.WHITE.withAlpha(0.9),outlineColor:Cesium.Color.WHITE.withAlpha(0.4),
       outlineWidth:3,disableDepthTestDistance:Number.POSITIVE_INFINITY},
     label:{text:"DEFENDED SITE",font:"10px monospace",fillColor:Cesium.Color.WHITE.withAlpha(0.9),
@@ -160,7 +245,21 @@ function ensureSite(s){if(siteEnt)return;
   siteRing=viewer.entities.add({id:"site-ring",position:Cesium.Cartesian3.fromDegrees(lon,lat,2),
     ellipse:{semiMajorAxis:200,semiMinorAxis:200,height:2,material:Cesium.Color.WHITE.withAlpha(0.04),
       outline:true,outlineColor:Cesium.Color.WHITE.withAlpha(0.2),outlineWidth:2}});
+  /* Pulsing ring that expands and fades */
+  sitePulseRing=viewer.entities.add({id:"site-pulse",position:Cesium.Cartesian3.fromDegrees(lon,lat,1),
+    ellipse:{semiMajorAxis:new Cesium.CallbackProperty(function(){return sitePulseRadius},false),
+      semiMinorAxis:new Cesium.CallbackProperty(function(){return sitePulseRadius},false),
+      height:1,material:Cesium.Color.WHITE.withAlpha(0.08),outline:true,
+      outlineColor:new Cesium.CallbackProperty(function(){
+        var a=Math.max(0,0.15*(1-(sitePulseRadius-200)/150));
+        return Cesium.Color.WHITE.withAlpha(a)},false),outlineWidth:1}});
 }
+/* Animate the pulse ring */
+viewer.scene.preRender.addEventListener(function(){
+  if(!sitePulseRing)return;
+  sitePulseRadius+=0.8;
+  if(sitePulseRadius>350)sitePulseRadius=200;
+});
 
 /* Track upsert */
 function upsertTrack(t){
@@ -234,6 +333,7 @@ function drawAssignments(asgs){
 }
 
 /* HUD metrics */
+var lastCostWin=null;
 function fmtTime(s){var m=Math.floor(s/60),sec=Math.floor(s%60);
   return"T+"+(m<10?"0":"")+m+":"+(sec<10?"0":"")+sec}
 
@@ -242,6 +342,10 @@ function updateMetrics(m){if(!m)return;
   var r=m.cost_exchange_ratio!=null?m.cost_exchange_ratio.toFixed(2):"--";
   var rc=m.cost_exchange_win===true?"good":m.cost_exchange_win===false?"bad":"val";
   var rl=m.cost_exchange_win===true?" (FAVORABLE)":m.cost_exchange_win===false?" (UNFAVORABLE)":"";
+  /* Detect cost ratio state change for flash */
+  var costChanged=lastCostWin!==null&&lastCostWin!==m.cost_exchange_win;
+  lastCostWin=m.cost_exchange_win;
+  var flashClass=costChanged?" flash-metric":"";
   document.getElementById("tick-label").textContent=fmtTime(m.sim_time_s||0);
   document.getElementById("metrics").innerHTML=
     '<div class="row"><span class="label">HOSTILES</span><span class="val">'+m.active_hostiles+'</span></div>'+
@@ -251,9 +355,11 @@ function updateMetrics(m){if(!m)return;
     '<div class="row"><span class="label">INTERCEPTS</span><span class="val">'+m.intercepts+' / '+m.engagements_made+'</span></div>'+
     '<div class="row"><span class="label">RATE</span><span class="'+(iR>=80?"good":iR>=50?"warn":"bad")+'">'+iR+'%</span></div>'+
     '<div class="divider"></div>'+
-    '<div class="row"><span class="label">COST RATIO</span><span class="'+rc+'">'+r+rl+'</span></div>'+
-    '<div class="row"><span class="label">DEF SPENT</span><span class="val">$'+(m.defender_spent||0).toFixed(0)+'</span></div>'+
-    '<div class="row"><span class="label">ATK DESTROYED</span><span class="val">$'+(m.attacker_destroyed||0).toFixed(0)+'</span></div>'}
+    '<div class="row"><span class="label">COST RATIO</span><span class="'+rc+flashClass+'" id="cost-ratio-val">'+r+rl+'</span></div>'+
+    '<div class="row"><span class="label">DEF SPENT</span><span class="val">$'+fmtMoney(m.defender_spent||0)+'</span></div>'+
+    '<div class="row"><span class="label">ATK DESTROYED</span><span class="val">$'+fmtMoney(m.attacker_destroyed||0)+'</span></div>'}
+
+function fmtMoney(v){return v.toLocaleString("en-US",{maximumFractionDigits:0})}
 
 /* Engagement feed */
 function addFeed(html){feedLines.push(html);if(feedLines.length>10)feedLines.shift();
@@ -274,14 +380,46 @@ viewer.screenSpaceEventHandler.setInputAction(function(click){
 },Cesium.ScreenSpaceEventType.LEFT_CLICK);
 function closeDetail(){document.getElementById("detail").style.display="none"}
 
+/* Scenario completion overlay */
+function showCompletion(m){
+  if(!m)return;
+  var hostiles=m.total_hostiles||m.active_hostiles||"--";
+  var neutralized=m.intercepts||0;
+  var leakers=m.leakers||0;
+  var total=neutralized+leakers;
+  var rate=total>0?((neutralized/total)*100).toFixed(1):"--";
+  var ratio=m.cost_exchange_ratio!=null?m.cost_exchange_ratio.toFixed(2):"--";
+  var favorable=m.cost_exchange_win===true;
+  var ratioClass=favorable?"favorable":"unfavorable";
+  var ratioLabel=favorable?"FAVORABLE":"UNFAVORABLE";
+  var defSpent=fmtMoney(m.defender_spent||0);
+  var atkDest=fmtMoney(m.attacker_destroyed||0);
+  var box=document.getElementById("completion-box");
+  box.innerHTML=
+    '<div class="title">SCENARIO COMPLETE</div>'+
+    '<div class="divider">─────────────────</div>'+
+    '<div>HOSTILES: <span class="stat-value">'+hostiles+'</span>'+
+    ' &nbsp;|&nbsp; NEUTRALIZED: <span class="stat-value">'+neutralized+'</span>'+
+    ' &nbsp;|&nbsp; LEAKED: <span class="stat-value">'+leakers+'</span></div>'+
+    '<div>INTERCEPT RATE: <span class="stat-value">'+rate+'%</span></div>'+
+    '<div>COST EXCHANGE: <span class="'+ratioClass+'">'+ratio+' ('+ratioLabel+')</span></div>'+
+    '<div>DEFENDER SPENT: <span class="stat-value">$'+defSpent+'</span></div>'+
+    '<div>ATTACKER DESTROYED: <span class="stat-value">$'+atkDest+'</span></div>';
+  document.getElementById("completion-overlay").classList.add("visible");
+}
+
 /* WebSocket */
 function setDot(c){document.getElementById("dot").className="dot "+c}
 function setConn(t){document.getElementById("conn-label").textContent=t}
+function setStatusDot(connected){
+  var el=document.getElementById("status-dot");
+  el.className="status-dot "+(connected?"connected":"disconnected")}
 
 function connect(){
-  setDot("wait");setConn("CONNECTING");document.getElementById("fallback").style.display="none";
+  setDot("wait");setConn("CONNECTING");setStatusDot(false);
+  document.getElementById("fallback").style.display="none";
   try{ws=new WebSocket(wsUrl)}catch(e){onFail();return}
-  ws.onopen=function(){setDot("ok");setConn("CONNECTED");
+  ws.onopen=function(){setDot("ok");setConn("CONNECTED");setStatusDot(true);
     if(reconTimer){clearTimeout(reconTimer);reconTimer=null}
     addFeed('<span class="info">CONNECTED TO '+scenario.toUpperCase()+'</span>')};
   ws.onmessage=function(ev){
@@ -296,15 +434,21 @@ function connect(){
       if(msg.metrics)updateMetrics(msg.metrics);
       document.getElementById("asset-count").textContent=tracks.length+" TRACKS / "+defs.length+" DEFENDERS";
       for(var a=0;a<asgs.length;a++){var ag=asgs[a],dl=ag.defender_id.substring(0,8),tl=ag.track_id.substring(0,8);
-        if(ag.status==="HIT")addFeed('<span class="hit">'+dl+' -> '+tl+': HIT</span>');
+        var eKey=ag.defender_id+"-"+ag.track_id;
+        if(ag.status==="HIT"){addFeed('<span class="hit">'+dl+' -> '+tl+': HIT</span>');
+          if(!explodedSet.has(eKey)){explodedSet.add(eKey);var hp=getTrackPos(ag.track_id);
+            if(hp)spawnExplosion(hp);flashDefender(ag.defender_id)}}
         else if(ag.status==="MISS")addFeed('<span class="miss">'+dl+' -> '+tl+': MISS</span>');
-        else if(ag.status==="LEAK")addFeed('<span class="leak">'+tl+': LEAKED</span>')}
-      if(msg.done){addFeed('<span class="info">--- SCENARIO COMPLETE ---</span>');setConn("COMPLETE")}}
+        else if(ag.status==="LEAK"){addFeed('<span class="leak">'+tl+': LEAKED</span>');
+          if(!explodedSet.has("leak-"+ag.track_id)){explodedSet.add("leak-"+ag.track_id);
+            var lp=getTrackPos(ag.track_id);if(lp)spawnSmoke(lp)}}}
+      if(msg.done){addFeed('<span class="info">--- SCENARIO COMPLETE ---</span>');setConn("COMPLETE");
+        showCompletion(msg.metrics,tracks.length,defs.length)}}
     if(msg.type==="ERROR")addFeed('<span class="miss">ERR: '+(msg.error||"unknown")+'</span>')};
   ws.onerror=function(){onFail()};
-  ws.onclose=function(){setDot("err");setConn("DISCONNECTED");schedRecon()}}
+  ws.onclose=function(){setDot("err");setConn("DISCONNECTED");setStatusDot(false);schedRecon()}}
 
-function onFail(){setDot("err");setConn("DISCONNECTED");
+function onFail(){setDot("err");setConn("DISCONNECTED");setStatusDot(false);
   document.getElementById("fallback").style.display="block";schedRecon()}
 function schedRecon(){if(reconTimer)return;reconTimer=setTimeout(function(){reconTimer=null;connect()},4000)}
 
@@ -320,11 +464,13 @@ selectEl.addEventListener("change",function(){
   for(var k4 in rangeEnts)viewer.entities.remove(rangeEnts[k4]);
   if(siteEnt){viewer.entities.remove(siteEnt);siteEnt=null}
   if(siteRing){viewer.entities.remove(siteRing);siteRing=null}
-  trackEnts={};defEnts={};assignEnts={};rangeEnts={};feedLines=[];
+  trackEnts={};defEnts={};assignEnts={};rangeEnts={};feedLines=[];explodedSet.clear();activeParticles=0;lastCostWin=null;
+  if(sitePulseRing){viewer.entities.remove(sitePulseRing);sitePulseRing=null}
   document.getElementById("feed").innerHTML='<div id="feed-title">ENGAGEMENT FEED</div>';
   document.getElementById("metrics").innerHTML="";
   document.getElementById("tick-label").textContent="T+00:00";
   document.getElementById("asset-count").textContent="-- TRACKS / -- DEFENDERS";
+  document.getElementById("completion-overlay").classList.remove("visible");
   connect()});
 
 connect();
