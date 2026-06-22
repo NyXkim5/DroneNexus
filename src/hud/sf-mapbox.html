@@ -355,7 +355,8 @@ function simStep(dt) {
   if (frameCount % 5 === 0) updateTrails();
   if (frameCount % 10 === 0) updateTargetStatus();
   updateCamera(dt); updateHUD(); frameCount++;
-  if (deployed >= TOTAL && strikes >= TOTAL && !missionEnded) showMissionComplete();
+  var allDone = deployed >= TOTAL && drones.every(function(d) { return d.struck || !d.launched; });
+  if (allDone && !missionEnded && strikes > 0) showMissionComplete();
 }
 
 function updateDronePhysics(d, i, dt) {
@@ -456,7 +457,7 @@ function updateCamera(dt) {
     document.getElementById("track-hud").style.display = "none";
     document.getElementById("compass").style.display = "none";
     camBearing += 0.1;
-    map.easeTo({bearing:camBearing, duration:150, easing:function(t){return t;}});
+    map.easeTo({bearing:camBearing, duration:80, easing:function(t){return t;}});
   }
 }
 
@@ -497,7 +498,7 @@ function updateTrackCamera(lead, dt) {
     var shakeAmp = camShakeIntensity*(camShakeTimer/0.3)*0.0001;
     shakeOffLng = (Math.random()-0.5)*shakeAmp; shakeOffLat = (Math.random()-0.5)*shakeAmp;
   }
-  map.easeTo({center:[safe(finalLng+shakeOffLng), safe(finalLat+shakeOffLat)], bearing:safe(camBearing), pitch:safe(camPitch), zoom:safe(camZoom), duration:150, easing:function(t){return t;}});
+  map.easeTo({center:[safe(finalLng+shakeOffLng), safe(finalLat+shakeOffLat)], bearing:safe(camBearing), pitch:safe(camPitch), zoom:safe(camZoom), duration:80, easing:function(t){return t;}});
   document.getElementById("track-hud").style.display = "block"; document.getElementById("compass").style.display = "block";
   document.getElementById("th-target").textContent = TARGETS[lead.targetIdx].name;
   if (isFinite(groundSpd) && groundSpd < 200) document.getElementById("th-speed").textContent = groundSpd.toFixed(1);
