@@ -199,7 +199,7 @@ function applyDeclutter(z){
     if(map.getLayer("trail-line"))map.setPaintProperty("trail-line","line-opacity",0.15);
   }
 }
-map.on("style.load",function(){
+map.on("load",function(){
   map.addLayer({id:"3d-buildings",source:"composite","source-layer":"building",filter:["==","extrude","true"],type:"fill-extrusion",minzoom:14,
     paint:{"fill-extrusion-color":["interpolate",["linear"],["get","height"],0,"#161d28",30,"#1a2538",100,"#1e2e45",200,"#243652",300,"#2a4060"],
       "fill-extrusion-height":["get","height"],"fill-extrusion-base":["get","min_height"],"fill-extrusion-opacity":0.88}});
