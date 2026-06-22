@@ -25,12 +25,19 @@ body{background:#000;overflow:hidden;font-family:'JetBrains Mono',monospace}
 .ctrls button:hover,.ctrls button.on{border-color:rgba(80,150,230,0.4);color:rgba(80,150,230,0.7)}
 #track-hud{position:fixed;top:36px;right:10px;z-index:10;font-size:8px;color:rgba(255,255,255,0.3);letter-spacing:1.2px;line-height:2.2;text-align:right;display:none}
 #track-hud .th-label{color:rgba(80,150,230,0.5)}
+#asset-detail{position:fixed;top:130px;right:10px;z-index:10;width:200px;background:rgba(0,0,0,0.85);border:1px solid rgba(255,255,255,0.08);padding:8px 10px;display:none;font-family:'JetBrains Mono',monospace}
+.ad-header{font-size:9px;letter-spacing:2px;color:rgba(80,150,230,0.8);margin-bottom:6px;font-weight:600}
+.ad-type{font-size:7px;letter-spacing:1px;color:rgba(255,255,255,0.25);margin-left:6px;font-weight:400}
+.ad-row{display:flex;justify-content:space-between;font-size:8px;letter-spacing:1px;color:rgba(255,255,255,0.2);line-height:2}
+.ad-val{color:rgba(255,255,255,0.45)}
 #compass{position:fixed;top:36px;right:120px;z-index:10;width:36px;height:36px;display:none}
 #clock{position:fixed;top:36px;left:10px;z-index:10;font-size:8px;color:rgba(255,255,255,0.2);letter-spacing:1.5px}
 #mission-status{position:fixed;top:52px;left:10px;z-index:10;font-size:7.5px;color:rgba(255,255,255,0.18);letter-spacing:1.2px;line-height:2}
 #bottom-bar{position:fixed;bottom:0;left:0;right:0;height:22px;z-index:10;display:flex;align-items:center;padding:0 14px;gap:20px;background:rgba(0,0,0,0.92);border-top:1px solid rgba(255,255,255,0.06)}
 .coord-display{font-size:7px;letter-spacing:1px;color:rgba(255,255,255,0.2)}
-.classification{font-size:7px;letter-spacing:2px;color:rgba(255,200,50,0.4);margin-left:auto}
+.track-id{font-size:7px;letter-spacing:1.5px;color:rgba(80,150,230,0.5)}
+.classification{font-size:7px;letter-spacing:2px;color:rgba(255,200,50,0.4);margin-left:auto;animation:fouo-blink 4s ease-in-out infinite}
+@keyframes fouo-blink{0%,100%{opacity:1}50%{opacity:0.4}}
 .mapboxgl-ctrl-logo,.mapboxgl-ctrl-attrib{display:none !important}
 </style>
 </head>
@@ -50,9 +57,20 @@ body{background:#000;overflow:hidden;font-family:'JetBrains Mono',monospace}
   <div><span class="th-label">ALT</span> <span id="th-alt">0</span> m</div>
   <div><span class="th-label">HDG</span> <span id="th-hdg">0</span> deg</div>
 </div>
+<div id="asset-detail">
+  <div class="ad-header"><span id="ad-name">---</span><span class="ad-type" id="ad-type">UAS / ROTARY</span></div>
+  <div class="ad-row"><span>STATUS</span><span class="ad-val" id="ad-status">---</span></div>
+  <div class="ad-row"><span>TARGET</span><span class="ad-val" id="ad-target">---</span></div>
+  <div class="ad-row"><span>SPEED</span><span class="ad-val" id="ad-speed">---</span></div>
+  <div class="ad-row"><span>ALT</span><span class="ad-val" id="ad-alt">---</span></div>
+  <div class="ad-row"><span>HEADING</span><span class="ad-val" id="ad-hdg">---</span></div>
+  <div class="ad-row"><span>PATH</span><span class="ad-val" id="ad-path">---</span></div>
+  <div class="ad-row"><span>ETA</span><span class="ad-val" id="ad-eta">---</span></div>
+</div>
 <canvas id="compass" width="36" height="36"></canvas>
 <div id="bottom-bar">
   <div class="coord-display" id="coord-display">37.7935N 122.3942W</div>
+  <div class="track-id" id="track-id"></div>
   <div class="classification">UNCLASSIFIED // FOUO</div>
 </div>
 <script>
@@ -73,6 +91,7 @@ var camBearing=-20,camPitch=45,camZoom=14.8,trackedDrone=null;
 var camBearingVel=0,camPosVelLng=0,camPosVelLat=0,camZoomVel=0;
 var droneMarkers=[],missionEnded=false,selectedDroneIdx=-1;
 var tgtMarkers=[],vanMarker=null;
+var currentSymbolSize=24,lastZoomForSize=14.8;
 var CORRIDORS=[
   {a:[-122.4180,37.7750],b:[-122.3930,37.7910]},
   {a:[-122.4180,37.7735],b:[-122.3930,37.7895]},
@@ -120,13 +139,18 @@ function pathDistance(wp){
   for(var i=1;i<wp.length;i++){var dx=(wp[i][0]-wp[i-1][0])*87000,dy=(wp[i][1]-wp[i-1][1])*111000;d+=Math.sqrt(dx*dx+dy*dy);}
   return d;
 }
-function noise(x){var s=Math.sin(x*127.1)*43758.5453;return s-Math.floor(s);}
-function smoothNoise(x){var ix=Math.floor(x),fx=x-ix;fx=fx*fx*(3-2*fx);return noise(ix)*(1-fx)+noise(ix+1)*fx;}
 function safe(v){return isFinite(v)?v:0;}
-function makeDroneSymbol(idx,heading,speed){
+function getSymbolSize(){
+  var z=map.getZoom();
+  if(z>=16)return 24;
+  if(z<=14)return 35;
+  return Math.round(35+(24-35)*((z-14)/2));
+}
+function makeDroneSymbol(idx,heading,speed,size){
+  var s=size||currentSymbolSize;
   var designation="D-"+String(idx+1).padStart(2,"0");
   return new milsymbol.Symbol("SFAPMFQ------",{
-    size:24,frame:true,fill:true,strokeWidth:1.5,
+    size:s,frame:true,fill:true,strokeWidth:1.5,
     uniqueDesignation:designation,speed:Math.round(speed||0),direction:Math.round(heading||0)
   }).toDataURL();
 }
@@ -145,16 +169,44 @@ function spawnDrone(idx){
     waypoints:wp,launched:false,struck:false,phase:"wait",trailCoords:[],pathT:0,
     pathDuration:pathDistance(wp)/cSpd,launchTime:0,riseTime:1.0,
     noiseSeed:Math.random()*1000,prevAlt:0,groundSpeed:0,
-    orbitPause:0,orbitWaypoint:-1,diving:false};
+    orbitPause:0,orbitWaypoint:-1,diving:false,
+    lastRenderedHeading:0,lastRenderedSpeed:0};
 }
 for(var i=0;i<TOTAL;i++)drones.push(spawnDrone(i));
 var map=new mapboxgl.Map({container:"map",style:"mapbox://styles/mapbox/dark-v11",center:SF_CENTER,zoom:14.8,pitch:45,bearing:-20,antialias:true});
+map.on("zoom",function(){
+  var z=map.getZoom();
+  if(Math.abs(z-lastZoomForSize)>0.3){
+    lastZoomForSize=z;currentSymbolSize=getSymbolSize();
+    for(var i=0;i<drones.length;i++){
+      if(!drones[i].launched||drones[i].struck||!droneMarkers[i])continue;
+      var img=document.getElementById("drone-img-"+i);
+      if(img){img.src=makeDroneSymbol(i,drones[i].heading,drones[i].groundSpeed);drones[i].lastRenderedHeading=drones[i].heading;drones[i].lastRenderedSpeed=drones[i].groundSpeed;}
+    }
+  }
+  applyDeclutter(z);
+});
+function applyDeclutter(z){
+  if(z<15.5){
+    document.querySelectorAll("[id^='drone-alt-']").forEach(function(el){el.style.display="none";});
+    if(map.getLayer("heading-vec"))map.setPaintProperty("heading-vec","line-opacity",0);
+    if(map.getLayer("assignment-lines"))map.setPaintProperty("assignment-lines","line-opacity",0);
+    if(map.getLayer("trail-line"))map.setPaintProperty("trail-line","line-opacity",0);
+  }else{
+    document.querySelectorAll("[id^='drone-alt-']").forEach(function(el){el.style.display="block";});
+    if(map.getLayer("heading-vec"))map.setPaintProperty("heading-vec","line-opacity",0.3);
+    if(map.getLayer("assignment-lines"))map.setPaintProperty("assignment-lines","line-opacity",0.06);
+    if(map.getLayer("trail-line"))map.setPaintProperty("trail-line","line-opacity",0.15);
+  }
+}
 map.on("style.load",function(){
   map.addLayer({id:"3d-buildings",source:"composite","source-layer":"building",filter:["==","extrude","true"],type:"fill-extrusion",minzoom:14,
     paint:{"fill-extrusion-color":["interpolate",["linear"],["get","height"],0,"#161d28",30,"#1a2538",100,"#1e2e45",200,"#243652",300,"#2a4060"],
       "fill-extrusion-height":["get","height"],"fill-extrusion-base":["get","min_height"],"fill-extrusion-opacity":0.88}});
   map.setFog({color:"#0a0f1a","high-color":"#121830","horizon-blend":0.06,"space-color":"#040810","star-intensity":0.4});
   map.setLight({anchor:"viewport",color:"#7799cc",intensity:0.3,position:[1.5,45,30]});
+  map.addSource("grid-lines",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+  map.addLayer({id:"grid-layer",type:"line",source:"grid-lines",minzoom:16,paint:{"line-color":"#ffffff","line-opacity":0.04,"line-width":0.5}});
   map.addSource("trails",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
   map.addLayer({id:"trail-line",type:"line",source:"trails",paint:{"line-color":"#4488cc","line-opacity":0.15,"line-width":1}});
   map.addSource("trails-recent",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
@@ -165,16 +217,30 @@ map.on("style.load",function(){
   map.addLayer({id:"heading-vec",type:"line",source:"heading-vectors",paint:{"line-color":"#4488dd","line-opacity":0.3,"line-width":1}});
   map.addSource("range-rings",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
   map.addLayer({id:"range-ring-layer",type:"line",source:"range-rings",paint:{"line-color":"#ffffff","line-opacity":0.08,"line-width":1,"line-dasharray":[6,4]}});
-  createRangeRings();createVanMarker();createTargetMarkers();animate();
+  map.addSource("range-labels",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+  map.addLayer({id:"range-label-layer",type:"symbol",source:"range-labels",layout:{"text-field":["get","label"],"text-size":9,"text-font":["DIN Pro Regular","Arial Unicode MS Regular"],"text-anchor":"center"},paint:{"text-color":"rgba(255,255,255,0.2)","text-halo-color":"rgba(0,0,0,0.6)","text-halo-width":1}});
+  createRangeRings();createGrid();createVanMarker();createTargetMarkers();animate();
 });
 function createRangeRings(){
-  var rings=[],radii=[500,1000];
+  var rings=[],labels=[],radii=[500,1000];
   for(var r=0;r<radii.length;r++){
     var coords=[];
     for(var a=0;a<=64;a++){var angle=(a/64)*Math.PI*2;coords.push([VAN_POS[0]+(radii[r]*Math.cos(angle))/87000,VAN_POS[1]+(radii[r]*Math.sin(angle))/111000]);}
     rings.push({type:"Feature",geometry:{type:"LineString",coordinates:coords},properties:{}});
+    labels.push({type:"Feature",geometry:{type:"Point",coordinates:[VAN_POS[0]+(radii[r])/87000,VAN_POS[1]]},properties:{label:radii[r]+"m"}});
   }
   if(map.getSource("range-rings"))map.getSource("range-rings").setData({type:"FeatureCollection",features:rings});
+  if(map.getSource("range-labels"))map.getSource("range-labels").setData({type:"FeatureCollection",features:labels});
+}
+function createGrid(){
+  var features=[],cx=VAN_POS[0],cy=VAN_POS[1],step100lng=100/87000,step100lat=100/111000;
+  for(var gx=-10;gx<=10;gx++){
+    features.push({type:"Feature",geometry:{type:"LineString",coordinates:[[cx+gx*step100lng,cy-10*step100lat],[cx+gx*step100lng,cy+10*step100lat]]},properties:{}});
+  }
+  for(var gy=-10;gy<=10;gy++){
+    features.push({type:"Feature",geometry:{type:"LineString",coordinates:[[cx-10*step100lng,cy+gy*step100lat],[cx+10*step100lng,cy+gy*step100lat]]},properties:{}});
+  }
+  if(map.getSource("grid-lines"))map.getSource("grid-lines").setData({type:"FeatureCollection",features:features});
 }
 function createVanMarker(){
   var el=document.createElement("div"),img=document.createElement("img");
@@ -198,7 +264,9 @@ function spawnDroneMarker(idx){
   var altLabel=document.createElement("div");
   altLabel.style.cssText="font-family:'JetBrains Mono',monospace;font-size:6px;color:rgba(255,255,255,0.3);text-align:center;margin-top:1px;letter-spacing:0.5px";
   altLabel.id="drone-alt-"+idx;altLabel.textContent="0m";el.appendChild(altLabel);
+  if(map.getZoom()<15.5)altLabel.style.display="none";
   droneMarkers[idx]=new mapboxgl.Marker({element:el,anchor:"center"}).setLngLat(VAN_POS).addTo(map);
+  d.lastRenderedHeading=d.heading;d.lastRenderedSpeed=d.groundSpeed;
 }
 function simStep(dt){
   if(!playing)return;
@@ -214,13 +282,13 @@ function simStep(dt){
   }
   if(frameCount%5===0)updateTrails();
   if(frameCount%8===0)updateOverlays();
+  if(frameCount%10===0)updateAssetDetail();
   updateCamera(dt);updateHUD();frameCount++;
   if(deployed>=TOTAL&&!missionEnded&&drones.every(function(d){return d.struck||!d.launched;})&&strikes>0){
     missionEnded=true;document.getElementById("mission-status").textContent="STATUS: ALL ASSETS RTB";
   }
 }
 function updateDronePhysics(d,i,dt){
-  var nt=simTime+d.noiseSeed;d.prevAlt=d.alt;
   if(d.phase==="rise"){
     var elapsed=simTime-d.launchTime,rf=Math.min(elapsed/d.riseTime,1),e=rf*rf*(3-2*rf);
     d.alt=e*15;d.lng=VAN_POS[0]+(Math.random()-0.5)*0.00001;d.lat=VAN_POS[1]+(Math.random()-0.5)*0.00001;
@@ -263,8 +331,14 @@ function updateCruisePhase(d,i,dt){
 function updateDroneMarker(d,i){
   if(!droneMarkers[i])return;
   droneMarkers[i].setLngLat([d.lng,d.lat]);
+  var headingDelta=Math.abs(d.heading-d.lastRenderedHeading);
+  if(headingDelta>180)headingDelta=360-headingDelta;
+  var speedDelta=Math.abs(d.groundSpeed-d.lastRenderedSpeed);
+  if(headingDelta>5||speedDelta>3){
+    var img=document.getElementById("drone-img-"+i);
+    if(img){img.src=makeDroneSymbol(i,d.heading,d.groundSpeed);d.lastRenderedHeading=d.heading;d.lastRenderedSpeed=d.groundSpeed;}
+  }
   if(frameCount%15===0){
-    var img=document.getElementById("drone-img-"+i);if(img)img.src=makeDroneSymbol(i,d.heading,d.groundSpeed);
     var altEl=document.getElementById("drone-alt-"+i);if(altEl)altEl.textContent=Math.round(d.alt)+"m";
   }
 }
@@ -272,6 +346,25 @@ function flashTarget(idx){
   var img=document.getElementById("tgt-img-"+idx),label=document.getElementById("tgt-label-"+idx);
   if(img){img.style.filter="brightness(3)";setTimeout(function(){img.src=makeHostileSymbol(true);img.style.filter="none";},200);}
   if(label){label.textContent="NEUTRALIZED";label.style.color="rgba(80,210,110,0.6)";}
+}
+function updateAssetDetail(){
+  var panel=document.getElementById("asset-detail");
+  if(selectedDroneIdx<0||!drones[selectedDroneIdx]||drones[selectedDroneIdx].struck){
+    panel.style.display="none";return;
+  }
+  var d=drones[selectedDroneIdx];
+  panel.style.display="block";
+  document.getElementById("ad-name").textContent="D-"+String(selectedDroneIdx+1).padStart(2,"0");
+  var status=d.phase==="rise"?"ASCENDING":d.diving?"TERMINAL":"EN ROUTE";
+  document.getElementById("ad-status").textContent=status;
+  document.getElementById("ad-target").textContent=TARGETS[d.targetIdx].name;
+  document.getElementById("ad-speed").textContent=d.groundSpeed.toFixed(1)+" m/s";
+  document.getElementById("ad-alt").textContent=Math.round(d.alt)+" m AGL";
+  document.getElementById("ad-hdg").textContent=((d.heading%360+360)%360).toFixed(0)+" deg";
+  var pct=Math.round(d.pathT*100);
+  document.getElementById("ad-path").textContent=pct+"% COMPLETE";
+  var remaining=(1-d.pathT)*d.pathDuration;
+  document.getElementById("ad-eta").textContent=Math.max(0,Math.round(remaining))+"s";
 }
 function updateOverlays(){
   var hf=[],af=[];
@@ -304,7 +397,7 @@ function updateCamera(dt){
     trackedDrone=null;
     document.getElementById("track-hud").style.display="none";
     document.getElementById("compass").style.display="none";
-    camBearing+=0.04;map.easeTo({bearing:camBearing,duration:80,easing:function(t){return t;}});
+    camBearing+=0.04;map.easeTo({bearing:camBearing,duration:50,easing:function(t){return t;}});
   }
 }
 function findTrackedDrone(){
@@ -314,18 +407,18 @@ function findTrackedDrone(){
   return null;
 }
 function updateTrackCamera(lead,dt){
-  var hr=lead.heading*Math.PI/180,lookAhead=40+Math.min(lead.groundSpeed*1.2,100);
+  var hr=lead.heading*Math.PI/180,lookAhead=60+Math.min(lead.groundSpeed*1.2,100);
   var laLng=Math.sin(hr)*(lookAhead/87000),laLat=Math.cos(hr)*(lookAhead/111000);
   camPosVelLng+=(lead.lng+laLng-(lead.lng+camPosVelLng*0.01))*5*dt;
   camPosVelLat+=(lead.lat+laLat-(lead.lat+camPosVelLat*0.01))*5*dt;
   camPosVelLng*=0.92;camPosVelLat*=0.92;
   var finalLng=lead.lng+camPosVelLng*0.1+laLng,finalLat=lead.lat+camPosVelLat*0.1+laLat;
   var bd=lead.heading-camBearing;while(bd>180)bd-=360;while(bd<-180)bd+=360;
-  camBearingVel+=bd*(Math.abs(bd)>20?8:4)*dt;camBearingVel*=0.88;camBearing+=camBearingVel*dt;
+  camBearingVel+=bd*(Math.abs(bd)>20?12:6)*dt;camBearingVel*=0.85;camBearing+=camBearingVel*dt;
   camPitch+=(50-camPitch)*Math.min(dt*2,1);
   var tZoom=Math.max(14.5,Math.min(17,17-(lead.alt/80)*2))-Math.min(lead.groundSpeed/60,1)*0.3;
   camZoomVel+=(tZoom-camZoom)*4*dt;camZoomVel*=0.92;camZoom+=camZoomVel*dt;
-  map.easeTo({center:[safe(finalLng),safe(finalLat)],bearing:safe(camBearing),pitch:safe(camPitch),zoom:safe(camZoom),duration:80,easing:function(t){return t;}});
+  map.easeTo({center:[safe(finalLng),safe(finalLat)],bearing:safe(camBearing),pitch:safe(camPitch),zoom:safe(camZoom),duration:50,easing:function(t){return t;}});
   document.getElementById("track-hud").style.display="block";document.getElementById("compass").style.display="block";
   document.getElementById("th-target").textContent=TARGETS[lead.targetIdx].name;
   if(lead.groundSpeed<200)document.getElementById("th-speed").textContent=lead.groundSpeed.toFixed(1);
@@ -350,6 +443,7 @@ function updateHUD(){
   document.getElementById("timestamp").textContent=new Date().toISOString().replace(/\.\d+Z/,"Z");
   var center=map.getCenter();
   document.getElementById("coord-display").textContent=center.lat.toFixed(4)+"N "+Math.abs(center.lng).toFixed(4)+"W";
+  document.getElementById("track-id").textContent=selectedDroneIdx>=0?"TRACKING: D-"+String(selectedDroneIdx+1).padStart(2,"0"):"";
   var status="DEPLOYED: "+deployed+"/"+TOTAL+" | STRIKES: "+strikes;
   if(missionEnded)status="STATUS: ALL ASSETS RTB";
   document.getElementById("mission-status").textContent=status;
@@ -365,6 +459,7 @@ map.on("click",function(ev){
   }
   selectedDroneIdx=bestIdx;
   if(bestIdx>=0){trackCam=true;document.getElementById("bt").className="on";}
+  else{document.getElementById("asset-detail").style.display="none";}
 });
 document.getElementById("bp").onclick=function(){playing=!playing;this.textContent=playing?"PAUSE":"PLAY";this.className=playing?"on":"";};
 document.getElementById("br").onclick=function(){
@@ -373,6 +468,7 @@ document.getElementById("br").onclick=function(){
   deployed=0;strikes=0;targetsHit=0;simTime=0;deployTimer=0;
   camBearingVel=0;camPosVelLng=0;camPosVelLat=0;camZoomVel=0;
   selectedDroneIdx=-1;missionEnded=false;trackedDrone=null;
+  document.getElementById("asset-detail").style.display="none";
   TARGETS.forEach(function(t){t.hit=false;});
   TARGETS.forEach(function(t,idx){
     var img=document.getElementById("tgt-img-"+idx);if(img){img.src=makeHostileSymbol(false);img.style.filter="none";}
@@ -386,7 +482,7 @@ document.getElementById("br").onclick=function(){
 };
 document.getElementById("bt").onclick=function(){
   trackCam=!trackCam;this.className=trackCam?"on":"";
-  if(!trackCam){selectedDroneIdx=-1;map.easeTo({center:SF_CENTER,zoom:14.8,pitch:45,bearing:camBearing,duration:1000});}
+  if(!trackCam){selectedDroneIdx=-1;document.getElementById("asset-detail").style.display="none";map.easeTo({center:SF_CENTER,zoom:14.8,pitch:45,bearing:camBearing,duration:1000});}
 };
 </script>
 </body>
