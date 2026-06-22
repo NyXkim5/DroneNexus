@@ -73,6 +73,8 @@ var TARGETS = [
 var TOTAL = 24, drones = [], deployed = 0, strikes = 0, targetsHit = 0;
 var simTime = 0, playing = true, trackCam = false, deployTimer = 0, frameCount = 0;
 var camBearing = -20, camPitch = 58, camZoom = 14.8, trackedDrone = null;
+var camBearingVel = 0, camPosVelLng = 0, camPosVelLat = 0, camZoomVel = 0;
+var camShakeTimer = 0, camShakeIntensity = 0;
 var threeScene, threeCamera, threeRenderer, vanMesh = null;
 var droneMeshes = [], shadowMeshes = [], explosions = [];
 
@@ -110,6 +112,14 @@ function lngLatAltToWorld(lng, lat, alt) {
   return { x: mc.x, y: mc.y, z: mc.z };
 }
 function meterScale(lat, alt) { return mapboxgl.MercatorCoordinate.fromLngLat([0, lat], alt).meterInMercatorCoordinateUnits(); }
+
+function noise(x) { var s = Math.sin(x * 127.1) * 43758.5453; return s - Math.floor(s); }
+function noise2(x, y) { return noise(x + noise(y) * 311.7); }
+function smoothNoise(x) {
+  var ix = Math.floor(x), fx = x - ix;
+  fx = fx * fx * (3 - 2 * fx);
+  return noise(ix) * (1 - fx) + noise(ix + 1) * fx;
+}
 
 function makeGlowTex() {
   var c = document.createElement("canvas"); c.width = 64; c.height = 64;
@@ -162,11 +172,13 @@ function spawnDrone(idx) {
   var tgt = TARGETS[idx % 4], cAlt = 40+Math.random()*40, cSpd = 22+Math.random()*8;
   var wp = generateWaypoints(VAN_POS[0], VAN_POS[1], tgt.lng, tgt.lat, 0.001+Math.random()*0.0015);
   return { lng:VAN_POS[0], lat:VAN_POS[1], alt:0, prevLng:VAN_POS[0], prevLat:VAN_POS[1],
-    heading:0, smoothHeading:0, bank:0, pitch:0, targetIdx:idx%4,
+    heading:0, smoothHeading:0, bank:0, bankVel:0, pitch:0, targetIdx:idx%4,
     tLng:tgt.lng, tLat:tgt.lat, tAlt:tgt.alt, cruiseAlt:cAlt, cruiseSpeed:cSpd,
     waypoints:wp, launched:false, struck:false, phase:"wait", trailCoords:[], pathT:0,
     pathDuration:pathDistance(wp)/cSpd, launchTime:0, riseTime:1.0,
-    jX:0, jY:0, jZ:0, jp:Math.random()*Math.PI*2 };
+    jX:0, jY:0, jZ:0, jp:Math.random()*Math.PI*2,
+    noiseSeed:Math.random()*1000, prevAlt:0, rotorSpeedMul:1.0,
+    orbitPause:0, orbitWaypoint:-1, diving:false };
 }
 for (var i = 0; i < TOTAL; i++) drones.push(spawnDrone(i));
 
@@ -228,34 +240,129 @@ function spawnDroneMesh(idx) {
   sh.rotation.x = -Math.PI/2; sh.visible = false; threeScene.add(sh); shadowMeshes[idx] = sh;
 }
 
+function makeFlashTex() {
+  var c = document.createElement("canvas"); c.width = 64; c.height = 64;
+  var ctx = c.getContext("2d"), g = ctx.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,"rgba(255,255,255,1)"); g.addColorStop(0.3,"rgba(255,200,100,0.8)"); g.addColorStop(1,"rgba(255,200,100,0)");
+  ctx.fillStyle = g; ctx.fillRect(0,0,64,64); return new THREE.CanvasTexture(c);
+}
+var flashTexture = null;
+function getFlashTex() { if (!flashTexture) flashTexture = makeFlashTex(); return flashTexture; }
+
+function makeRingTex() {
+  var c = document.createElement("canvas"); c.width = 128; c.height = 128;
+  var ctx = c.getContext("2d");
+  ctx.strokeStyle = "rgba(255,200,100,1)"; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.arc(64,64,50,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(64,64,50,0,Math.PI*2); ctx.stroke();
+  return new THREE.CanvasTexture(c);
+}
+
 function spawnExplosion(lng, lat, alt) {
-  var s = meterScale(lat, alt), w = lngLatAltToWorld(lng, lat, alt), parts = [];
-  var flash = new THREE.PointLight(0xff8800, 5, 50*s); flash.position.set(w.x, w.y, w.z); threeScene.add(flash);
-  for (var i = 0; i < 30; i++) {
-    var p = new THREE.Mesh(new THREE.SphereGeometry(0.3*s,4,4), new THREE.MeshBasicMaterial({color:0xff6600, transparent:true, opacity:1}));
+  var s = meterScale(lat, alt), w = lngLatAltToWorld(lng, lat, alt);
+  var hotDebris = [], smokeWisps = [];
+  // Point light flash
+  var flash = new THREE.PointLight(0xffaa33, 5, 80*s); flash.position.set(w.x, w.y, w.z); threeScene.add(flash);
+  // White flash sprite (additive blend)
+  var flashSprite = new THREE.Sprite(new THREE.SpriteMaterial({map:getFlashTex(), color:0xffffff, transparent:true, opacity:1, blending:THREE.AdditiveBlending}));
+  flashSprite.position.set(w.x, w.y, w.z); flashSprite.scale.set(0.01, 0.01, 1); threeScene.add(flashSprite);
+  // Hot debris: 20 particles, outward + gravity, shrink over 1.5s
+  for (var i = 0; i < 20; i++) {
+    var hue = Math.random() > 0.5 ? 0xff6600 : 0xff8833;
+    var p = new THREE.Mesh(new THREE.SphereGeometry(0.3*s,4,4), new THREE.MeshBasicMaterial({color:hue, transparent:true, opacity:1}));
     p.position.set(w.x, w.y, w.z);
-    var spd = (0.5+Math.random()*1.5)*s;
+    var spd = (0.8+Math.random()*2.0)*s;
     p.userData.vel = new THREE.Vector3((Math.random()-0.5)*spd, (Math.random()-0.5)*spd, (Math.random()-0.5)*spd*0.5);
-    p.userData.life = 1.0; threeScene.add(p); parts.push(p);
+    p.userData.life = 1.5; p.userData.maxLife = 1.5; p.userData.type = "hot";
+    threeScene.add(p); hotDebris.push(p);
   }
-  explosions.push({parts:parts, flash:flash, age:0, s:s});
+  // Smoke wisps: 10 particles, rise slowly, grow, fade over 2s
+  for (var j = 0; j < 10; j++) {
+    var gray = 0x444444 + Math.floor(Math.random() * 0x333333);
+    var sm = new THREE.Mesh(new THREE.SphereGeometry(0.4*s,6,6), new THREE.MeshBasicMaterial({color:gray, transparent:true, opacity:0.6}));
+    sm.position.set(w.x + (Math.random()-0.5)*s*2, w.y + (Math.random()-0.5)*s*2, w.z + (Math.random()-0.5)*s);
+    sm.userData.vel = new THREE.Vector3((Math.random()-0.5)*s*0.3, s*0.5 + Math.random()*s*0.3, (Math.random()-0.5)*s*0.3);
+    sm.userData.life = 2.0; sm.userData.maxLife = 2.0; sm.userData.type = "smoke";
+    threeScene.add(sm); smokeWisps.push(sm);
+  }
+  // Shockwave ring
+  var ringGeo = new THREE.TorusGeometry(1*s, 0.15*s, 8, 32);
+  var ringMat = new THREE.MeshBasicMaterial({color:0xffcc66, transparent:true, opacity:0.8, side:THREE.DoubleSide});
+  var ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.set(w.x, w.y, w.z); ring.rotation.x = Math.PI/2; threeScene.add(ring);
+  explosions.push({hotDebris:hotDebris, smokeWisps:smokeWisps, flash:flash, flashSprite:flashSprite, ring:ring, age:0, s:s, w:w});
 }
 
 function tickExplosions(dt) {
   for (var i = explosions.length-1; i >= 0; i--) {
     var ex = explosions[i]; ex.age += dt;
-    ex.flash.intensity = ex.age < 0.3 ? 5*(1-ex.age/0.3) : 0;
-    var grav = ex.s * 2;
-    for (var j = 0; j < ex.parts.length; j++) {
-      var p = ex.parts[j]; p.userData.life -= dt;
-      if (p.userData.life <= 0) { p.visible = false; continue; }
-      p.position.x += p.userData.vel.x*dt; p.position.y += p.userData.vel.y*dt;
-      p.userData.vel.y -= grav*dt; p.position.z += p.userData.vel.z*dt;
-      p.scale.setScalar(Math.max(0.1, p.userData.life)); p.material.opacity = p.userData.life;
+    // Point light decay over 0.5s
+    ex.flash.intensity = ex.age < 0.5 ? 5 * (1 - ex.age / 0.5) : 0;
+    // Flash sprite: scale from 0 to 30m over 0.1s then fade
+    if (ex.flashSprite) {
+      if (ex.age < 0.1) {
+        var fs = (ex.age / 0.1) * 30 * ex.s;
+        ex.flashSprite.scale.set(fs, fs, 1);
+        ex.flashSprite.material.opacity = 1;
+      } else if (ex.age < 0.4) {
+        var fo = 1 - (ex.age - 0.1) / 0.3;
+        ex.flashSprite.scale.set(30 * ex.s, 30 * ex.s, 1);
+        ex.flashSprite.material.opacity = Math.max(0, fo);
+      } else {
+        ex.flashSprite.visible = false;
+      }
     }
-    if (ex.age > 1.2) {
-      for (var k = 0; k < ex.parts.length; k++) { threeScene.remove(ex.parts[k]); ex.parts[k].geometry.dispose(); ex.parts[k].material.dispose(); }
-      threeScene.remove(ex.flash); explosions.splice(i, 1);
+    // Shockwave ring: expand from 1m to 50m radius over 0.5s, fade
+    if (ex.ring) {
+      if (ex.age < 0.5) {
+        var rf = ex.age / 0.5;
+        var ringScale = 1 + rf * 49;
+        ex.ring.scale.setScalar(ringScale);
+        ex.ring.material.opacity = 0.8 * (1 - rf);
+      } else {
+        ex.ring.visible = false;
+      }
+    }
+    var grav = ex.s * 3;
+    // Hot debris: outward + gravity, some bounce, shrink over 1.5s
+    for (var j = 0; j < ex.hotDebris.length; j++) {
+      var p = ex.hotDebris[j]; p.userData.life -= dt;
+      if (p.userData.life <= 0) { p.visible = false; continue; }
+      p.position.x += p.userData.vel.x * dt;
+      p.position.y += p.userData.vel.y * dt;
+      p.position.z += p.userData.vel.z * dt;
+      p.userData.vel.y -= grav * dt;
+      // Bounce off ground level (approximate: if y drops below origin)
+      if (p.position.y < ex.w.y - 20 * ex.s && p.userData.vel.y < 0) {
+        p.userData.vel.y *= -0.3;
+        p.userData.vel.x *= 0.7;
+        p.userData.vel.z *= 0.7;
+      }
+      var lifeRatio = p.userData.life / p.userData.maxLife;
+      p.scale.setScalar(Math.max(0.1, lifeRatio));
+      p.material.opacity = lifeRatio;
+    }
+    // Smoke wisps: rise slowly, grow in size, fade over 2s
+    for (var k = 0; k < ex.smokeWisps.length; k++) {
+      var sm = ex.smokeWisps[k]; sm.userData.life -= dt;
+      if (sm.userData.life <= 0) { sm.visible = false; continue; }
+      sm.position.x += sm.userData.vel.x * dt;
+      sm.position.y += sm.userData.vel.y * dt;
+      sm.position.z += sm.userData.vel.z * dt;
+      sm.userData.vel.x *= 0.98; sm.userData.vel.z *= 0.98;
+      var sLife = sm.userData.life / sm.userData.maxLife;
+      sm.scale.setScalar(1 + (1 - sLife) * 3);
+      sm.material.opacity = sLife * 0.6;
+    }
+    // Cleanup after everything has expired
+    if (ex.age > 2.5) {
+      for (var ci = 0; ci < ex.hotDebris.length; ci++) { threeScene.remove(ex.hotDebris[ci]); ex.hotDebris[ci].geometry.dispose(); ex.hotDebris[ci].material.dispose(); }
+      for (var si = 0; si < ex.smokeWisps.length; si++) { threeScene.remove(ex.smokeWisps[si]); ex.smokeWisps[si].geometry.dispose(); ex.smokeWisps[si].material.dispose(); }
+      threeScene.remove(ex.flash);
+      if (ex.flashSprite) { threeScene.remove(ex.flashSprite); ex.flashSprite.material.dispose(); }
+      if (ex.ring) { threeScene.remove(ex.ring); ex.ring.geometry.dispose(); ex.ring.material.dispose(); }
+      explosions.splice(i, 1);
     }
   }
 }
@@ -276,26 +383,82 @@ function simStep(dt) {
     var d = drones[i];
     if (!d.launched || d.struck) continue;
     var elapsed = simTime - d.launchTime;
-    d.jp += dt*3;
-    d.jX = Math.sin(d.jp*1.7)*0.1; d.jY = Math.cos(d.jp*2.3)*0.05; d.jZ = Math.sin(d.jp*1.1+1)*0.1;
+    // Perlin-like micro-turbulence
+    var nt = simTime + d.noiseSeed;
+    d.jX = (smoothNoise(nt * 1.7) - 0.5) * 0.6 + (smoothNoise(nt * 3.1 + 100) - 0.5) * 0.12;
+    d.jZ = (smoothNoise(nt * 1.3 + 50) - 0.5) * 0.6 + (smoothNoise(nt * 2.7 + 200) - 0.5) * 0.12;
+    d.jY = (smoothNoise(nt * 2.3 + 150) - 0.5) * 0.3 + (smoothNoise(nt * 4.1 + 300) - 0.5) * 0.06;
+    d.prevAlt = d.alt;
     if (d.phase === "rise") {
       var rf = Math.min(elapsed/d.riseTime, 1), e = rf*rf*(3-2*rf);
       d.alt = e*15; d.lng = VAN_POS[0]+(Math.random()-0.5)*0.00001; d.lat = VAN_POS[1]+(Math.random()-0.5)*0.00001;
+      d.rotorSpeedMul = 1.5;
       if (rf >= 1) { d.phase = "cruise"; d.launchTime = simTime; }
     } else if (d.phase === "cruise") {
-      d.pathT = Math.min((simTime-d.launchTime)/d.pathDuration, 1);
-      var pos = evalSpline(d.waypoints, d.pathT);
-      d.prevLng = d.lng; d.prevLat = d.lat; d.lng = pos[0]; d.lat = pos[1];
-      d.alt = altProfile(d.pathT, d.cruiseAlt, d.tAlt);
+      // Orbit pause at waypoints for staggered arrival
+      if (d.orbitPause > 0) {
+        d.orbitPause -= dt;
+        d.prevLng = d.lng; d.prevLat = d.lat;
+        // Orbit in a small circle while pausing
+        var orbitR = 0.00008;
+        var orbitAngle = simTime * 1.2 + d.noiseSeed;
+        d.lng += Math.cos(orbitAngle) * orbitR * dt;
+        d.lat += Math.sin(orbitAngle) * orbitR * dt;
+      } else {
+        var rawPathT = (simTime - d.launchTime) / d.pathDuration;
+        // Pre-strike dive: accelerate 2x in last 5% of path
+        if (rawPathT > 0.95 && !d.diving) { d.diving = true; }
+        if (d.diving) {
+          d.pathT = Math.min(d.pathT + (dt / d.pathDuration) * 2.0, 1);
+        } else {
+          d.pathT = Math.min(rawPathT, 1);
+        }
+        var pos = evalSpline(d.waypoints, d.pathT);
+        d.prevLng = d.lng; d.prevLat = d.lat; d.lng = pos[0]; d.lat = pos[1];
+        d.alt = altProfile(d.pathT, d.cruiseAlt, d.tAlt);
+        // Stagger: some drones pause briefly at ~50% path
+        var wpSeg = Math.floor(d.pathT * (d.waypoints.length - 1));
+        if (wpSeg > 0 && wpSeg !== d.orbitWaypoint && wpSeg < d.waypoints.length - 2 && d.pathT > 0.3 && d.pathT < 0.7) {
+          if (Math.random() < 0.004) {
+            d.orbitPause = 0.4 + Math.random() * 0.8;
+            d.orbitWaypoint = wpSeg;
+          }
+        }
+      }
       var dLng = d.lng-d.prevLng, dLat = d.lat-d.prevLat;
+      var turnRate = 0;
       if (Math.abs(dLng) > 1e-9 || Math.abs(dLat) > 1e-9) {
         var th = Math.atan2(dLng, dLat)*180/Math.PI, hd = th-d.smoothHeading;
         while (hd > 180) hd -= 360; while (hd < -180) hd += 360;
-        d.smoothHeading += hd*Math.min(dt*4, 1); d.heading = d.smoothHeading;
-        d.bank += (hd*Math.min(dt*4,1)*0.8 - d.bank)*Math.min(dt*5, 1);
+        turnRate = hd * Math.min(dt * 4, 1);
+        d.smoothHeading += turnRate; d.heading = d.smoothHeading;
       }
-      var tp = d.pathT > 0.85 ? -(d.pathT-0.85)/0.15*0.3 : 0;
-      d.pitch += (tp-d.pitch)*Math.min(dt*3, 1);
+      // Bank angle spring physics
+      var targetBank = Math.max(-35, Math.min(35, turnRate * 25)) * (Math.PI / 180);
+      d.bankVel += (targetBank - d.bank) * 8 * dt;
+      d.bankVel *= 0.85;
+      d.bank += d.bankVel * dt;
+      // Pitch: pre-strike dive nose-down hard
+      var tp;
+      if (d.diving) {
+        tp = -30 * Math.PI / 180;
+      } else if (d.pathT > 0.85) {
+        tp = -(d.pathT - 0.85) / 0.15 * 0.3;
+      } else {
+        tp = 0;
+      }
+      d.pitch += (tp - d.pitch) * Math.min(dt * 3, 1);
+      // Rotor speed response based on altitude change
+      var altRate = (d.alt - d.prevAlt) / Math.max(dt, 0.001);
+      if (d.diving) {
+        d.rotorSpeedMul = 2.0;
+      } else if (altRate > 1) {
+        d.rotorSpeedMul += (1.5 - d.rotorSpeedMul) * Math.min(dt * 4, 1);
+      } else if (altRate < -1) {
+        d.rotorSpeedMul += (0.7 - d.rotorSpeedMul) * Math.min(dt * 4, 1);
+      } else {
+        d.rotorSpeedMul += (1.0 - d.rotorSpeedMul) * Math.min(dt * 4, 1);
+      }
       if (d.pathT >= 0.98) {
         var sx = d.lng-d.tLng, sy = d.lat-d.tLat;
         if (Math.sqrt(sx*sx+sy*sy) < 0.0003 || d.pathT >= 1.0) {
@@ -303,6 +466,8 @@ function simStep(dt) {
           if (droneMeshes[i]) droneMeshes[i].visible = false;
           if (shadowMeshes[i]) shadowMeshes[i].visible = false;
           spawnExplosion(d.tLng, d.tLat, d.tAlt);
+          // Camera shake if strike is near tracked drone or camera
+          triggerCameraShake(d.tLng, d.tLat);
           var tgt = TARGETS[d.targetIdx];
           if (!tgt.hit) { tgt.hit = true; targetsHit++; flashTarget(d.targetIdx); }
           continue;
@@ -314,7 +479,7 @@ function simStep(dt) {
       droneMeshes[i].position.set(w.x+d.jX*s, w.y+d.jY*s, w.z+d.jZ*s);
       droneMeshes[i].rotation.set(d.pitch, -d.heading*Math.PI/180, d.bank);
       var rotors = droneMeshes[i].userData.rotors;
-      if (rotors) for (var r = 0; r < rotors.length; r++) rotors[r].rotation.z += dt*40+r*0.5;
+      if (rotors) for (var r = 0; r < rotors.length; r++) rotors[r].rotation.z += (dt * 40 * d.rotorSpeedMul) + r * 0.5;
       if (shadowMeshes[i]) {
         var gw = lngLatAltToWorld(d.lng, d.lat, 0);
         shadowMeshes[i].position.set(gw.x, gw.y, gw.z);
@@ -340,29 +505,86 @@ function flashTarget(idx) {
   }, 300);
 }
 
+function triggerCameraShake(strikeLng, strikeLat) {
+  // Check distance from camera center to strike
+  var center = map.getCenter();
+  var dx = (strikeLng - center.lng) * 87000, dy = (strikeLat - center.lat) * 111000;
+  var dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 200 || (trackedDrone && trackedDrone.struck)) {
+    camShakeTimer = 0.3;
+    camShakeIntensity = Math.max(0.3, 1.0 - dist / 200);
+  }
+}
+
 function updateCamera(dt) {
+  // Decay camera shake
+  if (camShakeTimer > 0) camShakeTimer -= dt;
   if (trackCam) {
     var lead = null;
     for (var i = 0; i < drones.length; i++) { if (drones[i].launched && !drones[i].struck && drones[i].phase==="cruise") { lead=drones[i]; break; } }
     if (!lead) for (var j = 0; j < drones.length; j++) { if (drones[j].launched && !drones[j].struck) { lead=drones[j]; break; } }
     trackedDrone = lead;
     if (lead) {
-      var hr = lead.heading*Math.PI/180, oD = 80;
-      var oLng = -Math.sin(hr)*(oD/87000), oLat = -Math.cos(hr)*(oD/111000);
-      var tc = [lead.lng+oLng*0.3, lead.lat+oLat*0.3];
-      var bd = lead.heading-camBearing; while(bd>180)bd-=360; while(bd<-180)bd+=360;
-      camBearing += bd*Math.min(dt*2.5,1);
+      // Compute drone ground speed for dynamic FOV and look-ahead
+      var spdLng = lead.lng - lead.prevLng, spdLat = lead.lat - lead.prevLat;
+      var groundSpd = Math.sqrt((spdLng*87000)*(spdLng*87000)+(spdLat*111000)*(spdLat*111000)) / Math.max(dt, 0.001);
+      if (!isFinite(groundSpd)) groundSpd = 0;
+
+      // Look-ahead: offset camera center AHEAD of drone in travel direction
+      var hr = lead.heading * Math.PI / 180;
+      var lookAheadDist = 40 + Math.min(groundSpd * 1.5, 120);
+      var laLng = Math.sin(hr) * (lookAheadDist / 87000);
+      var laLat = Math.cos(hr) * (lookAheadDist / 111000);
+      var targetCenterLng = lead.lng + laLng;
+      var targetCenterLat = lead.lat + laLat;
+
+      // Camera position momentum with inertia
+      var tcDiffLng = targetCenterLng - (lead.lng + camPosVelLng * 0.01);
+      var tcDiffLat = targetCenterLat - (lead.lat + camPosVelLat * 0.01);
+      camPosVelLng += tcDiffLng * 5 * dt;
+      camPosVelLat += tcDiffLat * 5 * dt;
+      camPosVelLng *= 0.92;
+      camPosVelLat *= 0.92;
+      var finalCenterLng = lead.lng + camPosVelLng * 0.1 + laLng;
+      var finalCenterLat = lead.lat + camPosVelLat * 0.1 + laLat;
+
+      // Camera bearing spring with overshoot
+      var targetBearing = lead.heading;
+      var bd = targetBearing - camBearing;
+      while (bd > 180) bd -= 360; while (bd < -180) bd += 360;
+      // Spring constant increases for sharp turns (>20 deg)
+      var springK = 6;
+      if (Math.abs(bd) > 20) springK = 10;
+      camBearingVel += bd * springK * dt;
+      camBearingVel *= 0.88;
+      camBearing += camBearingVel * dt;
+
+      // Camera pitch
       var tPitch = lead.pathT > 0.85 ? 55+(lead.pathT-0.85)/0.15*15 : 55;
       camPitch += (tPitch-camPitch)*Math.min(dt*2,1);
-      var tZoom = Math.max(14.5, Math.min(17, 17-(lead.alt/80)*2));
-      camZoom += (tZoom-camZoom)*Math.min(dt*2,1);
-      map.easeTo({center:tc, bearing:camBearing, pitch:camPitch, zoom:camZoom, duration:150, easing:function(t){return t;}});
+
+      // Dynamic FOV: zoom out when fast (dive), zoom in when slow
+      var baseZoom = Math.max(14.5, Math.min(17, 17-(lead.alt/80)*2));
+      var speedFactor = Math.min(groundSpd / 60, 1);
+      var dynamicZoomOffset = -speedFactor * 0.3;
+      var tZoom = baseZoom + dynamicZoomOffset;
+      camZoomVel += (tZoom - camZoom) * 4 * dt;
+      camZoomVel *= 0.92;
+      camZoom += camZoomVel * dt;
+
+      // Camera shake offset
+      var shakeOffLng = 0, shakeOffLat = 0;
+      if (camShakeTimer > 0) {
+        var shakeAmp = camShakeIntensity * (camShakeTimer / 0.3) * 0.0001;
+        shakeOffLng = (Math.random() - 0.5) * shakeAmp;
+        shakeOffLat = (Math.random() - 0.5) * shakeAmp;
+      }
+
+      map.easeTo({center:[finalCenterLng + shakeOffLng, finalCenterLat + shakeOffLat], bearing:camBearing, pitch:camPitch, zoom:camZoom, duration:150, easing:function(t){return t;}});
       document.getElementById("track-hud").style.display = "block";
       document.getElementById("compass").style.display = "block";
       document.getElementById("th-target").textContent = TARGETS[lead.targetIdx].name;
-      var sLng=lead.lng-lead.prevLng, sLat2=lead.lat-lead.prevLat;
-      var spd = Math.sqrt((sLng*87000)*(sLng*87000)+(sLat2*111000)*(sLat2*111000))/dt;
-      if (isFinite(spd) && spd < 200) document.getElementById("th-speed").textContent = spd.toFixed(1);
+      if (isFinite(groundSpd) && groundSpd < 200) document.getElementById("th-speed").textContent = groundSpd.toFixed(1);
       document.getElementById("th-alt").textContent = lead.alt.toFixed(0);
       document.getElementById("th-hdg").textContent = ((lead.heading%360+360)%360).toFixed(0);
       drawCompass(lead.heading);
@@ -418,10 +640,17 @@ function animate() {
 document.getElementById("bp").onclick = function() { playing=!playing; this.textContent=playing?"PAUSE":"PLAY"; this.className=playing?"on":""; };
 document.getElementById("br").onclick = function() {
   for (var i = 0; i < droneMeshes.length; i++) { if (droneMeshes[i]) threeScene.remove(droneMeshes[i]); if (shadowMeshes[i]) threeScene.remove(shadowMeshes[i]); }
-  for (var j = 0; j < explosions.length; j++) { for (var k=0;k<explosions[j].parts.length;k++) threeScene.remove(explosions[j].parts[k]); threeScene.remove(explosions[j].flash); }
+  for (var j = 0; j < explosions.length; j++) {
+    for (var k=0;k<explosions[j].hotDebris.length;k++) threeScene.remove(explosions[j].hotDebris[k]);
+    for (var si=0;si<explosions[j].smokeWisps.length;si++) threeScene.remove(explosions[j].smokeWisps[si]);
+    threeScene.remove(explosions[j].flash);
+    if (explosions[j].flashSprite) threeScene.remove(explosions[j].flashSprite);
+    if (explosions[j].ring) threeScene.remove(explosions[j].ring);
+  }
   droneMeshes=[]; shadowMeshes=[]; explosions=[]; drones=[];
   for (var n = 0; n < TOTAL; n++) drones.push(spawnDrone(n));
   deployed=0; strikes=0; targetsHit=0; simTime=0; deployTimer=0;
+  camBearingVel=0; camPosVelLng=0; camPosVelLat=0; camZoomVel=0; camShakeTimer=0; camShakeIntensity=0;
   TARGETS.forEach(function(t){t.hit=false;}); droneIcons.forEach(function(e){e.className="di";});
   TARGETS.forEach(function(t,idx) {
     var el = document.getElementById("tgt-marker-"+idx); if (!el) return;
