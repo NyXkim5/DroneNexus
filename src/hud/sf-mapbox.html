@@ -5,44 +5,34 @@
 <title>OVERWATCH - San Francisco Drone Swarm</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.css" rel="stylesheet">
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.js"></script>
+<script src="js/three.min.js"></script>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #000; overflow: hidden; font-family: 'JetBrains Mono', monospace; }
-#map { position: absolute; inset: 0; }
-#vignette { position: fixed; inset: 0; z-index: 5; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.5) 100%); }
-#scanlines { position: fixed; inset: 0; z-index: 6; pointer-events: none; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.015) 3px, rgba(0,0,0,0.015) 4px); }
-#hud-top { position: fixed; top: 0; left: 0; right: 0; height: 26px; z-index: 10; display: flex; align-items: center; padding: 0 14px; gap: 14px; background: rgba(0,0,0,0.88); border-bottom: 1px solid rgba(255,255,255,0.05); }
-.brand { font-size: 9px; letter-spacing: 4px; color: rgba(255,255,255,0.22); }
-.sc { font-size: 8px; letter-spacing: 2.5px; color: rgba(80,150,220,0.5); margin-left: 12px; }
-.ctrls { display: flex; gap: 5px; margin-left: auto; }
-.ctrls button { background: transparent; border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.2); font-family: inherit; font-size: 7px; letter-spacing: 1.5px; padding: 3px 8px; cursor: pointer; text-transform: uppercase; }
-.ctrls button:hover,.ctrls button.on { border-color: rgba(255,255,255,0.25); color: rgba(255,255,255,0.5); }
-#stats { position: fixed; top: 32px; left: 10px; z-index: 10; font-size: 8px; color: rgba(255,255,255,0.18); letter-spacing: 1.2px; line-height: 2.2; }
-.sv { color: rgba(255,255,255,0.4); } .sr { color: rgba(220,80,80,0.65); } .sb { color: rgba(80,150,230,0.65); } .sg { color: rgba(80,210,110,0.55); }
-#drone-icons { display: flex; gap: 2px; margin-top: 3px; }
-.di { width: 5px; height: 5px; border: 1px solid rgba(80,150,230,0.35); } .di.active { background: rgba(80,150,230,0.55); } .di.struck { background: rgba(220,80,80,0.5); border-color: rgba(220,80,80,0.5); }
-#clock { position: fixed; top: 34px; right: 10px; z-index: 10; font-size: 26px; font-weight: 100; letter-spacing: 4px; color: rgba(255,255,255,0.06); }
-#tgt { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 7px; letter-spacing: 3px; color: rgba(200,70,70,0.25); text-transform: uppercase; }
-#track-hud { position: fixed; bottom: 50px; right: 10px; z-index: 10; font-size: 8px; color: rgba(255,255,255,0.25); letter-spacing: 1.2px; line-height: 2.2; text-align: right; display: none; }
-#track-hud .th-label { color: rgba(80,150,230,0.5); }
-#compass { position: fixed; bottom: 52px; right: 100px; z-index: 10; width: 36px; height: 36px; display: none; }
-.mapboxgl-ctrl-logo,.mapboxgl-ctrl-attrib { display: none !important; }
-
-.drone-wrapper { position: relative; width: 28px; height: 28px; }
-.drone-glow { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-left: -10px; margin-top: -10px; border-radius: 50%; background: radial-gradient(circle, rgba(68,170,255,0.4) 0%, transparent 70%); animation: drone-pulse 2s ease-in-out infinite; }
-.drone-svg { position: absolute; top: 0; left: 0; width: 28px; height: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-.drone-svg .rotor { transform-origin: center; animation: rotor-spin 0.15s linear infinite; }
-
-@keyframes rotor-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes drone-pulse { 0%,100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.55; transform: scale(1.15); } }
-@keyframes van-pulse { 0%,100% { filter: drop-shadow(0 0 4px rgba(68,136,255,0.3)); } 50% { filter: drop-shadow(0 0 12px rgba(68,136,255,0.7)); } }
-@keyframes target-pulse { 0%,100% { transform: scale(1); opacity: 0.6; } 50% { transform: scale(1.1); opacity: 0.8; } }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'JetBrains Mono',monospace}
+#map{position:absolute;inset:0}
+#vignette{position:fixed;inset:0;z-index:5;pointer-events:none;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,0.5) 100%)}
+#scanlines{position:fixed;inset:0;z-index:6;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.015) 3px,rgba(0,0,0,0.015) 4px)}
+#hud-top{position:fixed;top:0;left:0;right:0;height:26px;z-index:10;display:flex;align-items:center;padding:0 14px;gap:14px;background:rgba(0,0,0,0.88);border-bottom:1px solid rgba(255,255,255,0.05)}
+.brand{font-size:9px;letter-spacing:4px;color:rgba(255,255,255,0.22)}
+.sc{font-size:8px;letter-spacing:2.5px;color:rgba(80,150,220,0.5);margin-left:12px}
+.ctrls{display:flex;gap:5px;margin-left:auto}
+.ctrls button{background:transparent;border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.2);font-family:inherit;font-size:7px;letter-spacing:1.5px;padding:3px 8px;cursor:pointer;text-transform:uppercase}
+.ctrls button:hover,.ctrls button.on{border-color:rgba(255,255,255,0.25);color:rgba(255,255,255,0.5)}
+#stats{position:fixed;top:32px;left:10px;z-index:10;font-size:8px;color:rgba(255,255,255,0.18);letter-spacing:1.2px;line-height:2.2}
+.sv{color:rgba(255,255,255,0.4)}.sr{color:rgba(220,80,80,0.65)}.sb{color:rgba(80,150,230,0.65)}.sg{color:rgba(80,210,110,0.55)}
+#drone-icons{display:flex;gap:2px;margin-top:3px}
+.di{width:5px;height:5px;border:1px solid rgba(80,150,230,0.35)}.di.active{background:rgba(80,150,230,0.55)}.di.struck{background:rgba(220,80,80,0.5);border-color:rgba(220,80,80,0.5)}
+#clock{position:fixed;top:34px;right:10px;z-index:10;font-size:26px;font-weight:100;letter-spacing:4px;color:rgba(255,255,255,0.06)}
+#tgt{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10;font-size:7px;letter-spacing:3px;color:rgba(200,70,70,0.25);text-transform:uppercase}
+#track-hud{position:fixed;bottom:50px;right:10px;z-index:10;font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:1.2px;line-height:2.2;text-align:right;display:none}
+#track-hud .th-label{color:rgba(80,150,230,0.5)}
+#compass{position:fixed;bottom:52px;right:100px;z-index:10;width:36px;height:36px;display:none}
+.mapboxgl-ctrl-logo,.mapboxgl-ctrl-attrib{display:none !important}
+@keyframes target-pulse{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.1);opacity:0.8}}
 </style>
 </head>
 <body>
-<div id="map"></div>
-<div id="vignette"></div>
-<div id="scanlines"></div>
+<div id="map"></div><div id="vignette"></div><div id="scanlines"></div>
 <div id="hud-top">
   <div class="brand">OVERWATCH</div>
   <div class="sc">SWARM DEPLOY - FINANCIAL DISTRICT</div>
@@ -73,734 +63,376 @@ var urlToken = new URLSearchParams(window.location.search).get("token");
 mapboxgl.accessToken = urlToken || localStorage.getItem("mapbox_token") || "";
 if (mapboxgl.accessToken) localStorage.setItem("mapbox_token", mapboxgl.accessToken);
 
-var SF_CENTER = [-122.3942, 37.7935];
-var VAN_POS = [-122.3948, 37.7878];
-
+var SF_CENTER = [-122.3942, 37.7935], VAN_POS = [-122.3948, 37.7878];
 var TARGETS = [
   { lng: -122.3936, lat: 37.7956, alt: 50, name: "EMBARCADERO CENTER", hit: false },
-  { lng: -122.4093, lat: 37.8087, alt: 15, name: "PIER 39 / FISHERMANS WHARF", hit: false },
+  { lng: -122.4093, lat: 37.8087, alt: 15, name: "PIER 39", hit: false },
   { lng: -122.3972, lat: 37.7897, alt: 326, name: "SALESFORCE TOWER", hit: false },
   { lng: -122.4194, lat: 37.8080, alt: 70, name: "GHIRARDELLI SQUARE", hit: false }
 ];
+var TOTAL = 24, drones = [], deployed = 0, strikes = 0, targetsHit = 0;
+var simTime = 0, playing = true, trackCam = false, deployTimer = 0, frameCount = 0;
+var camBearing = -20, camPitch = 58, camZoom = 14.8, trackedDrone = null;
+var threeScene, threeCamera, threeRenderer, vanMesh = null;
+var droneMeshes = [], shadowMeshes = [], explosions = [];
 
-var TOTAL = 24;
-var drones = [], deployed = 0, strikes = 0, targetsHit = 0;
-var simTime = 0, playing = true, trackCam = false, deployTimer = 0;
-var frameCount = 0;
-var camBearing = -20, camPitch = 58, camZoom = 14.8;
-var trackedDrone = null;
-
-// Catmull-Rom spline interpolation
 function catmullRom(p0, p1, p2, p3, t) {
   var t2 = t * t, t3 = t2 * t;
-  return 0.5 * (
-    (2 * p1) +
-    (-p0 + p2) * t +
-    (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-    (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-  );
+  return 0.5 * ((2*p1) + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t2 + (-p0+3*p1-3*p2+p3)*t3);
 }
-
-// Generate multi-waypoint path for a drone
-function generateWaypoints(startLng, startLat, tgtLng, tgtLat, variation) {
-  var pts = [];
-  pts.push([startLng, startLat]);
-
-  var dLng = tgtLng - startLng;
-  var dLat = tgtLat - startLat;
-  var perpLng = -dLat;
-  var perpLat = dLng;
-  var perpLen = Math.sqrt(perpLng * perpLng + perpLat * perpLat);
-  if (perpLen > 0) { perpLng /= perpLen; perpLat /= perpLen; }
-
-  // 3-4 intermediate waypoints along a street-like path
-  var numMid = 3 + Math.floor(Math.random() * 2);
-  for (var i = 1; i <= numMid; i++) {
-    var frac = i / (numMid + 1);
-    var offset = (Math.random() - 0.5) * variation * 2;
-    // Snap slightly to grid-like offsets
-    var gridSnap = Math.round(offset * 1000) / 1000;
-    pts.push([
-      startLng + dLng * frac + perpLng * gridSnap,
-      startLat + dLat * frac + perpLat * gridSnap
-    ]);
+function generateWaypoints(sLng, sLat, tLng, tLat, v) {
+  var pts = [[sLng, sLat]], dLng = tLng-sLng, dLat = tLat-sLat;
+  var pL = Math.sqrt(dLat*dLat + dLng*dLng), pLng = -dLat/pL, pLat = dLng/pL;
+  var n = 3 + Math.floor(Math.random()*2);
+  for (var i = 1; i <= n; i++) {
+    var f = i/(n+1), o = Math.round((Math.random()-0.5)*v*2000)/1000;
+    pts.push([sLng + dLng*f + pLng*o, sLat + dLat*f + pLat*o]);
   }
+  pts.push([tLng, tLat]); return pts;
+}
+function evalSpline(wp, t) {
+  var n = wp.length-1, s = t*n, seg = Math.min(Math.floor(s), n-1), lt = s-seg;
+  var p0=wp[Math.max(0,seg-1)], p1=wp[seg], p2=wp[Math.min(n,seg+1)], p3=wp[Math.min(n,seg+2)];
+  return [catmullRom(p0[0],p1[0],p2[0],p3[0],lt), catmullRom(p0[1],p1[1],p2[1],p3[1],lt)];
+}
+function altProfile(t, cAlt, tAlt) {
+  if (t < 0.2) { var r = t/0.2, e = r*r*(3-2*r); return 5 + (cAlt-5)*e; }
+  if (t < 0.85) return cAlt;
+  var d = (t-0.85)/0.15, e2 = d*d*(3-2*d); return cAlt + (tAlt-cAlt)*e2;
+}
+function pathDistance(wp) {
+  var d = 0;
+  for (var i = 1; i < wp.length; i++) { var dx=(wp[i][0]-wp[i-1][0])*87000, dy=(wp[i][1]-wp[i-1][1])*111000; d += Math.sqrt(dx*dx+dy*dy); }
+  return d;
+}
+function lngLatAltToWorld(lng, lat, alt) {
+  var mc = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], alt);
+  return { x: mc.x, y: mc.y, z: mc.z };
+}
+function meterScale(lat, alt) { return mapboxgl.MercatorCoordinate.fromLngLat([0, lat], alt).meterInMercatorCoordinateUnits(); }
 
-  pts.push([tgtLng, tgtLat]);
-  return pts;
+function makeGlowTex() {
+  var c = document.createElement("canvas"); c.width = 64; c.height = 64;
+  var ctx = c.getContext("2d"), g = ctx.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,"rgba(68,136,255,1)"); g.addColorStop(0.4,"rgba(68,136,255,0.4)"); g.addColorStop(1,"rgba(68,136,255,0)");
+  ctx.fillStyle = g; ctx.fillRect(0,0,64,64); return new THREE.CanvasTexture(c);
 }
 
-// Evaluate position along Catmull-Rom spline defined by waypoints
-function evalSpline(waypoints, t) {
-  var n = waypoints.length - 1;
-  var scaledT = t * n;
-  var seg = Math.min(Math.floor(scaledT), n - 1);
-  var localT = scaledT - seg;
-
-  var p0 = waypoints[Math.max(0, seg - 1)];
-  var p1 = waypoints[seg];
-  var p2 = waypoints[Math.min(n, seg + 1)];
-  var p3 = waypoints[Math.min(n, seg + 2)];
-
-  return [
-    catmullRom(p0[0], p1[0], p2[0], p3[0], localT),
-    catmullRom(p0[1], p1[1], p2[1], p3[1], localT)
-  ];
-}
-
-// Altitude profile: rise 0-20%, cruise 20-85%, descend 85-100%
-function altProfile(t, cruiseAlt, targetAlt) {
-  if (t < 0.2) {
-    // Rise phase: ease-in from 5m to cruise
-    var rt = t / 0.2;
-    var ease = rt * rt * (3 - 2 * rt); // smoothstep
-    return 5 + (cruiseAlt - 5) * ease;
-  } else if (t < 0.85) {
-    return cruiseAlt;
-  } else {
-    // Descent phase
-    var dt = (t - 0.85) / 0.15;
-    var ease2 = dt * dt * (3 - 2 * dt);
-    return cruiseAlt + (targetAlt - cruiseAlt) * ease2;
+function buildDrone(s) {
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.BoxGeometry(2*s, 0.5*s, 2*s), new THREE.MeshPhongMaterial({color:0x2a3a55, shininess:40}));
+  g.add(body);
+  var armPos = [[1,1],[-1,1],[1,-1],[-1,-1]];
+  var armMat = new THREE.MeshPhongMaterial({color:0x4a5a70});
+  var motorMat = new THREE.MeshPhongMaterial({color:0x3a4a60});
+  var rotorMat = new THREE.MeshBasicMaterial({color:0x44aaff, transparent:true, opacity:0.35, side:THREE.DoubleSide});
+  var glowTex = makeGlowTex();
+  g.userData.rotors = [];
+  for (var i = 0; i < 4; i++) {
+    var ax = armPos[i][0], az = armPos[i][1];
+    var arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06*s,0.06*s,1.8*s,6), armMat);
+    arm.position.set(ax*0.7*s, 0, az*0.7*s);
+    arm.rotation.z = Math.atan2(az,ax) - Math.PI/2; arm.rotateX(Math.PI/2);
+    g.add(arm);
+    var motor = new THREE.Mesh(new THREE.CylinderGeometry(0.2*s,0.2*s,0.3*s,8), motorMat);
+    motor.position.set(ax*1.4*s, 0.15*s, az*1.4*s); g.add(motor);
+    var rotor = new THREE.Mesh(new THREE.CircleGeometry(0.6*s,12), rotorMat);
+    rotor.position.set(ax*1.4*s, 0.35*s, az*1.4*s); rotor.rotation.x = -Math.PI/2;
+    g.add(rotor); g.userData.rotors.push(rotor);
+    var glow = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0x4488ff, transparent:true, opacity:0.5, blending:THREE.AdditiveBlending}));
+    glow.position.set(ax*1.4*s, -0.2*s, az*1.4*s); glow.scale.set(0.8*s,0.8*s,1); g.add(glow);
   }
+  var front = new THREE.Mesh(new THREE.SphereGeometry(0.12*s,6,6), new THREE.MeshBasicMaterial({color:0x44ff66}));
+  front.position.set(0, 0, -1.05*s); g.add(front);
+  return g;
 }
 
-// Speed easing: slow start, cruise, slow end
-function speedEase(t) {
-  // Trapezoidal speed profile
-  if (t < 0.1) return 0.3 + 0.7 * (t / 0.1); // accelerate
-  if (t > 0.9) return 0.3 + 0.7 * (1 - (t - 0.9) / 0.1); // decelerate
-  return 1.0; // cruise
+function buildVan(s) {
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.BoxGeometry(2.5*s,2*s,5*s), new THREE.MeshPhongMaterial({color:0xe8e8e8, shininess:30}));
+  body.position.y = 1*s; g.add(body);
+  var cab = new THREE.Mesh(new THREE.BoxGeometry(2.4*s,1.5*s,1.8*s), new THREE.MeshPhongMaterial({color:0xc0c8d0}));
+  cab.position.set(0, 0.75*s, -3.2*s); g.add(cab);
+  var light = new THREE.PointLight(0x4488ff, 2, 8*s);
+  light.position.set(0, 1*s, 0); g.add(light); g.userData.light = light;
+  return g;
 }
 
-var map = new mapboxgl.Map({
-  container: "map",
-  style: "mapbox://styles/mapbox/dark-v11",
-  center: SF_CENTER,
-  zoom: 14.8,
-  pitch: 58,
-  bearing: -20,
-  antialias: true
+function spawnDrone(idx) {
+  var tgt = TARGETS[idx % 4], cAlt = 40+Math.random()*40, cSpd = 22+Math.random()*8;
+  var wp = generateWaypoints(VAN_POS[0], VAN_POS[1], tgt.lng, tgt.lat, 0.001+Math.random()*0.0015);
+  return { lng:VAN_POS[0], lat:VAN_POS[1], alt:0, prevLng:VAN_POS[0], prevLat:VAN_POS[1],
+    heading:0, smoothHeading:0, bank:0, pitch:0, targetIdx:idx%4,
+    tLng:tgt.lng, tLat:tgt.lat, tAlt:tgt.alt, cruiseAlt:cAlt, cruiseSpeed:cSpd,
+    waypoints:wp, launched:false, struck:false, phase:"wait", trailCoords:[], pathT:0,
+    pathDuration:pathDistance(wp)/cSpd, launchTime:0, riseTime:1.0,
+    jX:0, jY:0, jZ:0, jp:Math.random()*Math.PI*2 };
+}
+for (var i = 0; i < TOTAL; i++) drones.push(spawnDrone(i));
+
+var map = new mapboxgl.Map({ container:"map", style:"mapbox://styles/mapbox/dark-v11", center:SF_CENTER, zoom:14.8, pitch:58, bearing:-20, antialias:true });
+
+// Target markers (HTML overlay)
+TARGETS.forEach(function(t, idx) {
+  var el = document.createElement("div"); el.id = "tgt-marker-" + idx;
+  el.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" style="animation:target-pulse 2.5s ease-in-out infinite"><circle cx="14" cy="14" r="11" fill="none" stroke="#ff3333" stroke-width="1.5" opacity="0.6"/><circle cx="14" cy="14" r="6" fill="none" stroke="#ff3333" stroke-width="1" opacity="0.4"/><circle cx="14" cy="14" r="2" fill="#ff3333" opacity="0.7"/></svg>';
+  el.style.cssText = "filter:drop-shadow(0 0 8px rgba(255,50,50,0.35))";
+  var popup = new mapboxgl.Popup({offset:16,closeButton:false}).setHTML('<div style="font-family:monospace;font-size:7px;letter-spacing:1.5px;color:#ff6666;background:rgba(0,0,0,0.85);padding:3px 6px;border:1px solid rgba(255,50,50,0.25);border-radius:2px">'+t.name+'</div>');
+  new mapboxgl.Marker({element:el,anchor:"center"}).setLngLat([t.lng,t.lat]).setPopup(popup).addTo(map).togglePopup();
 });
 
-// White Van marker
-var vanEl = document.createElement("div");
-vanEl.innerHTML = '<svg width="26" height="42" viewBox="0 0 22 38"><rect x="1" y="0" width="20" height="32" rx="3" fill="#e8e8e8" stroke="#999" stroke-width="0.8"/><rect x="2" y="2" width="18" height="8" rx="2" fill="#c0c8d0" opacity="0.6"/><rect x="3" y="28" width="7" height="5" rx="1" fill="#333" opacity="0.7"/><rect x="12" y="28" width="7" height="5" rx="1" fill="#333" opacity="0.7"/><rect x="5" y="32" width="12" height="6" rx="1" fill="none" stroke="#4488ff" stroke-width="1" opacity="0.6"/><circle cx="11" cy="35" r="2" fill="#4488ff" opacity="0.4"/></svg>';
-vanEl.style.cssText = "filter:drop-shadow(0 0 6px rgba(68,136,255,0.5));cursor:pointer;";
-var vanMarker = new mapboxgl.Marker({element: vanEl, anchor: "center"}).setLngLat(VAN_POS).addTo(map);
-var vanPopup = new mapboxgl.Popup({offset: 22, closeButton: false}).setHTML('<div style="font-family:monospace;font-size:9px;letter-spacing:1.5px;color:#4488ff;background:rgba(0,0,0,0.85);padding:4px 8px;border:1px solid rgba(68,136,255,0.3);border-radius:2px;">LAUNCH VEHICLE</div>');
-vanMarker.setPopup(vanPopup).togglePopup();
+// HUD icons
+var iconCtr = document.getElementById("drone-icons"), droneIcons = [];
+for (var di = 0; di < TOTAL; di++) { var e = document.createElement("div"); e.className="di"; iconCtr.appendChild(e); droneIcons.push(e); }
 
-// Target markers
-var targetMarkerEls = [];
-TARGETS.forEach(function(t, i) {
-  var el = document.createElement("div");
-  el.id = "tgt-marker-" + i;
-  el.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" style="animation:target-pulse 2.5s ease-in-out infinite;"><circle cx="14" cy="14" r="11" fill="none" stroke="#ff3333" stroke-width="1.5" opacity="0.6"/><circle cx="14" cy="14" r="6" fill="none" stroke="#ff3333" stroke-width="1" opacity="0.4"/><circle cx="14" cy="14" r="2" fill="#ff3333" opacity="0.7"/><line x1="14" y1="0" x2="14" y2="6" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/><line x1="14" y1="22" x2="14" y2="28" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/><line x1="0" y1="14" x2="6" y2="14" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/><line x1="22" y1="14" x2="28" y2="14" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/></svg>';
-  el.style.cssText = "filter:drop-shadow(0 0 8px rgba(255,50,50,0.35));";
-  targetMarkerEls.push(el);
-  var popup = new mapboxgl.Popup({offset: 16, closeButton: false}).setHTML('<div style="font-family:monospace;font-size:7px;letter-spacing:1.5px;color:#ff6666;background:rgba(0,0,0,0.85);padding:3px 6px;border:1px solid rgba(255,50,50,0.25);border-radius:2px;">' + t.name + '</div>');
-  new mapboxgl.Marker({element: el, anchor: "center"}).setLngLat([t.lng, t.lat]).setPopup(popup).addTo(map).togglePopup();
-});
+// Custom 3D layer
+var droneLayer = {
+  id: "drone-3d-layer", type: "custom", renderingMode: "3d",
+  onAdd: function(map, gl) {
+    threeCamera = new THREE.Camera();
+    threeScene = new THREE.Scene();
+    threeScene.add(new THREE.AmbientLight(0x7799cc, 0.6));
+    var dir = new THREE.DirectionalLight(0xffffff, 0.4); dir.position.set(1,2,1); threeScene.add(dir);
+    threeRenderer = new THREE.WebGLRenderer({ canvas:map.getCanvas(), context:gl, antialias:true });
+    threeRenderer.autoClear = false;
+    var vs = meterScale(VAN_POS[1], 0);
+    vanMesh = buildVan(vs);
+    var vw = lngLatAltToWorld(VAN_POS[0], VAN_POS[1], 0);
+    vanMesh.position.set(vw.x, vw.y, vw.z); threeScene.add(vanMesh);
+  },
+  render: function(gl, matrix) {
+    threeCamera.projectionMatrix = new THREE.Matrix4().fromArray(matrix);
+    threeRenderer.resetState();
+    threeRenderer.render(threeScene, threeCamera);
+    map.triggerRepaint();
+  }
+};
 
 map.on("style.load", function() {
-  map.addLayer({
-    id: "3d-buildings",
-    source: "composite",
-    "source-layer": "building",
-    filter: ["==", "extrude", "true"],
-    type: "fill-extrusion",
-    minzoom: 14,
-    paint: {
-      "fill-extrusion-color": ["interpolate", ["linear"], ["get", "height"],
-        0, "#151c28", 50, "#1a2538", 100, "#202e48", 200, "#283858", 300, "#304268"],
-      "fill-extrusion-height": ["get", "height"],
-      "fill-extrusion-base": ["get", "min_height"],
-      "fill-extrusion-opacity": 0.88
-    }
-  });
-  map.setFog({ color: "#0c1020", "high-color": "#0a1028", "horizon-blend": 0.06, "space-color": "#040810", "star-intensity": 0.5 });
-  map.setLight({ anchor: "viewport", color: "#7799cc", intensity: 0.5, position: [1.5, 200, 30] });
-});
-
-// HUD drone icons
-var iconContainer = document.getElementById("drone-icons");
-var droneIcons = [];
-for (var di = 0; di < TOTAL; di++) {
-  var el = document.createElement("div"); el.className = "di"; iconContainer.appendChild(el); droneIcons.push(el);
-}
-
-// Create drone SVG element
-function createDroneSVG() {
-  var wrapper = document.createElement("div");
-  wrapper.className = "drone-wrapper";
-
-  var glow = document.createElement("div");
-  glow.className = "drone-glow";
-  wrapper.appendChild(glow);
-
-  var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", "28");
-  svg.setAttribute("height", "28");
-  svg.setAttribute("viewBox", "0 0 32 32");
-  svg.setAttribute("class", "drone-svg");
-
-  // SVG filter for motion blur on rotors
-  var defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-  var filter = document.createElementNS("http://www.w3.org/2000/svg", "filter");
-  filter.setAttribute("id", "rotor-blur");
-  var feGauss = document.createElementNS("http://www.w3.org/2000/svg", "feGaussianBlur");
-  feGauss.setAttribute("stdDeviation", "0.4");
-  filter.appendChild(feGauss);
-  defs.appendChild(filter);
-  svg.appendChild(defs);
-
-  // Arms (diagonal, thin rectangles)
-  var armData = [
-    { x1: 12, y1: 12, x2: 5, y2: 5 },
-    { x1: 20, y1: 12, x2: 27, y2: 5 },
-    { x1: 12, y1: 20, x2: 5, y2: 27 },
-    { x1: 20, y1: 20, x2: 27, y2: 27 }
-  ];
-  armData.forEach(function(arm) {
-    var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", arm.x1);
-    line.setAttribute("y1", arm.y1);
-    line.setAttribute("x2", arm.x2);
-    line.setAttribute("y2", arm.y2);
-    line.setAttribute("stroke", "#4a5a70");
-    line.setAttribute("stroke-width", "1.8");
-    line.setAttribute("stroke-linecap", "round");
-    svg.appendChild(line);
-  });
-
-  // Motor pods (small filled circles at arm ends)
-  var motors = [[5, 5], [27, 5], [5, 27], [27, 27]];
-  motors.forEach(function(m) {
-    var c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.setAttribute("cx", m[0]);
-    c.setAttribute("cy", m[1]);
-    c.setAttribute("r", "2.2");
-    c.setAttribute("fill", "#3a4a60");
-    c.setAttribute("stroke", "#5a7090");
-    c.setAttribute("stroke-width", "0.5");
-    svg.appendChild(c);
-  });
-
-  // Spinning rotors (larger semi-transparent circles with motion blur)
-  motors.forEach(function(m, idx) {
-    // Outer blur ring
-    var r1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    r1.setAttribute("cx", m[0]);
-    r1.setAttribute("cy", m[1]);
-    r1.setAttribute("r", "4.5");
-    r1.setAttribute("fill", "rgba(68,170,255,0.12)");
-    r1.setAttribute("filter", "url(#rotor-blur)");
-    svg.appendChild(r1);
-
-    // Rotor disc
-    var r2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    r2.setAttribute("cx", m[0]);
-    r2.setAttribute("cy", m[1]);
-    r2.setAttribute("r", "4");
-    r2.setAttribute("fill", "rgba(68,170,255,0.25)");
-    r2.setAttribute("stroke", "rgba(68,170,255,0.35)");
-    r2.setAttribute("stroke-width", "0.3");
-    svg.appendChild(r2);
-
-    // Blade indicators (spinning lines)
-    var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    g.setAttribute("class", "rotor");
-    g.style.transformOrigin = m[0] + "px " + m[1] + "px";
-    // Offset animation start for each rotor
-    g.style.animationDelay = (idx * 37) + "ms";
-
-    var blade1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    blade1.setAttribute("x1", m[0] - 3.5);
-    blade1.setAttribute("y1", m[1]);
-    blade1.setAttribute("x2", m[0] + 3.5);
-    blade1.setAttribute("y2", m[1]);
-    blade1.setAttribute("stroke", "rgba(68,170,255,0.5)");
-    blade1.setAttribute("stroke-width", "0.7");
-    blade1.setAttribute("stroke-linecap", "round");
-    g.appendChild(blade1);
-
-    var blade2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    blade2.setAttribute("x1", m[0]);
-    blade2.setAttribute("y1", m[1] - 3.5);
-    blade2.setAttribute("x2", m[0]);
-    blade2.setAttribute("y2", m[1] + 3.5);
-    blade2.setAttribute("stroke", "rgba(68,170,255,0.5)");
-    blade2.setAttribute("stroke-width", "0.7");
-    blade2.setAttribute("stroke-linecap", "round");
-    g.appendChild(blade2);
-
-    svg.appendChild(g);
-  });
-
-  // Center body (rounded rectangle)
-  var body = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  body.setAttribute("x", "12");
-  body.setAttribute("y", "12");
-  body.setAttribute("width", "8");
-  body.setAttribute("height", "8");
-  body.setAttribute("rx", "2");
-  body.setAttribute("fill", "#2a3a55");
-  body.setAttribute("stroke", "#4a6a90");
-  body.setAttribute("stroke-width", "0.6");
-  svg.appendChild(body);
-
-  // Navigation lights: green front-left, red front-right
-  // Front is bottom in top-down view (direction of travel)
-  var navGreen = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  navGreen.setAttribute("cx", "13");
-  navGreen.setAttribute("cy", "21");
-  navGreen.setAttribute("r", "1");
-  navGreen.setAttribute("fill", "#44ff66");
-  navGreen.setAttribute("opacity", "0.8");
-  svg.appendChild(navGreen);
-
-  var navRed = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  navRed.setAttribute("cx", "19");
-  navRed.setAttribute("cy", "21");
-  navRed.setAttribute("r", "1");
-  navRed.setAttribute("fill", "#ff4444");
-  navRed.setAttribute("opacity", "0.8");
-  svg.appendChild(navRed);
-
-  // Camera/sensor dot (front center bottom)
-  var cam = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  cam.setAttribute("cx", "16");
-  cam.setAttribute("cy", "22");
-  cam.setAttribute("r", "0.8");
-  cam.setAttribute("fill", "#ffffff");
-  cam.setAttribute("opacity", "0.9");
-  svg.appendChild(cam);
-
-  wrapper.appendChild(svg);
-  return wrapper;
-}
-
-// Drone data
-function spawnDrone(idx) {
-  var tgt = TARGETS[idx % 4];
-  var startLng = VAN_POS[0], startLat = VAN_POS[1];
-  var cruiseAlt = 40 + Math.random() * 40; // 40-80m
-  var cruiseSpeed = 22 + Math.random() * 8; // 22-30 m/s
-  var variation = 0.001 + Math.random() * 0.0015;
-
-  // Generate multi-waypoint path
-  var waypoints = generateWaypoints(startLng, startLat, tgt.lng, tgt.lat, variation);
-
-  return {
-    lng: startLng, lat: startLat, alt: 0,
-    prevLng: startLng, prevLat: startLat,
-    heading: 0, smoothHeading: 0,
-    targetIdx: idx % 4,
-    tLng: tgt.lng, tLat: tgt.lat, tAlt: tgt.alt,
-    cruiseAlt: cruiseAlt,
-    cruiseSpeed: cruiseSpeed,
-    waypoints: waypoints,
-    launched: false, struck: false, phase: "wait",
-    marker: null, trailCoords: [],
-    pathT: 0,
-    // Total path time based on distance and speed
-    pathDuration: 0,
-    launchTime: 0,
-    riseTime: 1.0, // 1 second vertical rise
-    _flashTimeout: null
-  };
-}
-
-// Calculate path distance for duration estimate
-function pathDistance(waypoints) {
-  var dist = 0;
-  for (var i = 1; i < waypoints.length; i++) {
-    var dLng = waypoints[i][0] - waypoints[i-1][0];
-    var dLat = waypoints[i][1] - waypoints[i-1][1];
-    // Rough meters conversion at SF latitude
-    var dx = dLng * 87000; // degrees to meters at ~37.8N
-    var dy = dLat * 111000;
-    dist += Math.sqrt(dx * dx + dy * dy);
-  }
-  return dist;
-}
-
-for (var i = 0; i < TOTAL; i++) {
-  var dr = spawnDrone(i);
-  var dist = pathDistance(dr.waypoints);
-  dr.pathDuration = dist / dr.cruiseSpeed;
-  drones.push(dr);
-}
-
-var map_loaded = false;
-
-map.on("load", function() {
-  map_loaded = true;
-  // Add trail sources/layers immediately
-  map.addSource("trails", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-  map.addLayer({ id: "trail-glow", type: "line", source: "trails", paint: { "line-color": "#2255aa", "line-opacity": 0.08, "line-width": 6, "line-blur": 4 } });
-  map.addLayer({ id: "trail-lines", type: "line", source: "trails", paint: { "line-color": "#3388dd", "line-opacity": 0.3, "line-width": 2 } });
+  map.addLayer({ id:"3d-buildings", source:"composite", "source-layer":"building", filter:["==","extrude","true"], type:"fill-extrusion", minzoom:14,
+    paint:{"fill-extrusion-color":["interpolate",["linear"],["get","height"],0,"#151c28",50,"#1a2538",100,"#202e48",200,"#283858",300,"#304268"],"fill-extrusion-height":["get","height"],"fill-extrusion-base":["get","min_height"],"fill-extrusion-opacity":0.88}});
+  map.setFog({color:"#0c1020","high-color":"#0a1028","horizon-blend":0.06,"space-color":"#040810","star-intensity":0.5});
+  map.setLight({anchor:"viewport",color:"#7799cc",intensity:0.5,position:[1.5,200,30]});
+  map.addLayer(droneLayer);
+  map.addSource("trails",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+  map.addLayer({id:"trail-glow",type:"line",source:"trails",paint:{"line-color":"#2255aa","line-opacity":0.08,"line-width":6,"line-blur":4}});
+  map.addLayer({id:"trail-lines",type:"line",source:"trails",paint:{"line-color":"#3388dd","line-opacity":0.3,"line-width":2}});
   animate();
 });
 
+function spawnDroneMesh(idx) {
+  var s = meterScale(37.79, 50);
+  var mesh = buildDrone(s); mesh.visible = false; threeScene.add(mesh); droneMeshes[idx] = mesh;
+  var shGeo = new THREE.CircleGeometry(0.5*s, 12);
+  var sh = new THREE.Mesh(shGeo, new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.3, side:THREE.DoubleSide}));
+  sh.rotation.x = -Math.PI/2; sh.visible = false; threeScene.add(sh); shadowMeshes[idx] = sh;
+}
+
+function spawnExplosion(lng, lat, alt) {
+  var s = meterScale(lat, alt), w = lngLatAltToWorld(lng, lat, alt), parts = [];
+  var flash = new THREE.PointLight(0xff8800, 5, 50*s); flash.position.set(w.x, w.y, w.z); threeScene.add(flash);
+  for (var i = 0; i < 30; i++) {
+    var p = new THREE.Mesh(new THREE.SphereGeometry(0.3*s,4,4), new THREE.MeshBasicMaterial({color:0xff6600, transparent:true, opacity:1}));
+    p.position.set(w.x, w.y, w.z);
+    var spd = (0.5+Math.random()*1.5)*s;
+    p.userData.vel = new THREE.Vector3((Math.random()-0.5)*spd, (Math.random()-0.5)*spd, (Math.random()-0.5)*spd*0.5);
+    p.userData.life = 1.0; threeScene.add(p); parts.push(p);
+  }
+  explosions.push({parts:parts, flash:flash, age:0, s:s});
+}
+
+function tickExplosions(dt) {
+  for (var i = explosions.length-1; i >= 0; i--) {
+    var ex = explosions[i]; ex.age += dt;
+    ex.flash.intensity = ex.age < 0.3 ? 5*(1-ex.age/0.3) : 0;
+    var grav = ex.s * 2;
+    for (var j = 0; j < ex.parts.length; j++) {
+      var p = ex.parts[j]; p.userData.life -= dt;
+      if (p.userData.life <= 0) { p.visible = false; continue; }
+      p.position.x += p.userData.vel.x*dt; p.position.y += p.userData.vel.y*dt;
+      p.userData.vel.y -= grav*dt; p.position.z += p.userData.vel.z*dt;
+      p.scale.setScalar(Math.max(0.1, p.userData.life)); p.material.opacity = p.userData.life;
+    }
+    if (ex.age > 1.2) {
+      for (var k = 0; k < ex.parts.length; k++) { threeScene.remove(ex.parts[k]); ex.parts[k].geometry.dispose(); ex.parts[k].material.dispose(); }
+      threeScene.remove(ex.flash); explosions.splice(i, 1);
+    }
+  }
+}
+
 function simStep(dt) {
   if (!playing) return;
-  simTime += dt;
-  deployTimer += dt;
-
-  // Deploy one drone every 0.6 seconds
+  simTime += dt; deployTimer += dt;
   if (deployTimer >= 0.6 && deployed < TOTAL) {
-    var dr = drones[deployed];
-    dr.launched = true;
-    dr.phase = "rise";
-    dr.launchTime = simTime;
-    dr.pathT = 0;
-
-    // Create drone marker
-    var mEl = createDroneSVG();
-    dr.marker = new mapboxgl.Marker({element: mEl, anchor: "center", rotationAlignment: "map"}).setLngLat([dr.lng, dr.lat]).addTo(map);
-
-    // Van pulse effect while deploying
-    vanEl.style.animation = "van-pulse 1s ease-in-out infinite";
-
-    deployed++;
-    deployTimer = 0;
-    droneIcons[deployed - 1].className = "di active";
+    var d = drones[deployed]; d.launched = true; d.phase = "rise"; d.launchTime = simTime; d.pathT = 0;
+    spawnDroneMesh(deployed); droneMeshes[deployed].visible = true; shadowMeshes[deployed].visible = true;
+    deployed++; deployTimer = 0; droneIcons[deployed-1].className = "di active";
+    if (vanMesh && vanMesh.userData.light) vanMesh.userData.light.intensity = 6;
   }
-
-  // Stop van pulse when all deployed
-  if (deployed >= TOTAL) {
-    vanEl.style.animation = "";
+  if (vanMesh && vanMesh.userData.light && vanMesh.userData.light.intensity > 2) {
+    vanMesh.userData.light.intensity = Math.max(2, vanMesh.userData.light.intensity - dt*8);
   }
-
-  var activeCount = 0;
-
   for (var i = 0; i < drones.length; i++) {
     var d = drones[i];
     if (!d.launched || d.struck) continue;
-    activeCount++;
-
     var elapsed = simTime - d.launchTime;
-
+    d.jp += dt*3;
+    d.jX = Math.sin(d.jp*1.7)*0.1; d.jY = Math.cos(d.jp*2.3)*0.05; d.jZ = Math.sin(d.jp*1.1+1)*0.1;
     if (d.phase === "rise") {
-      // Vertical rise for 1 second
-      var riseFrac = Math.min(elapsed / d.riseTime, 1);
-      var eased = riseFrac * riseFrac * (3 - 2 * riseFrac);
-      d.alt = eased * 15; // Rise to 15m before cruise begins
-      d.lng = VAN_POS[0] + (Math.random() - 0.5) * 0.00001; // Tiny drift
-      d.lat = VAN_POS[1] + (Math.random() - 0.5) * 0.00001;
-
-      if (riseFrac >= 1) {
-        d.phase = "cruise";
-        d.launchTime = simTime; // Reset for cruise timing
-      }
+      var rf = Math.min(elapsed/d.riseTime, 1), e = rf*rf*(3-2*rf);
+      d.alt = e*15; d.lng = VAN_POS[0]+(Math.random()-0.5)*0.00001; d.lat = VAN_POS[1]+(Math.random()-0.5)*0.00001;
+      if (rf >= 1) { d.phase = "cruise"; d.launchTime = simTime; }
     } else if (d.phase === "cruise") {
-      var cruiseElapsed = simTime - d.launchTime;
-      // Raw t based on elapsed time vs path duration
-      var rawT = cruiseElapsed / d.pathDuration;
-
-      // Apply speed easing (acceleration/deceleration)
-      // Integrate speed profile to get actual position
-      // Simple approach: use adaptive step
-      d.pathT = Math.min(rawT, 1);
-
-      // Evaluate spline position
+      d.pathT = Math.min((simTime-d.launchTime)/d.pathDuration, 1);
       var pos = evalSpline(d.waypoints, d.pathT);
-      d.prevLng = d.lng;
-      d.prevLat = d.lat;
-      d.lng = pos[0];
-      d.lat = pos[1];
-
-      // Altitude profile
+      d.prevLng = d.lng; d.prevLat = d.lat; d.lng = pos[0]; d.lat = pos[1];
       d.alt = altProfile(d.pathT, d.cruiseAlt, d.tAlt);
-
-      // Calculate heading from movement direction
-      var dLng = d.lng - d.prevLng;
-      var dLat = d.lat - d.prevLat;
+      var dLng = d.lng-d.prevLng, dLat = d.lat-d.prevLat;
       if (Math.abs(dLng) > 1e-9 || Math.abs(dLat) > 1e-9) {
-        var targetHeading = Math.atan2(dLng, dLat) * 180 / Math.PI;
-        // Smooth heading interpolation
-        var hDiff = targetHeading - d.smoothHeading;
-        // Normalize to -180..180
-        while (hDiff > 180) hDiff -= 360;
-        while (hDiff < -180) hDiff += 360;
-        d.smoothHeading += hDiff * Math.min(dt * 4, 1);
-        d.heading = d.smoothHeading;
+        var th = Math.atan2(dLng, dLat)*180/Math.PI, hd = th-d.smoothHeading;
+        while (hd > 180) hd -= 360; while (hd < -180) hd += 360;
+        d.smoothHeading += hd*Math.min(dt*4, 1); d.heading = d.smoothHeading;
+        d.bank += (hd*Math.min(dt*4,1)*0.8 - d.bank)*Math.min(dt*5, 1);
       }
-
-      // Strike check
+      var tp = d.pathT > 0.85 ? -(d.pathT-0.85)/0.15*0.3 : 0;
+      d.pitch += (tp-d.pitch)*Math.min(dt*3, 1);
       if (d.pathT >= 0.98) {
-        var dx = d.lng - d.tLng, dy = d.lat - d.tLat;
-        var distToTarget = Math.sqrt(dx * dx + dy * dy);
-        if (distToTarget < 0.0003 || d.pathT >= 1.0) {
-          d.struck = true;
-          strikes++;
-          if (d.marker) { d.marker.remove(); d.marker = null; }
-          droneIcons[i].className = "di struck";
-
+        var sx = d.lng-d.tLng, sy = d.lat-d.tLat;
+        if (Math.sqrt(sx*sx+sy*sy) < 0.0003 || d.pathT >= 1.0) {
+          d.struck = true; strikes++; droneIcons[i].className = "di struck";
+          if (droneMeshes[i]) droneMeshes[i].visible = false;
+          if (shadowMeshes[i]) shadowMeshes[i].visible = false;
+          spawnExplosion(d.tLng, d.tLat, d.tAlt);
           var tgt = TARGETS[d.targetIdx];
-          if (!tgt.hit) {
-            tgt.hit = true;
-            targetsHit++;
-            // Flash target white then green
-            var tEl = document.getElementById("tgt-marker-" + d.targetIdx);
-            if (tEl) {
-              tEl.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="rgba(255,255,255,0.8)"/><circle cx="14" cy="14" r="11" fill="none" stroke="#ffffff" stroke-width="2"/></svg>';
-              tEl.style.filter = "drop-shadow(0 0 16px rgba(255,255,255,0.9))";
-              (function(el, idx) {
-                setTimeout(function() {
-                  el.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="#44ff44" stroke-width="1.5" opacity="0.7"/><circle cx="14" cy="14" r="6" fill="none" stroke="#44ff44" stroke-width="1" opacity="0.5"/><circle cx="14" cy="14" r="2" fill="#44ff44" opacity="0.8"/><line x1="14" y1="0" x2="14" y2="6" stroke="#44ff44" stroke-width="0.5" opacity="0.5"/><line x1="14" y1="22" x2="14" y2="28" stroke="#44ff44" stroke-width="0.5" opacity="0.5"/><line x1="0" y1="14" x2="6" y2="14" stroke="#44ff44" stroke-width="0.5" opacity="0.5"/><line x1="22" y1="14" x2="28" y2="14" stroke="#44ff44" stroke-width="0.5" opacity="0.5"/></svg>';
-                  el.style.filter = "drop-shadow(0 0 10px rgba(68,255,68,0.5))";
-                }, 300);
-              })(tEl, d.targetIdx);
-            }
-          }
+          if (!tgt.hit) { tgt.hit = true; targetsHit++; flashTarget(d.targetIdx); }
           continue;
         }
       }
     }
-
-    // Update marker position and rotation
-    if (d.marker) {
-      d.marker.setLngLat([d.lng, d.lat]);
-      d.marker.setRotation(d.heading);
+    if (droneMeshes[i] && droneMeshes[i].visible) {
+      var s = meterScale(d.lat, d.alt), w = lngLatAltToWorld(d.lng, d.lat, d.alt);
+      droneMeshes[i].position.set(w.x+d.jX*s, w.y+d.jY*s, w.z+d.jZ*s);
+      droneMeshes[i].rotation.set(d.pitch, -d.heading*Math.PI/180, d.bank);
+      var rotors = droneMeshes[i].userData.rotors;
+      if (rotors) for (var r = 0; r < rotors.length; r++) rotors[r].rotation.z += dt*40+r*0.5;
+      if (shadowMeshes[i]) {
+        var gw = lngLatAltToWorld(d.lng, d.lat, 0);
+        shadowMeshes[i].position.set(gw.x, gw.y, gw.z);
+        shadowMeshes[i].scale.setScalar(1+d.alt*0.01);
+        shadowMeshes[i].material.opacity = Math.max(0.05, 0.3-d.alt*0.002);
+      }
     }
-
-    // Trail coordinates (store for rendering)
     d.trailCoords.push([d.lng, d.lat]);
     if (d.trailCoords.length > 80) d.trailCoords.shift();
   }
+  tickExplosions(dt);
+  if (frameCount % 3 === 0) updateTrails();
+  updateCamera(dt); updateHUD(); frameCount++;
+}
 
-  // Update trails every 3 frames for performance
-  if (frameCount % 3 === 0) {
-    updateTrails();
-  }
-
-  // Camera
-  updateCamera(dt);
-  updateHUD();
-  frameCount++;
+function flashTarget(idx) {
+  var el = document.getElementById("tgt-marker-"+idx); if (!el) return;
+  el.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="rgba(255,255,255,0.8)"/></svg>';
+  el.style.filter = "drop-shadow(0 0 16px rgba(255,255,255,0.9))";
+  setTimeout(function() {
+    el.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="#44ff44" stroke-width="1.5" opacity="0.7"/><circle cx="14" cy="14" r="2" fill="#44ff44" opacity="0.8"/></svg>';
+    el.style.filter = "drop-shadow(0 0 10px rgba(68,255,68,0.5))";
+  }, 300);
 }
 
 function updateCamera(dt) {
   if (trackCam) {
-    // Find lead drone to track
     var lead = null;
-    for (var i = 0; i < drones.length; i++) {
-      if (drones[i].launched && !drones[i].struck && drones[i].phase === "cruise") {
-        lead = drones[i];
-        break;
-      }
-    }
-    if (!lead) {
-      // Fall back to any launched drone
-      for (var j = 0; j < drones.length; j++) {
-        if (drones[j].launched && !drones[j].struck) { lead = drones[j]; break; }
-      }
-    }
+    for (var i = 0; i < drones.length; i++) { if (drones[i].launched && !drones[i].struck && drones[i].phase==="cruise") { lead=drones[i]; break; } }
+    if (!lead) for (var j = 0; j < drones.length; j++) { if (drones[j].launched && !drones[j].struck) { lead=drones[j]; break; } }
     trackedDrone = lead;
-
     if (lead) {
-      // Chase cam: 80m behind, 30m above along velocity vector
-      var headingRad = lead.heading * Math.PI / 180;
-      // Camera positioned behind the drone (opposite of heading)
-      var offsetDist = 80; // meters behind
-      var offsetLng = -Math.sin(headingRad) * (offsetDist / 87000);
-      var offsetLat = -Math.cos(headingRad) * (offsetDist / 111000);
-
-      var targetCenter = [lead.lng + offsetLng * 0.3, lead.lat + offsetLat * 0.3];
-
-      // Bearing follows drone heading (smoothly)
-      var targetBearing = lead.heading;
-      var bDiff = targetBearing - camBearing;
-      while (bDiff > 180) bDiff -= 360;
-      while (bDiff < -180) bDiff += 360;
-      camBearing += bDiff * Math.min(dt * 2.5, 1);
-
-      // Pitch varies with phase
-      var targetPitch = 55;
-      if (lead.pathT > 0.85) {
-        targetPitch = 55 + (lead.pathT - 0.85) / 0.15 * 15; // up to 70 when diving
-      }
-      camPitch += (targetPitch - camPitch) * Math.min(dt * 2, 1);
-
-      // Zoom varies with altitude
-      var targetZoom = 17 - (lead.alt / 80) * 2; // higher = more zoomed out
-      targetZoom = Math.max(14.5, Math.min(17, targetZoom));
-      camZoom += (targetZoom - camZoom) * Math.min(dt * 2, 1);
-
-      map.easeTo({
-        center: targetCenter,
-        bearing: camBearing,
-        pitch: camPitch,
-        zoom: camZoom,
-        duration: 100,
-        easing: function(t) { return t; }
-      });
-
-      // Show tracking HUD
+      var hr = lead.heading*Math.PI/180, oD = 80;
+      var oLng = -Math.sin(hr)*(oD/87000), oLat = -Math.cos(hr)*(oD/111000);
+      var tc = [lead.lng+oLng*0.3, lead.lat+oLat*0.3];
+      var bd = lead.heading-camBearing; while(bd>180)bd-=360; while(bd<-180)bd+=360;
+      camBearing += bd*Math.min(dt*2.5,1);
+      var tPitch = lead.pathT > 0.85 ? 55+(lead.pathT-0.85)/0.15*15 : 55;
+      camPitch += (tPitch-camPitch)*Math.min(dt*2,1);
+      var tZoom = Math.max(14.5, Math.min(17, 17-(lead.alt/80)*2));
+      camZoom += (tZoom-camZoom)*Math.min(dt*2,1);
+      map.easeTo({center:tc, bearing:camBearing, pitch:camPitch, zoom:camZoom, duration:150, easing:function(t){return t;}});
       document.getElementById("track-hud").style.display = "block";
       document.getElementById("compass").style.display = "block";
       document.getElementById("th-target").textContent = TARGETS[lead.targetIdx].name;
-
-      // Speed calculation (m/s from coordinate delta)
-      var dLng = lead.lng - lead.prevLng;
-      var dLat = lead.lat - lead.prevLat;
-      var speedMs = Math.sqrt((dLng * 87000) * (dLng * 87000) + (dLat * 111000) * (dLat * 111000)) / dt;
-      if (isFinite(speedMs) && speedMs < 200) {
-        document.getElementById("th-speed").textContent = speedMs.toFixed(1);
-      }
+      var sLng=lead.lng-lead.prevLng, sLat2=lead.lat-lead.prevLat;
+      var spd = Math.sqrt((sLng*87000)*(sLng*87000)+(sLat2*111000)*(sLat2*111000))/dt;
+      if (isFinite(spd) && spd < 200) document.getElementById("th-speed").textContent = spd.toFixed(1);
       document.getElementById("th-alt").textContent = lead.alt.toFixed(0);
-      document.getElementById("th-hdg").textContent = ((lead.heading % 360 + 360) % 360).toFixed(0);
-
-      // Draw compass
+      document.getElementById("th-hdg").textContent = ((lead.heading%360+360)%360).toFixed(0);
       drawCompass(lead.heading);
     }
   } else {
     trackedDrone = null;
     document.getElementById("track-hud").style.display = "none";
     document.getElementById("compass").style.display = "none";
-
-    // Slow auto-orbit when not tracking
     camBearing += 0.1;
-    map.easeTo({
-      bearing: camBearing,
-      duration: 100,
-      easing: function(t) { return t; }
-    });
+    map.easeTo({bearing:camBearing, duration:150, easing:function(t){return t;}});
   }
 }
 
-function drawCompass(heading) {
-  var canvas = document.getElementById("compass");
-  var ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, 36, 36);
-
-  ctx.strokeStyle = "rgba(255,255,255,0.15)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(18, 18, 15, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // N marker
-  ctx.save();
-  ctx.translate(18, 18);
-  ctx.rotate(-heading * Math.PI / 180);
-
-  // North indicator
-  ctx.fillStyle = "rgba(255,80,80,0.7)";
-  ctx.beginPath();
-  ctx.moveTo(0, -12);
-  ctx.lineTo(-3, -6);
-  ctx.lineTo(3, -6);
-  ctx.closePath();
-  ctx.fill();
-
-  // South indicator
-  ctx.fillStyle = "rgba(255,255,255,0.2)";
-  ctx.beginPath();
-  ctx.moveTo(0, 12);
-  ctx.lineTo(-3, 6);
-  ctx.lineTo(3, 6);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.restore();
-
-  // Center dot
-  ctx.fillStyle = "rgba(68,170,255,0.6)";
-  ctx.beginPath();
-  ctx.arc(18, 18, 2, 0, Math.PI * 2);
-  ctx.fill();
+function drawCompass(h) {
+  var c = document.getElementById("compass"), ctx = c.getContext("2d");
+  ctx.clearRect(0,0,36,36); ctx.strokeStyle="rgba(255,255,255,0.15)"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(18,18,15,0,Math.PI*2); ctx.stroke();
+  ctx.save(); ctx.translate(18,18); ctx.rotate(-h*Math.PI/180);
+  ctx.fillStyle="rgba(255,80,80,0.7)"; ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(-3,-6); ctx.lineTo(3,-6); ctx.closePath(); ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,0.2)"; ctx.beginPath(); ctx.moveTo(0,12); ctx.lineTo(-3,6); ctx.lineTo(3,6); ctx.closePath(); ctx.fill();
+  ctx.restore(); ctx.fillStyle="rgba(68,170,255,0.6)"; ctx.beginPath(); ctx.arc(18,18,2,0,Math.PI*2); ctx.fill();
 }
 
 function updateTrails() {
-  if (!map_loaded || !map.getSource("trails")) return;
-  var features = [];
-  for (var i = 0; i < drones.length; i++) {
-    if (drones[i].trailCoords.length < 2) continue;
-    features.push({
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: drones[i].trailCoords.slice() },
-      properties: {}
-    });
-  }
-  map.getSource("trails").setData({ type: "FeatureCollection", features: features });
+  if (!map.getSource("trails")) return;
+  var f = [];
+  for (var i = 0; i < drones.length; i++) { if (drones[i].trailCoords.length < 2) continue; f.push({type:"Feature",geometry:{type:"LineString",coordinates:drones[i].trailCoords.slice()},properties:{}}); }
+  map.getSource("trails").setData({type:"FeatureCollection", features:f});
 }
 
 var hudTimer = 0;
 function updateHUD() {
   if (++hudTimer % 5 !== 0) return;
   var inFlight = 0;
-  for (var i = 0; i < TOTAL; i++) {
-    if (drones[i].launched && !drones[i].struck) inFlight++;
-  }
-  document.getElementById("sDep").textContent = deployed + "/" + TOTAL;
+  for (var i = 0; i < TOTAL; i++) { if (drones[i].launched && !drones[i].struck) inFlight++; }
+  document.getElementById("sDep").textContent = deployed+"/"+TOTAL;
   document.getElementById("sFly").textContent = inFlight;
   document.getElementById("sHit").textContent = strikes;
-  document.getElementById("sTH").textContent = targetsHit + " / " + TARGETS.length;
-
-  var active = null;
-  for (var j = 0; j < drones.length; j++) {
-    if (drones[j].launched && !drones[j].struck) { active = drones[j]; break; }
-  }
-  if (active) document.getElementById("sTgt").textContent = TARGETS[active.targetIdx].name;
-
+  document.getElementById("sTH").textContent = targetsHit+" / "+TARGETS.length;
+  var act = null; for (var j = 0; j < drones.length; j++) { if (drones[j].launched && !drones[j].struck) { act=drones[j]; break; } }
+  if (act) document.getElementById("sTgt").textContent = TARGETS[act.targetIdx].name;
   var ts = Math.floor(simTime);
-  document.getElementById("clock").textContent = String(Math.floor(ts / 60)).padStart(2, "0") + ":" + String(ts % 60).padStart(2, "0");
+  document.getElementById("clock").textContent = String(Math.floor(ts/60)).padStart(2,"0")+":"+String(ts%60).padStart(2,"0");
 }
 
-// Animation loop with delta time
 var lastTime = performance.now();
 function animate() {
   requestAnimationFrame(animate);
-  var now = performance.now();
-  var dt = Math.min((now - lastTime) / 1000, 0.05);
-  lastTime = now;
+  var now = performance.now(), dt = Math.min((now-lastTime)/1000, 0.05); lastTime = now;
   simStep(dt);
 }
 
-// Controls
-document.getElementById("bp").onclick = function() {
-  playing = !playing;
-  this.textContent = playing ? "PAUSE" : "PLAY";
-  this.className = playing ? "on" : "";
-};
-
+document.getElementById("bp").onclick = function() { playing=!playing; this.textContent=playing?"PAUSE":"PLAY"; this.className=playing?"on":""; };
 document.getElementById("br").onclick = function() {
-  drones.forEach(function(d) { if (d.marker) d.marker.remove(); });
-  drones = [];
-  for (var i = 0; i < TOTAL; i++) {
-    var dr = spawnDrone(i);
-    var dist = pathDistance(dr.waypoints);
-    dr.pathDuration = dist / dr.cruiseSpeed;
-    drones.push(dr);
-  }
-  deployed = 0; strikes = 0; targetsHit = 0; simTime = 0; deployTimer = 0;
-  TARGETS.forEach(function(t) { t.hit = false; });
-  droneIcons.forEach(function(e) { e.className = "di"; });
-  // Reset target markers
-  TARGETS.forEach(function(t, idx) {
-    var el = document.getElementById("tgt-marker-" + idx);
-    if (el) {
-      el.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" style="animation:target-pulse 2.5s ease-in-out infinite;"><circle cx="14" cy="14" r="11" fill="none" stroke="#ff3333" stroke-width="1.5" opacity="0.6"/><circle cx="14" cy="14" r="6" fill="none" stroke="#ff3333" stroke-width="1" opacity="0.4"/><circle cx="14" cy="14" r="2" fill="#ff3333" opacity="0.7"/><line x1="14" y1="0" x2="14" y2="6" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/><line x1="14" y1="22" x2="14" y2="28" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/><line x1="0" y1="14" x2="6" y2="14" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/><line x1="22" y1="14" x2="28" y2="14" stroke="#ff3333" stroke-width="0.5" opacity="0.4"/></svg>';
-      el.style.filter = "drop-shadow(0 0 8px rgba(255,50,50,0.35))";
-    }
+  for (var i = 0; i < droneMeshes.length; i++) { if (droneMeshes[i]) threeScene.remove(droneMeshes[i]); if (shadowMeshes[i]) threeScene.remove(shadowMeshes[i]); }
+  for (var j = 0; j < explosions.length; j++) { for (var k=0;k<explosions[j].parts.length;k++) threeScene.remove(explosions[j].parts[k]); threeScene.remove(explosions[j].flash); }
+  droneMeshes=[]; shadowMeshes=[]; explosions=[]; drones=[];
+  for (var n = 0; n < TOTAL; n++) drones.push(spawnDrone(n));
+  deployed=0; strikes=0; targetsHit=0; simTime=0; deployTimer=0;
+  TARGETS.forEach(function(t){t.hit=false;}); droneIcons.forEach(function(e){e.className="di";});
+  TARGETS.forEach(function(t,idx) {
+    var el = document.getElementById("tgt-marker-"+idx); if (!el) return;
+    el.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" style="animation:target-pulse 2.5s ease-in-out infinite"><circle cx="14" cy="14" r="11" fill="none" stroke="#ff3333" stroke-width="1.5" opacity="0.6"/><circle cx="14" cy="14" r="6" fill="none" stroke="#ff3333" stroke-width="1" opacity="0.4"/><circle cx="14" cy="14" r="2" fill="#ff3333" opacity="0.7"/></svg>';
+    el.style.filter = "drop-shadow(0 0 8px rgba(255,50,50,0.35))";
   });
-  if (map.getSource("trails")) map.getSource("trails").setData({type: "FeatureCollection", features: []});
-  camBearing = -20; camPitch = 58; camZoom = 14.8;
-  map.easeTo({ center: SF_CENTER, zoom: 14.8, pitch: 58, bearing: -20, duration: 500 });
+  if (map.getSource("trails")) map.getSource("trails").setData({type:"FeatureCollection",features:[]});
+  camBearing=-20; camPitch=58; camZoom=14.8;
+  map.easeTo({center:SF_CENTER, zoom:14.8, pitch:58, bearing:-20, duration:500});
 };
-
-document.getElementById("bt").onclick = function() {
-  trackCam = !trackCam;
-  this.className = trackCam ? "on" : "";
-  if (!trackCam) {
-    // Return to overview
-    map.easeTo({ center: SF_CENTER, zoom: 14.8, pitch: 58, bearing: camBearing, duration: 1000 });
-  }
-};
+document.getElementById("bt").onclick = function() { trackCam=!trackCam; this.className=trackCam?"on":""; if(!trackCam) map.easeTo({center:SF_CENTER,zoom:14.8,pitch:58,bearing:camBearing,duration:1000}); };
 </script>
 </body>
 </html>
