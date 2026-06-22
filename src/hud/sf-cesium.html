@@ -148,14 +148,15 @@ for (var ti = 0; ti < TARGETS.length; ti++) {
       id: "drone-" + idx, name: lbl,
       availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({ start: ds, stop: stopTime })]),
       position: pos, orientation: new Cesium.VelocityOrientationProperty(pos),
-      model: { uri: "models/CesiumDrone.glb", minimumPixelSize: 80, scale: 8.0,
-        color: c.withAlpha(0.9), colorBlendMode: Cesium.ColorBlendMode.MIX, colorBlendAmount: 0.3 },
-      path: { resolution: 1, width: 2.5, leadTime: 0, trailTime: 25,
-        material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.15, color: c.withAlpha(0.5) }) },
-      label: { text: lbl, font: "9pt monospace", fillColor: Cesium.Color.WHITE.withAlpha(0.7),
-        showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.5),
-        pixelOffset: new Cesium.Cartesian2(0,-28), scale: 0.55,
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3000),
+      model: { uri: "models/CesiumDrone.glb", minimumPixelSize: 28, scale: 1.5 },
+      path: { resolution: 1, width: 1.2, leadTime: 0, trailTime: 20,
+        material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.08, color: c.withAlpha(0.35) }) },
+      point: { pixelSize: 4, color: c, outlineColor: Cesium.Color.BLACK, outlineWidth: 1,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      label: { text: lbl, font: "8pt monospace", fillColor: Cesium.Color.WHITE.withAlpha(0.5),
+        showBackground: true, backgroundColor: new Cesium.Color(0,0,0,0.4),
+        pixelOffset: new Cesium.Cartesian2(0,-18), scale: 0.45,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 2000),
         disableDepthTestDistance: Number.POSITIVE_INFINITY }
     });
   }
