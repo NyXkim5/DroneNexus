@@ -7,11 +7,12 @@ When disabled, all endpoints are open -- existing tests are unaffected.
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+import bcrypt
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -42,26 +43,25 @@ if SECRET_KEY == DEFAULT_JWT_SECRET:
 # Password hashing helpers
 # ---------------------------------------------------------------------------
 
-def _hash_password(plaintext: str) -> str:
-    """Return SHA-256 hex digest of a plaintext password."""
-    return hashlib.sha256(plaintext.encode()).hexdigest()
+def _hash_password(password: str) -> str:
+    """Hash password with bcrypt (salted, key-stretched)."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-def _verify_password(plaintext: str, stored_hash: str) -> bool:
-    """Constant-time comparison of input hash against stored hash."""
-    return hmac.compare_digest(
-        hashlib.sha256(plaintext.encode()).hexdigest(),
-        stored_hash,
-    )
+def _verify_password(password: str, hashed: str) -> bool:
+    """Verify password against bcrypt hash."""
+    return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
 
 
 # ---------------------------------------------------------------------------
-# Default user store (hashed -- swap for a real DB in production)
+# Default user store (bcrypt hashed). Default credentials for development only.
+# Set OVERWATCH_USERS in production.
 # ---------------------------------------------------------------------------
 _USERS: dict[str, dict] = {
     "operator": {"password_hash": _hash_password("nexus-alpha"), "role": "operator"},
     "viewer":   {"password_hash": _hash_password("nexus-view"),  "role": "viewer"},
 }
+_USING_DEFAULT_CREDENTIALS = True
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -116,11 +116,11 @@ def decode_access_token(token: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _auth_enabled() -> bool:
-    """Return True when JWT enforcement is on."""
+    """Return True when JWT enforcement is on. Fail-closed on error."""
     try:
         return OverwatchSettings().auth_enabled
     except Exception:
-        return False
+        return True
 
 
 # ---------------------------------------------------------------------------
@@ -207,20 +207,44 @@ async def require_viewer(
 
 
 # ---------------------------------------------------------------------------
+# Login rate limiting (in-memory, per IP)
+# ---------------------------------------------------------------------------
+_login_attempts: dict[str, tuple[int, float]] = {}
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 300  # 5 minutes
+
+
+def _check_rate_limit(ip: str) -> bool:
+    """Return True if the login attempt should be allowed."""
+    now = time.time()
+    if ip in _login_attempts:
+        count, first = _login_attempts[ip]
+        if now - first > LOGIN_WINDOW_SECONDS:
+            _login_attempts[ip] = (1, now)
+            return True
+        if count >= MAX_LOGIN_ATTEMPTS:
+            return False
+        _login_attempts[ip] = (count + 1, first)
+    else:
+        _login_attempts[ip] = (1, now)
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Auth router (mounted at /api/v1/auth)
 # ---------------------------------------------------------------------------
 auth_router = APIRouter(tags=["auth"])
 
 
 @auth_router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest):
-    """
-    Authenticate with username/password and receive a JWT.
+async def login(body: LoginRequest, req: Request):
+    """Authenticate with username/password and receive a JWT."""
+    if not _check_rate_limit(req.client.host if req.client else "unknown"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Try again later.",
+        )
 
-    Default credentials:
-      - operator / nexus-alpha  (full access)
-      - viewer   / nexus-view   (read-only)
-    """
     user_record = _USERS.get(body.username)
     if not user_record or not _verify_password(body.password, user_record["password_hash"]):
         raise HTTPException(

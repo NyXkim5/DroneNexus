@@ -16,7 +16,7 @@ import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import OverwatchSettings, ASSET_ROSTER
+from config import OverwatchSettings, ASSET_ROSTER, DEFAULT_JWT_SECRET
 from protocol import OverlayType, Waypoint, AssetClassification
 from telemetry.collector import DroneState
 from telemetry.aggregator import SwarmAggregator
@@ -251,8 +251,24 @@ class OverwatchApp:
         self.msp_connections: Dict[str, object] = {}
 
     async def startup(self) -> None:
+        # Refuse to start if auth is on but JWT secret is the default
+        if self.settings.auth_enabled and self.settings.jwt_secret == DEFAULT_JWT_SECRET:
+            logger.critical(
+                "REFUSING TO START: auth is enabled but JWT secret is the "
+                "default. Set OVERWATCH_JWT_SECRET to a strong random string."
+            )
+            sys.exit(1)
+
+        # Warn if using default development credentials
+        from api.auth import _USING_DEFAULT_CREDENTIALS
+        if _USING_DEFAULT_CREDENTIALS:
+            logger.warning(
+                "Using default development credentials. "
+                "Set OVERWATCH_USERS in production."
+            )
+
         logger.info("=" * 60)
-        logger.info("OVERWATCH ISR Platform — Starting")
+        logger.info("OVERWATCH ISR Platform -- Starting")
         logger.info("=" * 60)
 
         # Database

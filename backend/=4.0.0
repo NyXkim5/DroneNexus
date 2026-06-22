@@ -1,0 +1,10 @@
+Collecting bcrypt
+  Obtaining dependency information for bcrypt from https://files.pythonhosted.org/packages/5d/ba/2af136406e1c3839aea9ecadc2f6be2bcd1eff255bd451dd39bcf302c47a/bcrypt-5.0.0-cp39-abi3-macosx_10_12_universal2.whl.metadata
+  Downloading bcrypt-5.0.0-cp39-abi3-macosx_10_12_universal2.whl.metadata (10 kB)
+Downloading bcrypt-5.0.0-cp39-abi3-macosx_10_12_universal2.whl (495 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 495.3/495.3 kB 4.0 MB/s eta 0:00:00
+Installing collected packages: bcrypt
+Successfully installed bcrypt-5.0.0
+
+[notice] A new release of pip is available: 23.2.1 -> 26.1.2
+[notice] To update, run: pip3 install --upgrade pip

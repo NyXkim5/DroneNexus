@@ -330,9 +330,15 @@ class WebSocketHandler:
             elif command == "RTB" or command == "RTL":
                 success = await self.app.command_dispatcher.rtl(drone_id)
             elif command == "GOTO":
-                success = await self.app.command_dispatcher.goto(
-                    params.get("lat"), params.get("lng"),
-                )
+                lat = params.get("lat")
+                lng = params.get("lng")
+                if lat is None or lng is None:
+                    raise ValueError("GOTO requires lat and lng")
+                if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
+                    raise ValueError("GOTO lat and lng must be numbers")
+                if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+                    raise ValueError(f"Invalid coordinates: lat={lat}, lng={lng}")
+                success = await self.app.command_dispatcher.goto(lat, lng)
             elif command == "SET_OVERLAY" or command == "SET_FORMATION":
                 success = await self.app.command_dispatcher.set_formation(
                     params.get("formation"),

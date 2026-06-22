@@ -1,10 +1,9 @@
 """
-Tests for secrets management: JWT config via settings, password hashing,
-and default-secret warning.
+Tests for secrets management: JWT config via settings, password hashing
+(bcrypt), and default-secret warning.
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import sys
@@ -17,16 +16,15 @@ from config import DEFAULT_JWT_SECRET
 
 
 # ---------------------------------------------------------------------------
-# Password hashing
+# Password hashing (bcrypt)
 # ---------------------------------------------------------------------------
 
-def test_hash_password_returns_sha256_hex():
+def test_hash_password_returns_bcrypt_hash():
     from api.auth import _hash_password
 
-    result = _hash_password("nexus-alpha")
-    expected = hashlib.sha256(b"nexus-alpha").hexdigest()
-    assert result == expected
-    assert len(result) == 64
+    result = _hash_password("test-password")
+    assert result.startswith("$2b$")
+    assert len(result) == 60
 
 
 def test_verify_password_accepts_correct():
@@ -139,7 +137,7 @@ def test_user_store_has_hashed_passwords():
             f"User {username} still has plaintext password"
         )
         assert "password_hash" in record
-        assert len(record["password_hash"]) == 64  # SHA-256 hex
+        assert record["password_hash"].startswith("$2b$")  # bcrypt
 
 
 # ---------------------------------------------------------------------------
