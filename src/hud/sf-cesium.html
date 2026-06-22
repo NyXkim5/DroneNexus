@@ -1,289 +1,243 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OVERWATCH C2 - SF Theater</title>
-<script src="https://cdn.jsdelivr.net/npm/cesium@1.121/Build/Cesium/Cesium.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/cesium@1.121/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
-<script>window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.121/Build/Cesium/";</script>
+<title>OVERWATCH C2 - SF Drone Swarm</title>
+<script src="cesium/Cesium.js"></script>
+<link href="cesium/Widgets/widgets.css" rel="stylesheet">
+<script>window.CESIUM_BASE_URL = "cesium/";</script>
 <style>
-  html, body, #cesiumContainer { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000; }
-  #hud { position:absolute; top:0; left:0; right:0; bottom:0; z-index:10; pointer-events:none; font-family:'Courier New',monospace; }
-  #top-bar {
-    position:absolute; top:8px; left:12px; right:12px;
-    font-size:8px; color:rgba(180,220,255,0.7); letter-spacing:2.5px; text-transform:uppercase;
-    background:rgba(0,0,0,0.35); padding:6px 12px; border:1px solid rgba(68,170,255,0.15);
-  }
-  #bottom-bar {
-    position:absolute; bottom:36px; left:12px; right:12px;
-    font-size:8px; color:rgba(180,220,255,0.5); letter-spacing:2px; text-transform:uppercase;
-    background:rgba(0,0,0,0.3); padding:5px 12px; border:1px solid rgba(68,170,255,0.1);
-    display:flex; justify-content:space-between;
-  }
-  #target-status {
-    position:absolute; top:36px; right:12px;
-    font-size:8px; color:rgba(180,220,255,0.65); letter-spacing:1.5px;
-    background:rgba(0,0,0,0.35); padding:6px 10px; border:1px solid rgba(68,170,255,0.12);
-    line-height:1.7;
-  }
-  .tgt-pending { color:rgba(255,80,80,0.9); }
-  .tgt-complete { color:rgba(80,255,120,0.9); }
+html,body,#c{margin:0;width:100%;height:100%;overflow:hidden}
+#hud{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;font-family:'JetBrains Mono',monospace}
+#top-bar{padding:6px 14px;font-size:8px;color:rgba(150,200,255,0.7);letter-spacing:2.5px;background:rgba(0,0,0,0.5);border-bottom:1px solid rgba(68,170,255,0.15);text-transform:uppercase}
+#tgt-panel{position:absolute;top:34px;right:10px;font-size:8px;color:rgba(150,200,255,0.6);letter-spacing:1.5px;background:rgba(0,0,0,0.5);padding:6px 10px;border:1px solid rgba(68,170,255,0.1);line-height:1.8}
+.tgt-pending{color:rgba(255,80,80,0.8)}.tgt-done{color:rgba(80,255,120,0.8)}
+#bottom-bar{position:absolute;bottom:32px;left:0;right:0;padding:4px 14px;font-size:7px;color:rgba(150,200,255,0.4);letter-spacing:2px;background:rgba(0,0,0,0.4);border-top:1px solid rgba(68,170,255,0.08);display:flex;justify-content:space-between;text-transform:uppercase}
+#keys{position:absolute;bottom:60px;left:10px;font-size:7px;color:rgba(255,255,255,0.2);letter-spacing:1px;line-height:1.8}
 </style>
 </head>
 <body>
-<div id="cesiumContainer"></div>
+<div id="c"></div>
 <div id="hud">
-  <div id="top-bar">OVERWATCH C2 | BFT: 24 ASSETS | ACTIVE: <span id="active-count">0</span> | TARGETS: 4</div>
-  <div id="target-status" id="targets"></div>
-  <div id="bottom-bar">
-    <span>37.7897N 122.3972W | ALT REF: WGS84</span>
-    <span>UNCLASSIFIED // FOUO</span>
-  </div>
+  <div id="top-bar">OVERWATCH C2 | BFT: 24 ASSETS | ACTIVE: <span id="active">0</span> | TARGETS: 4 | NEUTRALIZED: <span id="neutral">0</span></div>
+  <div id="tgt-panel"></div>
+  <div id="bottom-bar"><span>37.7897N 122.3972W</span><span id="speed-display">1X</span><span>UNCLASSIFIED // FOUO</span></div>
+  <div id="keys">SPACE: pause | 1-5: speed | R: reset | click drone: track</div>
 </div>
+
 <script>
-(async () => {
-  // Cesium ion token -- get yours free at https://cesium.com/ion/signup/
-  var ionToken = new URLSearchParams(window.location.search).get("ion") || localStorage.getItem("cesium_ion_token") || "";
-  if (!ionToken) { ionToken = prompt("Enter your free Cesium ion token (get one at cesium.com/ion/signup):"); }
-  if (ionToken) { localStorage.setItem("cesium_ion_token", ionToken); }
-  Cesium.Ion.defaultAccessToken = ionToken;
+Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlOGY0MjBhYy0zZTFlLTRkNTItOGFmNS1mYmM0ZDE1ZmYxMGYiLCJpZCI6NDQ3NDY2LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODIxMTI4MjN9.uvbJwgTognrLcj79tpt-kn46yt5S288s2hWgRBIhct8";
 
-  const viewer = new Cesium.Viewer("cesiumContainer", {
-    timeline: true, animation: true, shouldAnimate: true,
-    geocoder: Cesium.IonGeocodeProviderType.GOOGLE,
-    globe: false, sceneModePicker: false, baseLayerPicker: false
+var viewer = new Cesium.Viewer("c", {
+  timeline: true, animation: true, shouldAnimate: true,
+  homeButton: false, sceneModePicker: false, baseLayerPicker: false,
+  navigationHelpButton: false, geocoder: false, fullscreenButton: false
+});
+
+// Try Cesium World Terrain for 3D terrain
+Cesium.createWorldTerrainAsync().then(function(terrain) {
+  viewer.scene.terrainProvider = terrain;
+});
+
+// Try Cesium OSM Buildings for 3D buildings
+Cesium.createOsmBuildingsAsync().then(function(tileset) {
+  viewer.scene.primitives.add(tileset);
+}).catch(function(e) { console.warn("OSM buildings failed:", e); });
+
+var LAUNCH = { lon: -122.3948, lat: 37.7878 };
+var TARGETS = [
+  { name: "EMBARCADERO", lon: -122.3936, lat: 37.7956, alt: 80 },
+  { name: "PIER 39",     lon: -122.4093, lat: 37.8087, alt: 40 },
+  { name: "SALESFORCE",  lon: -122.3972, lat: 37.7897, alt: 300 },
+  { name: "GHIRARDELLI", lon: -122.4194, lat: 37.8080, alt: 80 }
+];
+var TOTAL = 24, PER_TGT = 6;
+var TRAIL_COLORS = [Cesium.Color.CYAN, Cesium.Color.ORANGE, Cesium.Color.HOTPINK, Cesium.Color.LIME];
+
+var startTime = Cesium.JulianDate.fromIso8601("2026-06-22T00:00:00Z");
+var stopTime = Cesium.JulianDate.addSeconds(startTime, 240, new Cesium.JulianDate());
+
+viewer.clock.startTime = startTime.clone();
+viewer.clock.stopTime = stopTime.clone();
+viewer.clock.currentTime = startTime.clone();
+viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
+viewer.clock.multiplier = 1;
+viewer.timeline.zoomTo(startTime, stopTime);
+
+// Generate waypoints for a drone
+function buildPath(tgt, droneIdx) {
+  var pts = [];
+  var dx = tgt.lon - LAUNCH.lon, dy = tgt.lat - LAUNCH.lat;
+  var dist = Math.sqrt(dx * dx + dy * dy);
+  var perpX = -dy / dist, perpY = dx / dist;
+  var offset = (droneIdx - 2.5) * 0.0002;
+  var cruiseAlt = 35 + Math.random() * 30;
+  var steps = 8 + Math.floor(Math.random() * 4);
+
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    var jx = (Math.random() - 0.5) * 0.0006;
+    var jy = (Math.random() - 0.5) * 0.0006;
+    // Curve toward Market St corridor
+    var bias = Math.sin(t * Math.PI) * 0.25;
+    var marketLon = -122.400, marketLat = 37.790;
+    var bLon = LAUNCH.lon + dx * t, bLat = LAUNCH.lat + dy * t;
+    var lon = bLon * (1 - bias) + marketLon * bias + jx + offset * perpX;
+    var lat = bLat * (1 - bias) + marketLat * bias + jy + offset * perpY;
+
+    var alt;
+    if (t < 0.12) alt = 5 + cruiseAlt * (t / 0.12);
+    else if (t > 0.88) alt = cruiseAlt + (tgt.alt - cruiseAlt) * ((t - 0.88) / 0.12);
+    else alt = cruiseAlt + (Math.random() - 0.5) * 5;
+
+    pts.push({ lon: lon, lat: lat, alt: alt });
+  }
+  pts[0] = { lon: LAUNCH.lon + offset * 0.3, lat: LAUNCH.lat + offset * 0.3, alt: 5 };
+  pts[pts.length - 1] = { lon: tgt.lon, lat: tgt.lat, alt: tgt.alt };
+  return pts;
+}
+
+// Create all 24 drones
+var droneArrivals = [];
+
+for (var ti = 0; ti < TARGETS.length; ti++) {
+  var tgt = TARGETS[ti];
+
+  // Target marker
+  viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(tgt.lon, tgt.lat, tgt.alt + 5),
+    point: { pixelSize: 10, color: Cesium.Color.RED.withAlpha(0.85), outlineColor: Cesium.Color.WHITE, outlineWidth: 1 },
+    label: {
+      text: tgt.name, font: "10pt monospace",
+      fillColor: Cesium.Color.fromAlpha(Cesium.Color.RED, 0.8),
+      showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.6),
+      pixelOffset: new Cesium.Cartesian2(0, -20), scale: 0.7
+    }
   });
-  try {
-    const tileset = await Cesium.createGooglePhotorealistic3DTileset();
-    viewer.scene.primitives.add(tileset);
-  } catch(e) {
-    console.warn("Google 3D tiles failed, using Bing imagery:", e);
-    viewer.scene.globe = new Cesium.Globe();
-  }
 
-  const LAUNCH = { lon: -122.3948, lat: 37.7878, alt: 5 };
-  const TARGETS = [
-    { name: "EMBARCADERO CENTER", lon: -122.3936, lat: 37.7956, alt: 50 },
-    { name: "PIER 39",           lon: -122.4093, lat: 37.8087, alt: 15 },
-    { name: "SALESFORCE TOWER",  lon: -122.3972, lat: 37.7897, alt: 326 },
-    { name: "GHIRARDELLI SQ",    lon: -122.4194, lat: 37.8080, alt: 70 }
-  ];
-  const DRONES_PER_TARGET = 6;
-  const COLORS = [
-    [68,170,255,100], [255,170,68,100], [255,68,170,100], [68,255,170,100]
-  ];
-
-  const now = Cesium.JulianDate.now();
-  const startIso = Cesium.JulianDate.toIso8601(now);
-  const endTime = Cesium.JulianDate.addSeconds(now, 210, new Cesium.JulianDate());
-  const endIso = Cesium.JulianDate.toIso8601(endTime);
-
-  viewer.clock.startTime = now.clone();
-  viewer.clock.stopTime = endTime.clone();
-  viewer.clock.currentTime = now.clone();
-  viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
-  viewer.clock.multiplier = 1;
-  viewer.timeline.zoomTo(now, endTime);
-
-  function lerp(a, b, t) { return a + (b - a) * t; }
-  function rand(lo, hi) { return lo + Math.random() * (hi - lo); }
-
-  // Street-biased intermediate waypoints between launch and target
-  function buildWaypoints(tgt, droneIdx) {
-    const jitter = () => rand(-0.0008, 0.0008);
-    const pts = [];
-    const dx = tgt.lon - LAUNCH.lon;
-    const dy = tgt.lat - LAUNCH.lat;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const cruiseAlt = rand(35, 60);
-    const steps = Math.round(rand(5, 7));
-    const offset = (droneIdx - 2.5) * 0.00015; // lateral spread
-
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      let alt;
-      if (t < 0.15) alt = lerp(LAUNCH.alt, cruiseAlt, t / 0.15);
-      else if (t > 0.85) alt = lerp(cruiseAlt, tgt.alt, (t - 0.85) / 0.15);
-      else alt = cruiseAlt + rand(-3, 3);
-
-      // Bias path toward Market St corridor (-122.40, 37.79) for realism
-      const biasFactor = Math.sin(t * Math.PI) * 0.3;
-      const marketLon = -122.400, marketLat = 37.790;
-      const baseLon = lerp(LAUNCH.lon, tgt.lon, t);
-      const baseLat = lerp(LAUNCH.lat, tgt.lat, t);
-      const lon = lerp(baseLon, marketLon, biasFactor * (1 - t)) + jitter() + offset * (dy / dist);
-      const lat = lerp(baseLat, marketLat, biasFactor * (1 - t)) + jitter() - offset * (dx / dist);
-
-      pts.push({ lon, lat, alt });
+  for (var di = 0; di < PER_TGT; di++) {
+    var idx = ti * PER_TGT + di;
+    var label = "D-" + String(idx + 1).padStart(2, "0");
+    var launchDelay = idx * 2;
+    var pts = buildPath(tgt, di);
+    var flightDist = 0;
+    for (var pi = 1; pi < pts.length; pi++) {
+      var ddx = (pts[pi].lon - pts[pi-1].lon) * 85000;
+      var ddy = (pts[pi].lat - pts[pi-1].lat) * 111000;
+      flightDist += Math.sqrt(ddx * ddx + ddy * ddy);
     }
-    // Pin start and end exactly
-    pts[0] = { lon: LAUNCH.lon + offset * 0.3, lat: LAUNCH.lat + offset * 0.3, alt: LAUNCH.alt };
-    pts[pts.length - 1] = { lon: tgt.lon, lat: tgt.lat, alt: tgt.alt };
-    return pts;
-  }
+    var flightDur = Math.max(50, Math.min(110, flightDist / 14));
+    var totalDur = launchDelay + flightDur;
+    droneArrivals.push({ ti: ti, arrival: totalDur });
 
-  // CZML document header
-  const czml = [{
-    id: "document", name: "OVERWATCH SF", version: "1.0",
-    clock: { interval: startIso + "/" + endIso, currentTime: startIso, multiplier: 1 }
-  }];
-
-  const droneArrivals = []; // { targetIdx, arrivalSec }
-
-  for (let ti = 0; ti < TARGETS.length; ti++) {
-    const tgt = TARGETS[ti];
-    for (let di = 0; di < DRONES_PER_TARGET; di++) {
-      const idx = ti * DRONES_PER_TARGET + di;
-      const label = "D-" + String(idx + 1).padStart(2, "0");
-      const launchDelay = idx * 2;
-      const pts = buildWaypoints(tgt, di);
-      const dist = Math.sqrt(
-        Math.pow((tgt.lon - LAUNCH.lon) * 85000, 2) +
-        Math.pow((tgt.lat - LAUNCH.lat) * 111000, 2)
-      );
-      const flightDur = Math.max(60, Math.min(120, dist / 12));
-      const totalDur = launchDelay + flightDur;
-
-      droneArrivals.push({ targetIdx: ti, arrivalSec: totalDur });
-
-      const dStart = Cesium.JulianDate.addSeconds(now, launchDelay, new Cesium.JulianDate());
-      const dEnd = Cesium.JulianDate.addSeconds(now, totalDur, new Cesium.JulianDate());
-      const avail = Cesium.JulianDate.toIso8601(dStart) + "/" + endIso;
-
-      // Build cartographicDegrees array [time, lon, lat, alt, ...]
-      const coords = [];
-      for (let pi = 0; pi < pts.length; pi++) {
-        const t = (pi / (pts.length - 1)) * flightDur;
-        coords.push(t, pts[pi].lon, pts[pi].lat, pts[pi].alt);
-      }
-
-      czml.push({
-        id: "drone-" + idx, name: label, availability: avail,
-        position: {
-          epoch: Cesium.JulianDate.toIso8601(dStart),
-          cartographicDegrees: coords,
-          interpolationAlgorithm: "HERMITE", interpolationDegree: 1
-        },
-        orientation: { velocityReference: "#position" },
-        model: {
-          gltf: "models/CesiumDrone.glb", scale: 2.0,
-          minimumPixelSize: 32, maximumScale: 50
-        },
-        path: {
-          material: { solidColor: { color: { rgba: COLORS[ti] } } },
-          width: 1.5, leadTime: 0, trailTime: 30
-        },
-        label: {
-          text: label, font: "10pt monospace",
-          fillColor: { rgba: [255, 255, 255, 180] },
-          showBackground: true,
-          backgroundColor: { rgba: [0, 0, 0, 150] },
-          pixelOffset: { cartesian2: [0, -25] },
-          scale: 0.6
-        }
-      });
+    // Build position samples
+    var positionProperty = new Cesium.SampledPositionProperty();
+    for (var si = 0; si < pts.length; si++) {
+      var sampleTime = Cesium.JulianDate.addSeconds(startTime, launchDelay + (si / (pts.length - 1)) * flightDur, new Cesium.JulianDate());
+      positionProperty.addSample(sampleTime, Cesium.Cartesian3.fromDegrees(pts[si].lon, pts[si].lat, pts[si].alt));
     }
-  }
+    positionProperty.setInterpolationOptions({
+      interpolationDegree: 3,
+      interpolationAlgorithm: Cesium.HermitePolynomialApproximation
+    });
 
-  const dataSource = await Cesium.CzmlDataSource.load(czml);
-  viewer.dataSources.add(dataSource);
+    var droneStart = Cesium.JulianDate.addSeconds(startTime, launchDelay, new Cesium.JulianDate());
+    var droneEnd = Cesium.JulianDate.addSeconds(startTime, totalDur, new Cesium.JulianDate());
 
-  // Target markers
-  const targetEntities = TARGETS.map((tgt, ti) => {
-    return viewer.entities.add({
-      name: tgt.name,
-      position: Cesium.Cartesian3.fromDegrees(tgt.lon, tgt.lat, tgt.alt + 3),
-      point: { pixelSize: 12, color: Cesium.Color.RED.withAlpha(0.9) },
+    viewer.entities.add({
+      id: "drone-" + idx,
+      name: label,
+      availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({ start: droneStart, stop: stopTime })]),
+      position: positionProperty,
+      orientation: new Cesium.VelocityOrientationProperty(positionProperty),
+      model: {
+        uri: "models/CesiumDrone.glb",
+        minimumPixelSize: 48,
+        scale: 4.0,
+        color: TRAIL_COLORS[ti].withAlpha(0.9),
+        colorBlendMode: Cesium.ColorBlendMode.MIX,
+        colorBlendAmount: 0.3
+      },
+      path: {
+        resolution: 1,
+        material: new Cesium.PolylineGlowMaterialProperty({
+          glowPower: 0.15,
+          color: TRAIL_COLORS[ti].withAlpha(0.5)
+        }),
+        width: 2.5,
+        leadTime: 0,
+        trailTime: 25
+      },
       label: {
-        text: tgt.name, font: "9pt monospace",
-        fillColor: Cesium.Color.fromAlpha(Cesium.Color.WHITE, 0.8),
+        text: label,
+        font: "9pt monospace",
+        fillColor: Cesium.Color.WHITE.withAlpha(0.7),
         showBackground: true,
-        backgroundColor: Cesium.Color.fromAlpha(Cesium.Color.BLACK, 0.5),
-        pixelOffset: new Cesium.Cartesian2(0, -20), scale: 0.7
+        backgroundColor: new Cesium.Color(0, 0, 0, 0.5),
+        pixelOffset: new Cesium.Cartesian2(0, -28),
+        scale: 0.55,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3000)
       }
     });
-  });
-
-  // Launch marker
-  viewer.entities.add({
-    name: "LAUNCH POINT",
-    position: Cesium.Cartesian3.fromDegrees(LAUNCH.lon, LAUNCH.lat, LAUNCH.alt),
-    point: { pixelSize: 10, color: Cesium.Color.WHITE.withAlpha(0.8) },
-    label: {
-      text: "VAN / LP", font: "8pt monospace",
-      fillColor: Cesium.Color.WHITE.withAlpha(0.7),
-      showBackground: true,
-      backgroundColor: Cesium.Color.fromAlpha(Cesium.Color.BLACK, 0.5),
-      pixelOffset: new Cesium.Cartesian2(0, -18), scale: 0.6
-    }
-  });
-
-  // Fly camera to SF overview
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.792, 800),
-    orientation: {
-      heading: Cesium.Math.toRadians(15),
-      pitch: Cesium.Math.toRadians(-35),
-      roll: 0
-    },
-    duration: 3
-  });
-
-  // HUD update loop
-  const activeEl = document.getElementById("active-count");
-  const statusEl = document.getElementById("target-status");
-  const targetComplete = [false, false, false, false];
-
-  function updateHUD() {
-    const elapsed = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, now);
-    let activeCount = 0;
-
-    for (let i = 0; i < 24; i++) {
-      const launchDelay = i * 2;
-      const ti = Math.floor(i / DRONES_PER_TARGET);
-      const arrival = droneArrivals[i].arrivalSec;
-      if (elapsed >= launchDelay && elapsed <= arrival + 5) activeCount++;
-    }
-    activeEl.textContent = activeCount;
-
-    let html = "";
-    for (let ti = 0; ti < TARGETS.length; ti++) {
-      const arrivals = droneArrivals.filter(d => d.targetIdx === ti);
-      const arrived = arrivals.filter(d => elapsed >= d.arrivalSec).length;
-      const done = arrived >= DRONES_PER_TARGET;
-      if (done) targetComplete[ti] = true;
-      const cls = done ? "tgt-complete" : "tgt-pending";
-      const sym = done ? "OK" : arrived + "/" + DRONES_PER_TARGET;
-      html += '<div class="' + cls + '">' + TARGETS[ti].name + " [" + sym + "]</div>";
-
-      // Update point color
-      if (done && targetEntities[ti]) {
-        targetEntities[ti].point.color = Cesium.Color.LIME.withAlpha(0.9);
-      } else if (targetEntities[ti]) {
-        targetEntities[ti].point.color = Cesium.Color.RED.withAlpha(0.9);
-      }
-    }
-    statusEl.innerHTML = html;
-    Cesium.requestAnimationFrame(updateHUD);
   }
+}
+
+// Launch marker
+viewer.entities.add({
+  position: Cesium.Cartesian3.fromDegrees(LAUNCH.lon, LAUNCH.lat, 3),
+  point: { pixelSize: 8, color: Cesium.Color.WHITE.withAlpha(0.8) },
+  label: {
+    text: "LAUNCH / VAN-01", font: "8pt monospace",
+    fillColor: Cesium.Color.WHITE.withAlpha(0.6),
+    showBackground: true, backgroundColor: new Cesium.Color(0, 0, 0, 0.5),
+    pixelOffset: new Cesium.Cartesian2(0, -16), scale: 0.5
+  }
+});
+
+// Fly to SF
+viewer.camera.flyTo({
+  destination: Cesium.Cartesian3.fromDegrees(-122.400, 37.793, 600),
+  orientation: { heading: Cesium.Math.toRadians(20), pitch: Cesium.Math.toRadians(-25), roll: 0 },
+  duration: 3
+});
+
+// HUD update
+function updateHUD() {
+  var elapsed = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, startTime);
+  var active = 0, neutralized = 0;
+  for (var i = 0; i < TOTAL; i++) {
+    var launch = i * 2;
+    if (elapsed >= launch && elapsed < droneArrivals[i].arrival + 3) active++;
+  }
+  var tgtHtml = "";
+  for (var t = 0; t < TARGETS.length; t++) {
+    var arrived = droneArrivals.filter(function(d) { return d.ti === t && elapsed >= d.arrival; }).length;
+    var done = arrived >= PER_TGT;
+    if (done) neutralized++;
+    tgtHtml += '<div class="' + (done ? "tgt-done" : "tgt-pending") + '">' +
+      TARGETS[t].name + " [" + (done ? "NEUTRALIZED" : arrived + "/" + PER_TGT) + "]</div>";
+  }
+  document.getElementById("active").textContent = active;
+  document.getElementById("neutral").textContent = neutralized;
+  document.getElementById("tgt-panel").innerHTML = tgtHtml;
+  document.getElementById("speed-display").textContent = viewer.clock.multiplier + "X";
   Cesium.requestAnimationFrame(updateHUD);
+}
+Cesium.requestAnimationFrame(updateHUD);
 
-  // Keyboard controls: 1-5 for speed, Space for pause
-  document.addEventListener("keydown", function(e) {
-    if (e.key === " ") { viewer.clock.shouldAnimate = !viewer.clock.shouldAnimate; e.preventDefault(); }
-    if (e.key === "1") viewer.clock.multiplier = 1;
-    if (e.key === "2") viewer.clock.multiplier = 2;
-    if (e.key === "3") viewer.clock.multiplier = 5;
-    if (e.key === "4") viewer.clock.multiplier = 10;
-    if (e.key === "5") viewer.clock.multiplier = 20;
-    if (e.key === "r" || e.key === "R") {
-      viewer.clock.currentTime = now.clone();
-      viewer.trackedEntity = undefined;
-    }
-  });
-
-})();
+// Keyboard controls
+document.addEventListener("keydown", function(e) {
+  if (e.key === " ") { viewer.clock.shouldAnimate = !viewer.clock.shouldAnimate; e.preventDefault(); }
+  if (e.key === "1") viewer.clock.multiplier = 1;
+  if (e.key === "2") viewer.clock.multiplier = 3;
+  if (e.key === "3") viewer.clock.multiplier = 5;
+  if (e.key === "4") viewer.clock.multiplier = 10;
+  if (e.key === "5") viewer.clock.multiplier = 20;
+  if (e.key === "r" || e.key === "R") {
+    viewer.clock.currentTime = startTime.clone();
+    viewer.trackedEntity = undefined;
+  }
+});
 </script>
 </body>
 </html>

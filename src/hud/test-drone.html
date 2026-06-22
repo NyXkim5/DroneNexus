@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="cesium/Cesium.js"></script>
+<link href="cesium/Widgets/widgets.css" rel="stylesheet">
+<script>window.CESIUM_BASE_URL = "cesium/";</script>
+<style>html,body,#c{margin:0;width:100%;height:100%}</style>
+</head>
+<body>
+<div id="c"></div>
+<div id="s" style="position:absolute;top:10px;left:10px;color:lime;font-family:monospace;font-size:12px;background:rgba(0,0,0,0.9);padding:8px;z-index:10">Loading...</div>
+<script>
+Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlOGY0MjBhYy0zZTFlLTRkNTItOGFmNS1mYmM0ZDE1ZmYxMGYiLCJpZCI6NDQ3NDY2LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODIxMTI4MjN9.uvbJwgTognrLcj79tpt-kn46yt5S288s2hWgRBIhct8";
+
+var s = document.getElementById("s");
+var viewer;
+
+try {
+  viewer = new Cesium.Viewer("c", {
+    timeline: true, animation: true, shouldAnimate: true
+  });
+  s.textContent = "Viewer created. Adding drone...";
+} catch(e) {
+  s.textContent = "Viewer error: " + e.message;
+}
+
+// Simple drone that flies in a circle over SF
+var startTime = Cesium.JulianDate.fromIso8601("2026-06-22T00:00:00Z");
+var stopTime = Cesium.JulianDate.fromIso8601("2026-06-22T00:05:00Z");
+
+viewer.clock.startTime = startTime.clone();
+viewer.clock.stopTime = stopTime.clone();
+viewer.clock.currentTime = startTime.clone();
+viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
+viewer.clock.multiplier = 10;
+viewer.timeline.zoomTo(startTime, stopTime);
+
+// Build position samples for circular orbit
+var positionProperty = new Cesium.SampledPositionProperty();
+for (var i = 0; i <= 300; i += 5) {
+  var time = Cesium.JulianDate.addSeconds(startTime, i, new Cesium.JulianDate());
+  var angle = (i / 300) * Math.PI * 2;
+  var lon = -122.3972 + Math.cos(angle) * 0.005;
+  var lat = 37.7897 + Math.sin(angle) * 0.005;
+  var alt = 100 + Math.sin(angle * 2) * 30;
+  positionProperty.addSample(time, Cesium.Cartesian3.fromDegrees(lon, lat, alt));
+}
+positionProperty.setInterpolationOptions({
+  interpolationDegree: 3,
+  interpolationAlgorithm: Cesium.HermitePolynomialApproximation
+});
+
+var drone = viewer.entities.add({
+  name: "Test Drone",
+  availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({start: startTime, stop: stopTime})]),
+  position: positionProperty,
+  orientation: new Cesium.VelocityOrientationProperty(positionProperty),
+  model: {
+    uri: "models/CesiumDrone.glb",
+    minimumPixelSize: 64,
+    scale: 5.0
+  },
+  path: {
+    resolution: 1,
+    material: new Cesium.PolylineGlowMaterialProperty({
+      glowPower: 0.2,
+      color: Cesium.Color.CYAN
+    }),
+    width: 3
+  },
+  label: {
+    text: "DRONE-01",
+    font: "12pt monospace",
+    fillColor: Cesium.Color.CYAN,
+    showBackground: true,
+    backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
+    pixelOffset: new Cesium.Cartesian2(0, -30)
+  }
+});
+
+viewer.trackedEntity = drone;
+
+viewer.camera.flyTo({
+  destination: Cesium.Cartesian3.fromDegrees(-122.3972, 37.7897, 800),
+  orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-30) },
+  duration: 2
+});
+
+s.textContent = "Cesium " + Cesium.VERSION + " | Drone orbiting SF | Click drone to track | Space=pause | Scroll=zoom";
+</script>
+</body>
+</html>
