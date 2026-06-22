@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OVERWATCH C2 - SF Theater</title>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.128/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.128/Widgets/widgets.css" rel="stylesheet">
+<style>
+  html, body, #cesiumContainer { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000; }
+  #hud { position:absolute; top:0; left:0; right:0; bottom:0; z-index:10; pointer-events:none; font-family:'Courier New',monospace; }
+  #top-bar {
+    position:absolute; top:8px; left:12px; right:12px;
+    font-size:8px; color:rgba(180,220,255,0.7); letter-spacing:2.5px; text-transform:uppercase;
+    background:rgba(0,0,0,0.35); padding:6px 12px; border:1px solid rgba(68,170,255,0.15);
+  }
+  #bottom-bar {
+    position:absolute; bottom:36px; left:12px; right:12px;
+    font-size:8px; color:rgba(180,220,255,0.5); letter-spacing:2px; text-transform:uppercase;
+    background:rgba(0,0,0,0.3); padding:5px 12px; border:1px solid rgba(68,170,255,0.1);
+    display:flex; justify-content:space-between;
+  }
+  #target-status {
+    position:absolute; top:36px; right:12px;
+    font-size:8px; color:rgba(180,220,255,0.65); letter-spacing:1.5px;
+    background:rgba(0,0,0,0.35); padding:6px 10px; border:1px solid rgba(68,170,255,0.12);
+    line-height:1.7;
+  }
+  .tgt-pending { color:rgba(255,80,80,0.9); }
+  .tgt-complete { color:rgba(80,255,120,0.9); }
+</style>
+</head>
+<body>
+<div id="cesiumContainer"></div>
+<div id="hud">
+  <div id="top-bar">OVERWATCH C2 | BFT: 24 ASSETS | ACTIVE: <span id="active-count">0</span> | TARGETS: 4</div>
+  <div id="target-status" id="targets"></div>
+  <div id="bottom-bar">
+    <span>37.7897N 122.3972W | ALT REF: WGS84</span>
+    <span>UNCLASSIFIED // FOUO</span>
+  </div>
+</div>
+<script>
+(async () => {
+  Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxMDYxM2JlMS00NTIzLTQ0YWItYTg5My00NzRkMDgwNThiZDciLCJpZCI6MjU5LCJzdWIiOiJDZXNpdW1KUyIsImlzcyI6Imh0dHBzOi8vYXBpLmNlc2l1bS5jb20iLCJhdWQiOiIxLjE0MiBSZWxlYXNlIC0gRGVsZXRlIG9uIEF1Z3VzdCAxLCAyMDI2IiwiaWF0IjoxNzc5NjkwODE2fQ.Eq05fkRTh1lFGZUqr9vZZorz4HO_6rY_UmYi3fIHYaU";
+
+  const viewer = new Cesium.Viewer("cesiumContainer", {
+    timeline: true, animation: true, shouldAnimate: true,
+    geocoder: Cesium.IonGeocodeProviderType.GOOGLE,
+    globe: false, sceneModePicker: false, baseLayerPicker: false
+  });
+  const tileset = await Cesium.createGooglePhotorealistic3DTileset();
+  viewer.scene.primitives.add(tileset);
+
+  const LAUNCH = { lon: -122.3948, lat: 37.7878, alt: 5 };
+  const TARGETS = [
+    { name: "EMBARCADERO CENTER", lon: -122.3936, lat: 37.7956, alt: 50 },
+    { name: "PIER 39",           lon: -122.4093, lat: 37.8087, alt: 15 },
+    { name: "SALESFORCE TOWER",  lon: -122.3972, lat: 37.7897, alt: 326 },
+    { name: "GHIRARDELLI SQ",    lon: -122.4194, lat: 37.8080, alt: 70 }
+  ];
+  const DRONES_PER_TARGET = 6;
+  const COLORS = [
+    [68,170,255,100], [255,170,68,100], [255,68,170,100], [68,255,170,100]
+  ];
+
+  const now = Cesium.JulianDate.now();
+  const startIso = Cesium.JulianDate.toIso8601(now);
+  const endTime = Cesium.JulianDate.addSeconds(now, 210, new Cesium.JulianDate());
+  const endIso = Cesium.JulianDate.toIso8601(endTime);
+
+  viewer.clock.startTime = now.clone();
+  viewer.clock.stopTime = endTime.clone();
+  viewer.clock.currentTime = now.clone();
+  viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
+  viewer.clock.multiplier = 1;
+  viewer.timeline.zoomTo(now, endTime);
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rand(lo, hi) { return lo + Math.random() * (hi - lo); }
+
+  // Street-biased intermediate waypoints between launch and target
+  function buildWaypoints(tgt, droneIdx) {
+    const jitter = () => rand(-0.0008, 0.0008);
+    const pts = [];
+    const dx = tgt.lon - LAUNCH.lon;
+    const dy = tgt.lat - LAUNCH.lat;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const cruiseAlt = rand(35, 60);
+    const steps = Math.round(rand(5, 7));
+    const offset = (droneIdx - 2.5) * 0.00015; // lateral spread
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      let alt;
+      if (t < 0.15) alt = lerp(LAUNCH.alt, cruiseAlt, t / 0.15);
+      else if (t > 0.85) alt = lerp(cruiseAlt, tgt.alt, (t - 0.85) / 0.15);
+      else alt = cruiseAlt + rand(-3, 3);
+
+      // Bias path toward Market St corridor (-122.40, 37.79) for realism
+      const biasFactor = Math.sin(t * Math.PI) * 0.3;
+      const marketLon = -122.400, marketLat = 37.790;
+      const baseLon = lerp(LAUNCH.lon, tgt.lon, t);
+      const baseLat = lerp(LAUNCH.lat, tgt.lat, t);
+      const lon = lerp(baseLon, marketLon, biasFactor * (1 - t)) + jitter() + offset * (dy / dist);
+      const lat = lerp(baseLat, marketLat, biasFactor * (1 - t)) + jitter() - offset * (dx / dist);
+
+      pts.push({ lon, lat, alt });
+    }
+    // Pin start and end exactly
+    pts[0] = { lon: LAUNCH.lon + offset * 0.3, lat: LAUNCH.lat + offset * 0.3, alt: LAUNCH.alt };
+    pts[pts.length - 1] = { lon: tgt.lon, lat: tgt.lat, alt: tgt.alt };
+    return pts;
+  }
+
+  // CZML document header
+  const czml = [{
+    id: "document", name: "OVERWATCH SF", version: "1.0",
+    clock: { interval: startIso + "/" + endIso, currentTime: startIso, multiplier: 1 }
+  }];
+
+  const droneArrivals = []; // { targetIdx, arrivalSec }
+
+  for (let ti = 0; ti < TARGETS.length; ti++) {
+    const tgt = TARGETS[ti];
+    for (let di = 0; di < DRONES_PER_TARGET; di++) {
+      const idx = ti * DRONES_PER_TARGET + di;
+      const label = "D-" + String(idx + 1).padStart(2, "0");
+      const launchDelay = idx * 2;
+      const pts = buildWaypoints(tgt, di);
+      const dist = Math.sqrt(
+        Math.pow((tgt.lon - LAUNCH.lon) * 85000, 2) +
+        Math.pow((tgt.lat - LAUNCH.lat) * 111000, 2)
+      );
+      const flightDur = Math.max(60, Math.min(120, dist / 12));
+      const totalDur = launchDelay + flightDur;
+
+      droneArrivals.push({ targetIdx: ti, arrivalSec: totalDur });
+
+      const dStart = Cesium.JulianDate.addSeconds(now, launchDelay, new Cesium.JulianDate());
+      const dEnd = Cesium.JulianDate.addSeconds(now, totalDur, new Cesium.JulianDate());
+      const avail = Cesium.JulianDate.toIso8601(dStart) + "/" + endIso;
+
+      // Build cartographicDegrees array [time, lon, lat, alt, ...]
+      const coords = [];
+      for (let pi = 0; pi < pts.length; pi++) {
+        const t = (pi / (pts.length - 1)) * flightDur;
+        coords.push(t, pts[pi].lon, pts[pi].lat, pts[pi].alt);
+      }
+
+      czml.push({
+        id: "drone-" + idx, name: label, availability: avail,
+        position: {
+          epoch: Cesium.JulianDate.toIso8601(dStart),
+          cartographicDegrees: coords,
+          interpolationAlgorithm: "LAGRANGE", interpolationDegree: 3
+        },
+        orientation: { velocityReference: "#position" },
+        model: {
+          gltf: "models/CesiumDrone.glb", scale: 2.0,
+          minimumPixelSize: 32, maximumScale: 50
+        },
+        path: {
+          material: { solidColor: { color: { rgba: COLORS[ti] } } },
+          width: 1.5, leadTime: 0, trailTime: 30
+        },
+        label: {
+          text: label, font: "10pt monospace",
+          fillColor: { rgba: [255, 255, 255, 180] },
+          showBackground: true,
+          backgroundColor: { rgba: [0, 0, 0, 150] },
+          pixelOffset: { cartesian2: [0, -25] },
+          scale: 0.6
+        }
+      });
+    }
+  }
+
+  const dataSource = await Cesium.CzmlDataSource.load(czml);
+  viewer.dataSources.add(dataSource);
+
+  // Target markers
+  const targetEntities = TARGETS.map((tgt, ti) => {
+    return viewer.entities.add({
+      name: tgt.name,
+      position: Cesium.Cartesian3.fromDegrees(tgt.lon, tgt.lat, tgt.alt + 3),
+      point: { pixelSize: 12, color: Cesium.Color.RED.withAlpha(0.9) },
+      label: {
+        text: tgt.name, font: "9pt monospace",
+        fillColor: Cesium.Color.fromAlpha(Cesium.Color.WHITE, 0.8),
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromAlpha(Cesium.Color.BLACK, 0.5),
+        pixelOffset: new Cesium.Cartesian2(0, -20), scale: 0.7
+      }
+    });
+  });
+
+  // Launch marker
+  viewer.entities.add({
+    name: "LAUNCH POINT",
+    position: Cesium.Cartesian3.fromDegrees(LAUNCH.lon, LAUNCH.lat, LAUNCH.alt),
+    point: { pixelSize: 10, color: Cesium.Color.WHITE.withAlpha(0.8) },
+    label: {
+      text: "VAN / LP", font: "8pt monospace",
+      fillColor: Cesium.Color.WHITE.withAlpha(0.7),
+      showBackground: true,
+      backgroundColor: Cesium.Color.fromAlpha(Cesium.Color.BLACK, 0.5),
+      pixelOffset: new Cesium.Cartesian2(0, -18), scale: 0.6
+    }
+  });
+
+  // Fly camera to SF overview
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(-122.405, 37.795, 2500),
+    orientation: {
+      heading: Cesium.Math.toRadians(15),
+      pitch: Cesium.Math.toRadians(-35),
+      roll: 0
+    },
+    duration: 3
+  });
+
+  // HUD update loop
+  const activeEl = document.getElementById("active-count");
+  const statusEl = document.getElementById("target-status");
+  const targetComplete = [false, false, false, false];
+
+  function updateHUD() {
+    const elapsed = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, now);
+    let activeCount = 0;
+
+    for (let i = 0; i < 24; i++) {
+      const launchDelay = i * 2;
+      const ti = Math.floor(i / DRONES_PER_TARGET);
+      const arrival = droneArrivals[i].arrivalSec;
+      if (elapsed >= launchDelay && elapsed <= arrival + 5) activeCount++;
+    }
+    activeEl.textContent = activeCount;
+
+    let html = "";
+    for (let ti = 0; ti < TARGETS.length; ti++) {
+      const arrivals = droneArrivals.filter(d => d.targetIdx === ti);
+      const arrived = arrivals.filter(d => elapsed >= d.arrivalSec).length;
+      const done = arrived >= DRONES_PER_TARGET;
+      if (done) targetComplete[ti] = true;
+      const cls = done ? "tgt-complete" : "tgt-pending";
+      const sym = done ? "OK" : arrived + "/" + DRONES_PER_TARGET;
+      html += '<div class="' + cls + '">' + TARGETS[ti].name + " [" + sym + "]</div>";
+
+      // Update point color
+      if (done && targetEntities[ti]) {
+        targetEntities[ti].point.color = Cesium.Color.LIME.withAlpha(0.9);
+      } else if (targetEntities[ti]) {
+        targetEntities[ti].point.color = Cesium.Color.RED.withAlpha(0.9);
+      }
+    }
+    statusEl.innerHTML = html;
+    Cesium.requestAnimationFrame(updateHUD);
+  }
+  Cesium.requestAnimationFrame(updateHUD);
+
+})();
+</script>
+</body>
+</html>
