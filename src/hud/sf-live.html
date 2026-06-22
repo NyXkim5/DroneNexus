@@ -90,6 +90,21 @@ html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
 #completion-box .favorable{color:rgba(70,255,130,0.9)}
 #completion-box .unfavorable{color:rgba(255,70,70,0.9)}
 #completion-box .stat-value{color:rgba(80,200,255,0.9);font-weight:600}
+
+/* Priority queue panel */
+#priority-queue{position:absolute;top:142px;right:12px;font-size:8px;letter-spacing:1px;
+  color:rgba(140,200,255,0.7);background:rgba(4,8,16,0.85);padding:8px 10px;
+  border:1px solid rgba(60,120,200,0.12);min-width:290px;line-height:1.7}
+#priority-queue .pq-title{color:rgba(100,150,200,0.5);font-size:7px;letter-spacing:2px;margin-bottom:4px}
+#priority-queue .pq-row{white-space:nowrap}
+.pq-bar{display:inline-block;height:6px;vertical-align:middle;margin-left:2px}
+
+/* AI model banner */
+#ai-banner{font-size:7px;letter-spacing:2px;color:rgba(80,200,255,0.7);text-transform:uppercase}
+#ai-banner .ai-active{color:rgba(70,255,130,0.9);font-weight:700}
+
+/* AI CONFIRM flash on tracks */
+@keyframes ai-confirm-pulse{0%{opacity:1}100%{opacity:0}}
 </style>
 </head>
 <body>
@@ -114,6 +129,7 @@ html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
     <span class="sep">|</span><span id="tick-label">T+00:00</span>
     <span class="spacer"></span>
     <span id="mute-btn" style="cursor:pointer;pointer-events:auto;color:rgba(80,200,255,0.7)" onclick="audioMuted=!audioMuted;this.textContent=audioMuted?'[MUTED]':'[SND]';">[SND]</span>
+    <span class="sep">|</span><span id="ai-banner">OVERWATCH AI <span class="sep">|</span> MODEL: YOLOv11-SERAPHIM <span class="sep">|</span> mAP50: 94.9% <span class="sep">|</span> DETECTOR: <span class="ai-active">ACTIVE</span></span>
     <span class="sep">|</span><span>UNCLASSIFIED // FOUO</span>
   </div>
   <div id="metrics"></div>
@@ -124,6 +140,7 @@ html,body,#c{width:100%;height:100%;overflow:hidden;background:#06080e}
     <i style="background:#0f6;border-radius:1px;margin-left:6px"></i>ENGAGING
     <i style="background:#fff;border-radius:50%;margin-left:6px"></i>SITE
   </div>
+  <div id="priority-queue"><div class="pq-title">PRIORITY TARGETS</div><div id="pq-list"></div></div>
   <div id="feed"><div id="feed-title">ENGAGEMENT FEED</div></div>
   <div id="detail"><span class="close" onclick="closeDetail()">X</span><div id="detail-body"></div></div>
   <div id="threat-warning" style="position:absolute;bottom:60px;left:50%;transform:translateX(-50%);font-size:11px;
@@ -240,9 +257,13 @@ var wsUrl="ws://localhost:8765/ws/v1/wargame/"+scenario;
 var trackEnts={},defEnts={},assignEnts={},rangeEnts={};
 var siteEnt=null,siteRing=null,feedLines=[],ws=null,reconTimer=null;
 var trackHistory={};
+var trackFirstSeen={};   /* track_id -> sim_time_s when first detected */
+var killChainTimes=[];    /* array of kill chain durations in seconds */
+var aiConfirmSet=new Set(); /* tracks that already flashed AI CONFIRM */
 var activeEngageIds=new Set();
 var leakZoomCount=0,leakZooming=false;
 var corridorEntity=null,corridorFrameCount=0;
+var currentSimTime=0;
 var orbitAngle=0,orbitActive=true,frameCount=0,selectEl=document.getElementById("scenario-select");
 selectEl.value=scenario;
 document.getElementById("ws-label").textContent=wsUrl.replace(/^wss?:\/\//,"");
@@ -307,6 +328,10 @@ function upsertTrack(t){
   if(sz<28)sz=28;if(sz>40)sz=40;
   var tti=t.time_to_impact_s;
   if(typeof tti==="number"&&tti<15){sz=Math.round(sz*(1+(1-tti/15)*0.5))}
+  /* Sensor fusion label */
+  var conf=t.confidence||0.5;
+  var fusionText=conf>0.8?"RF+VIS":conf>0.5?"RF":"UNK";
+  var trackLabel=t.id.substring(0,8)+" "+intent+"\n"+fusionText+" "+Math.round(conf*100)+"%";
   var pos=Cesium.Cartesian3.fromDegrees(lon,lat,alt);
   /* Heading trail history */
   if(!trackHistory[t.id])trackHistory[t.id]=[];
@@ -321,16 +346,22 @@ function upsertTrack(t){
   var ent=trackEnts[t.id];
   if(!ent){ent=viewer.entities.add({id:"t-"+t.id,name:t.id,position:pos,
     billboard:{image:makeIcon("diamond",hex),width:sz,height:sz,disableDepthTestDistance:Number.POSITIVE_INFINITY},
-    label:{text:t.id.substring(0,8)+" "+intent,font:"8px monospace",fillColor:col.withAlpha(0.85),
+    label:{text:trackLabel,font:"8px monospace",fillColor:col.withAlpha(0.85),
       showBackground:true,backgroundColor:new Cesium.Color(0,0,0,0.55),
       pixelOffset:new Cesium.Cartesian2(0,-20),scale:0.55,
       disableDepthTestDistance:Number.POSITIVE_INFINITY,
       distanceDisplayCondition:new Cesium.DistanceDisplayCondition(0,5000)}});
-    trackEnts[t.id]=ent}
+    trackEnts[t.id]=ent;
+    /* AI CONFIRM flash for high-confidence first detections */
+    if(conf>0.85&&!aiConfirmSet.has(t.id)){aiConfirmSet.add(t.id);
+      ent.label.text="AI CONFIRM\n"+trackLabel;
+      (function(e,lbl){setTimeout(function(){if(e.label)e.label.text=lbl},1000)})(ent,trackLabel)}}
   else{ent.position=pos;
     if(ent.billboard){ent.billboard.image=makeIcon("diamond",hex);ent.billboard.width=sz;ent.billboard.height=sz}
-    if(ent.label&&frameCount%5===0)ent.label.text=t.id.substring(0,8)+" "+intent}
+    if(ent.label&&frameCount%5===0)ent.label.text=trackLabel}
   ent._data=t;
+  /* Record first-seen time for kill chain calculation */
+  if(!(t.id in trackFirstSeen))trackFirstSeen[t.id]=currentSimTime;
 }
 
 /* Defender upsert */
@@ -390,6 +421,35 @@ function drawAssignments(asgs){
       activeEngageIds.delete(eid)},3000)})(engId)}
 }
 
+/* Average kill chain time */
+function avgKC(){if(killChainTimes.length===0)return 0;
+  var sum=0;for(var i=0;i<killChainTimes.length;i++)sum+=killChainTimes[i];
+  return sum/killChainTimes.length}
+
+/* Priority queue update */
+function updatePriorityQueue(tracks){
+  var sorted=tracks.slice().filter(function(t){return t.intent&&t.intent!=="DECOY"});
+  sorted.sort(function(a,b){
+    var ttiA=typeof a.time_to_impact_s==="number"?a.time_to_impact_s:9999;
+    var ttiB=typeof b.time_to_impact_s==="number"?b.time_to_impact_s:9999;
+    if(ttiA!==ttiB)return ttiA-ttiB;
+    return(b.confidence||0)-(a.confidence||0)});
+  var top5=sorted.slice(0,5),html="";
+  for(var i=0;i<top5.length;i++){var t=top5[i];
+    var conf=t.confidence||0;
+    var fusion=conf>0.8?"RF+VIS":conf>0.5?"RF":"UNK";
+    var tti=typeof t.time_to_impact_s==="number"?t.time_to_impact_s.toFixed(1)+"s":"--";
+    var score=t.threat_score||conf;
+    var barLen=Math.round(score*8);
+    var barFull="";for(var b=0;b<barLen;b++)barFull+="\u2588";
+    var barEmpty="";for(var e=0;e<8-barLen;e++)barEmpty+="\u2591";
+    var barColor=score>0.7?"rgba(255,70,70,0.9)":"rgba(255,200,70,0.9)";
+    html+='<div class="pq-row">'+(i+1)+". "+t.id.substring(0,7)+" | "+(t.intent||"UNK")+" | "+
+      fusion+" "+Math.round(conf*100)+"% | TTI "+tti+
+      ' | <span style="color:'+barColor+'">'+barFull+'</span><span style="color:rgba(60,120,200,0.2)">'+barEmpty+"</span></div>"}
+  if(top5.length===0)html='<div class="pq-row" style="color:rgba(100,150,200,0.4)">NO ACTIVE THREATS</div>';
+  document.getElementById("pq-list").innerHTML=html}
+
 /* HUD metrics */
 var lastCostWin=null;
 function fmtTime(s){var m=Math.floor(s/60),sec=Math.floor(s%60);
@@ -415,7 +475,9 @@ function updateMetrics(m){if(!m)return;
     '<div class="divider"></div>'+
     '<div class="row"><span class="label">COST RATIO</span><span class="'+rc+flashClass+'" id="cost-ratio-val">'+r+rl+'</span></div>'+
     '<div class="row"><span class="label">DEF SPENT</span><span class="val">$'+fmtMoney(m.defender_spent||0)+'</span></div>'+
-    '<div class="row"><span class="label">ATK DESTROYED</span><span class="val">$'+fmtMoney(m.attacker_destroyed||0)+'</span></div>'}
+    '<div class="row"><span class="label">ATK DESTROYED</span><span class="val">$'+fmtMoney(m.attacker_destroyed||0)+'</span></div>'+
+    '<div class="divider"></div>'+
+    '<div class="row"><span class="label">AVG KILL CHAIN</span><span class="'+(avgKC()<6?"good":"warn")+'">'+avgKC().toFixed(1)+'s</span></div>'}
 
 function fmtMoney(v){return v.toLocaleString("en-US",{maximumFractionDigits:0})}
 
@@ -526,6 +588,7 @@ function connect(){
   ws.onmessage=function(ev){
     var msg;try{msg=JSON.parse(ev.data)}catch(e){return}
     if(msg.type==="WARGAME_FRAME"){frameCount++;
+      if(msg.metrics&&msg.metrics.sim_time_s!=null)currentSimTime=msg.metrics.sim_time_s;
       var tracks=msg.tracks||[],defs=msg.defenders||[],asgs=msg.assignments||[];
       var lt={};for(var i=0;i<tracks.length;i++){upsertTrack(tracks[i]);lt[tracks[i].id]=true}
       removeStale(lt,trackEnts);
@@ -534,6 +597,7 @@ function connect(){
       drawAssignments(asgs);ensureSite(msg.site);
       corridorFrameCount++;if(corridorFrameCount%30===0)updateCorridor(tracks);
       if(msg.metrics)updateMetrics(msg.metrics);
+      if(frameCount%10===0)updatePriorityQueue(tracks);
       document.getElementById("asset-count").textContent=tracks.length+" TRACKS / "+defs.length+" DEFENDERS";
       /* Narration triggers */
       showNarration("init","WARGAME INITIALIZED - "+scenario.toUpperCase().replace("_"," "),3);
@@ -564,7 +628,10 @@ function connect(){
       else{sm.textContent=""}
       for(var a=0;a<asgs.length;a++){var ag=asgs[a],dl=ag.defender_id.substring(0,8),tl=ag.track_id.substring(0,8);
         var eKey=ag.defender_id+"-"+ag.track_id;
-        if(ag.status==="HIT"){addFeed('<span class="hit">'+dl+' -> '+tl+': HIT</span>');
+        if(ag.status==="HIT"){var kcStr="";
+          if(ag.track_id in trackFirstSeen){var kcTime=currentSimTime-trackFirstSeen[ag.track_id];
+            killChainTimes.push(kcTime);kcStr=" [KILL CHAIN: "+kcTime.toFixed(1)+"s]"}
+          addFeed('<span class="hit">'+dl+' -> '+tl+': HIT'+kcStr+'</span>');
           playPing(1200,0.1,0.08);
           if(!explodedSet.has(eKey)){explodedSet.add(eKey);var hp=getTrackPos(ag.track_id);
             if(hp)spawnExplosion(hp);flashDefender(ag.defender_id)}}
@@ -607,6 +674,7 @@ function clearAllEntities(){
   if(sitePulseRing){viewer.entities.remove(sitePulseRing);sitePulseRing=null}
   trackEnts={};defEnts={};assignEnts={};rangeEnts={};feedLines=[];explodedSet.clear();
   activeParticles=0;lastCostWin=null;narrationShown={};trackHistory={};
+  trackFirstSeen={};killChainTimes=[];aiConfirmSet.clear();currentSimTime=0;
   leakZoomCount=0;leakZooming=false;corridorFrameCount=0;frameCount=0;
   document.getElementById("feed").innerHTML='<div id="feed-title">ENGAGEMENT FEED</div>';
   document.getElementById("metrics").innerHTML="";
@@ -615,7 +683,8 @@ function clearAllEntities(){
   document.getElementById("completion-overlay").classList.remove("visible");
   document.getElementById("threat-warning").textContent="";
   document.getElementById("status-msg").textContent="";
-  document.getElementById("narration").style.color="rgba(140,200,255,0)"}
+  document.getElementById("narration").style.color="rgba(140,200,255,0)";
+  document.getElementById("pq-list").innerHTML=""}
 
 /* R key: restart scenario */
 document.addEventListener("keydown",function(e){
