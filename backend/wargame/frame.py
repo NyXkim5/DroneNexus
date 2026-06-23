@@ -161,6 +161,12 @@ class Frame:
     visual_correlations: List[dict] = field(default_factory=list)
     # ROE evaluation results for engagements this tick.
     roe_evaluations: List[dict] = field(default_factory=list)
+    # Predictive threat forecasts from the ThreatPredictor.
+    predictions: List[dict] = field(default_factory=list)
+    # Human-readable early warning strings for imminent threats.
+    early_warnings: List[str] = field(default_factory=list)
+    # Advisory swarm-counter intercept orders from SwarmCounterPlanner.
+    intercept_orders: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, object]:
         """Serialize the whole frame to a JSON-ready dict for the websocket."""
@@ -186,6 +192,9 @@ class Frame:
             "heatmap_data": self.heatmap_data,
             "visual_correlations": self.visual_correlations,
             "roe_evaluations": self.roe_evaluations,
+            "predictions": self.predictions,
+            "early_warnings": self.early_warnings,
+            "intercept_orders": self.intercept_orders,
         }
 
     def _threats_by_track(self) -> Dict[str, Threat]:

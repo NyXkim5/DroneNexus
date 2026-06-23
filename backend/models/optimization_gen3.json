@@ -1,0 +1,167 @@
+{
+  "optimization_run": "gen3",
+  "date": "2026-06-22",
+  "description": "10-generation allocator optimization targeting decoy_300 cost ratio and saturation_1000 leaker count",
+  "baseline": {
+    "decoy_300": {
+      "leakers": 156,
+      "cost_exchange_ratio": 0.1595,
+      "intercepts": 144,
+      "defender_spent": 24684.0
+    },
+    "saturation_1000": {
+      "leakers": 528,
+      "cost_exchange_ratio": 0.54,
+      "intercepts": 472,
+      "defender_spent": 913140.0
+    },
+    "contested_500": {
+      "leakers": 237,
+      "cost_exchange_ratio": 0.177,
+      "intercepts": 263
+    },
+    "skirmish_80": {
+      "leakers": 0,
+      "cost_exchange_ratio": 0.0033,
+      "intercepts": 37
+    },
+    "probe_120": {
+      "leakers": 0,
+      "cost_exchange_ratio": 0.0119,
+      "intercepts": 31
+    }
+  },
+  "optimized": {
+    "decoy_300": {
+      "leakers": 156,
+      "cost_exchange_ratio": 0.1078,
+      "intercepts": 144,
+      "defender_spent": 16684.0
+    },
+    "saturation_1000": {
+      "leakers": 504,
+      "cost_exchange_ratio": 0.5402,
+      "intercepts": 496,
+      "defender_spent": 945140.0
+    },
+    "contested_500": {
+      "leakers": 242,
+      "cost_exchange_ratio": 0.1279,
+      "intercepts": 258,
+      "defender_spent": 129140.0
+    },
+    "skirmish_80": {
+      "leakers": 0,
+      "cost_exchange_ratio": 0.0033,
+      "intercepts": 37
+    },
+    "probe_120": {
+      "leakers": 0,
+      "cost_exchange_ratio": 0.0119,
+      "intercepts": 31
+    }
+  },
+  "deltas": {
+    "decoy_300": {
+      "leakers_delta": 0,
+      "cost_ratio_delta": -0.0517,
+      "cost_ratio_pct_improvement": "32.4%",
+      "defender_spend_saved": 8000.0
+    },
+    "saturation_1000": {
+      "leakers_delta": -24,
+      "leakers_pct_improvement": "4.5%",
+      "cost_ratio_delta": 0.0002,
+      "intercepts_delta": 24
+    },
+    "contested_500": {
+      "leakers_delta": 5,
+      "cost_ratio_delta": -0.0491,
+      "note": "leaker increase within variance (3-seed range: 218-242)"
+    },
+    "skirmish_80": {
+      "leakers_delta": 0,
+      "cost_ratio_delta": 0,
+      "note": "no regression"
+    },
+    "probe_120": {
+      "leakers_delta": 0,
+      "cost_ratio_delta": 0,
+      "note": "no regression"
+    }
+  },
+  "applied_changes": [
+    {
+      "generation": 1,
+      "change": "Area confidence gate: skip low-confidence targets (< 0.3) from area coverage when effector is expensive",
+      "impact": "Neutral. Defensive guard that prevents future regressions.",
+      "file": "backend/defense/allocator.py",
+      "kept": true
+    },
+    {
+      "generation": 2,
+      "change": "Intent value scaling: UNKNOWN=0.3, WAVES=0.8 (from 1.0)",
+      "impact": "Neutral on current scenarios. Deprioritizes uncertain targets in point phase.",
+      "file": "backend/defense/allocator.py",
+      "kept": true
+    },
+    {
+      "generation": 3,
+      "change": "Area reload acceleration: 1.6x factor for area effectors",
+      "impact": "REGRESSION. Leakers up in both targets. Reverted.",
+      "kept": false
+    },
+    {
+      "generation": 4,
+      "change": "Capacity conservation: block distant threats when defender capacity <= 2",
+      "impact": "Neutral. Defensive guard for ammo-starved defenders.",
+      "file": "backend/defense/allocator.py",
+      "kept": true
+    },
+    {
+      "generation": 5,
+      "change": "Area min coverage lowered from 3 to 2",
+      "impact": "Mixed. Sat -24 leakers but decoy +11 leakers. Replaced by Gen 6.",
+      "kept": false
+    },
+    {
+      "generation": 6,
+      "change": "Dynamic area coverage threshold: min_cov=2 when live_count > 600, else 3",
+      "impact": "IMPROVEMENT. Sat_1000: -24 leakers. No regression on other scenarios.",
+      "file": "backend/defense/allocator.py",
+      "kept": true
+    },
+    {
+      "generation": 7,
+      "change": "TTI 15s urgency band added (1.5x multiplier)",
+      "impact": "Neutral. No measurable change but correct directionally.",
+      "file": "backend/defense/allocator.py",
+      "kept": true
+    },
+    {
+      "generation": 8,
+      "change": "SATURATION overspend cap raised from 8x to 20x",
+      "impact": "REGRESSION. Cost ratio improved but leakers up +63. Reverted.",
+      "kept": false
+    },
+    {
+      "generation": 9,
+      "change": "Score-weighted area coverage selection",
+      "impact": "REGRESSION. Both metrics worse. Reverted.",
+      "kept": false
+    },
+    {
+      "generation": 10,
+      "change": "Cost ratio ceiling lowered from 0.15 to 0.10",
+      "impact": "IMPROVEMENT. Decoy cost ratio: 0.16 -> 0.11 (32% better). Defender spend saved $8k.",
+      "file": "backend/defense/allocator.py",
+      "kept": true
+    }
+  ],
+  "analysis": {
+    "saturation_1000_bottleneck": "All 10 area effectors (5 HPM + 5 EW) fully depleted. 230 area shots fired, average 1.7 targets per shot, 24% miss rate. Leaker count is capacity-limited.",
+    "decoy_300_improvement": "Cost ratio improved 32% by tightening the dynamic cost ceiling from 0.15 to 0.10. Interceptor spending cut from $24.7k to $16.7k with no change in kill count.",
+    "area_miss_analysis": "55 out of 230 area shots hit 0 targets due to position uncertainty between allocation and kill resolution. Improving fusion accuracy would reduce this.",
+    "key_insight": "In saturation, area effector capacity is the binding constraint. Adding more HPM/EW units or increasing max_simultaneous would reduce leakers more than any allocator optimization."
+  }
+}

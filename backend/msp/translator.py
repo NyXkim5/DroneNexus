@@ -58,15 +58,23 @@ class MSPTranslator:
         Convert a dict from MSPConnection.poll_telemetry() into a flat dict
         suitable for updating DroneState or creating an FPV telemetry packet.
         """
-        state = {}
+        state: dict = {}
+        self._translate_attitude(state, msp_data)
+        self._translate_gps(state, msp_data)
+        self._translate_altitude(state, msp_data)
+        self._translate_battery(state, msp_data)
+        self._translate_status_and_timers(state, msp_data, dt)
+        self._translate_home_distance(state)
+        self._translate_derived(state)
+        return state
 
-        # Attitude
+    def _translate_attitude(self, state: dict, msp_data: dict) -> None:
         att = msp_data.get('attitude', {})
         state['roll'] = att.get('roll', 0.0)
         state['pitch'] = att.get('pitch', 0.0)
         state['yaw'] = att.get('heading', 0.0)
 
-        # GPS
+    def _translate_gps(self, state: dict, msp_data: dict) -> None:
         gps = msp_data.get('gps', {})
         state['lat'] = gps.get('lat', 0.0)
         state['lon'] = gps.get('lon', 0.0)
@@ -76,21 +84,20 @@ class MSPTranslator:
         state['ground_speed'] = gps.get('speed', 0.0)
         state['heading'] = gps.get('ground_course', 0.0)
 
-        # Altitude
+    def _translate_altitude(self, state: dict, msp_data: dict) -> None:
         alt = msp_data.get('altitude', {})
         alt_m = alt.get('alt_cm', 0) / 100.0
         state['alt_msl'] = alt_m
         state['alt_agl'] = alt_m
         state['vertical_speed'] = alt.get('vario_cms', 0) / 100.0
 
-        # Battery (analog)
+    def _translate_battery(self, state: dict, msp_data: dict) -> None:
         analog = msp_data.get('analog', {})
         state['voltage'] = analog.get('vbat', 0.0)
         state['current'] = analog.get('amperage', 0.0)
         state['rssi'] = min(100, int(analog.get('rssi', 0) / 10.24))
         state['mah_consumed'] = analog.get('mah_drawn', 0)
 
-        # Battery state (extended)
         batt = msp_data.get('battery', {})
         cell_count = batt.get('cell_count', 0)
         if cell_count > 0:
@@ -105,13 +112,13 @@ class MSPTranslator:
             state['cell_voltage'] = state['voltage']
             state['remaining_pct'] = _voltage_to_pct(state['voltage'])
 
-        # Status
+    def _translate_status_and_timers(self, state: dict, msp_data: dict,
+                                     dt: float) -> None:
         status = msp_data.get('status', {})
         armed = status.get('armed', False)
         flags = status.get('flight_mode_flags', 0)
         state['flight_mode'] = msp_to_flight_mode(flags)
 
-        # Timers
         self._flight_timer += dt
         if armed and not self._was_armed:
             self._arm_timer = 0.0
@@ -124,7 +131,7 @@ class MSPTranslator:
         state['flight_timer_s'] = self._flight_timer
         state['arm_timer_s'] = self._arm_timer
 
-        # Home distance/direction
+    def _translate_home_distance(self, state: dict) -> None:
         if self._home_lat is not None and state['lat'] != 0:
             d_lat = (state['lat'] - self._home_lat) * 111320
             d_lon = (state['lon'] - self._home_lon) * 111320 * math.cos(
@@ -136,7 +143,7 @@ class MSPTranslator:
             state['home_distance_m'] = 0.0
             state['home_direction_deg'] = 0.0
 
-        # Derived status
+    def _translate_derived(self, state: dict) -> None:
         if state['remaining_pct'] < 25:
             state['status'] = 'LOW_BATT'
         elif state['rssi'] < 60:
@@ -148,8 +155,6 @@ class MSPTranslator:
         state['quality'] = min(100, state['rssi'])
         state['latency_ms'] = 0
         state['hdop'] = 1.5 if state['satellites'] > 6 else 5.0
-
-        return state
 
 
 def _voltage_to_pct(cell_v: float) -> float:

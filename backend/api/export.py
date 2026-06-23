@@ -35,45 +35,8 @@ def _extract_position(packet: dict) -> Optional[dict]:
     return {"lat": lat, "lon": lon, "alt_msl": alt_msl, "alt_agl": alt_agl}
 
 
-@export_router.get("/kml")
-async def export_kml(
-    drone_id: str = Query(..., description="Asset identifier, e.g. ALPHA-1"),
-    start: str = Query(..., description="Start time ISO-8601, e.g. 2026-01-01T00:00:00Z"),
-    end: str = Query(..., description="End time ISO-8601, e.g. 2026-12-31T23:59:59Z"),
-):
-    """Export flight path as a KML file with LineString and waypoint placemarks."""
-    app = _get_app()
-    if not app.db:
-        raise HTTPException(503, "Database not available")
-
-    packets = await app.db.get_telemetry_range(drone_id, start, end)
-    if not packets:
-        raise HTTPException(404, f"No telemetry found for {drone_id} in the given range")
-
-    # Extract position data
-    positions = []
-    for pkt in packets:
-        pos = _extract_position(pkt)
-        if pos:
-            positions.append({
-                "lat": pos["lat"],
-                "lon": pos["lon"],
-                "alt": pos["alt_msl"],
-                "timestamp": pkt.get("timestamp", ""),
-            })
-
-    if not positions:
-        raise HTTPException(404, "No position data in telemetry range")
-
-    # Build KML XML
-    kml_ns = "http://www.opengis.net/kml/2.2"
-    kml = Element("kml", xmlns=kml_ns)
-    doc = SubElement(kml, "Document")
-
-    name_el = SubElement(doc, "name")
-    name_el.text = f"OVERWATCH Flight Log \u2014 {drone_id}"
-
-    # Style for the flight path
+def _build_kml_styles(doc: Element) -> None:
+    """Add flight path and waypoint styles to the KML document."""
     style = SubElement(doc, "Style", id="flightPath")
     line_style = SubElement(style, "LineStyle")
     color_el = SubElement(line_style, "color")
@@ -81,13 +44,14 @@ async def export_kml(
     width_el = SubElement(line_style, "width")
     width_el.text = "3"
 
-    # Style for waypoint placemarks
     wp_style = SubElement(doc, "Style", id="waypoint")
     icon_style = SubElement(wp_style, "IconStyle")
     icon_scale = SubElement(icon_style, "scale")
     icon_scale.text = "0.8"
 
-    # Flight path LineString
+
+def _build_kml_flight_path(doc: Element, positions: list) -> None:
+    """Add the flight path LineString placemark to the KML document."""
     pm = SubElement(doc, "Placemark")
     pm_name = SubElement(pm, "name")
     pm_name.text = "Flight Path"
@@ -102,7 +66,9 @@ async def export_kml(
         f"{p['lon']},{p['lat']},{p['alt']}" for p in positions
     )
 
-    # Waypoint placemarks at start, end, and sampled intervals
+
+def _build_kml_waypoints(doc: Element, positions: list) -> None:
+    """Add sampled waypoint placemarks to the KML document."""
     waypoint_indices = _sample_waypoint_indices(len(positions), max_waypoints=20)
     for idx in waypoint_indices:
         p = positions[idx]
@@ -128,7 +94,45 @@ async def export_kml(
         wp_coords = SubElement(wp_point, "coordinates")
         wp_coords.text = f"{p['lon']},{p['lat']},{p['alt']}"
 
-    # Serialize
+
+@export_router.get("/kml")
+async def export_kml(
+    drone_id: str = Query(..., description="Asset identifier, e.g. ALPHA-1"),
+    start: str = Query(..., description="Start time ISO-8601, e.g. 2026-01-01T00:00:00Z"),
+    end: str = Query(..., description="End time ISO-8601, e.g. 2026-12-31T23:59:59Z"),
+):
+    """Export flight path as a KML file with LineString and waypoint placemarks."""
+    app = _get_app()
+    if not app.db:
+        raise HTTPException(503, "Database not available")
+
+    packets = await app.db.get_telemetry_range(drone_id, start, end)
+    if not packets:
+        raise HTTPException(404, f"No telemetry found for {drone_id} in the given range")
+
+    positions = []
+    for pkt in packets:
+        pos = _extract_position(pkt)
+        if pos:
+            positions.append({
+                "lat": pos["lat"],
+                "lon": pos["lon"],
+                "alt": pos["alt_msl"],
+                "timestamp": pkt.get("timestamp", ""),
+            })
+
+    if not positions:
+        raise HTTPException(404, "No position data in telemetry range")
+
+    kml = Element("kml", xmlns="http://www.opengis.net/kml/2.2")
+    doc = SubElement(kml, "Document")
+    name_el = SubElement(doc, "name")
+    name_el.text = f"OVERWATCH Flight Log \u2014 {drone_id}"
+
+    _build_kml_styles(doc)
+    _build_kml_flight_path(doc, positions)
+    _build_kml_waypoints(doc, positions)
+
     xml_declaration = '<?xml version="1.0" encoding="UTF-8"?>\n'
     kml_bytes = xml_declaration.encode("utf-8") + tostring(kml, encoding="unicode").encode("utf-8")
 

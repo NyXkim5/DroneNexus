@@ -295,8 +295,8 @@ _INTENT_VALUE_SCALE = {
     SwarmIntent.DECOY: 0.1,
     SwarmIntent.PROBE: 0.5,
     SwarmIntent.SATURATION: 1.0,
-    SwarmIntent.WAVES: 1.0,
-    SwarmIntent.UNKNOWN: 1.0,
+    SwarmIntent.WAVES: 0.8,
+    SwarmIntent.UNKNOWN: 0.3,
 }
 
 
@@ -304,8 +304,10 @@ def _tti_urgency(tti: Optional[float]) -> float:
     """Urgency multiplier based on time-to-impact for point effector priority.
 
     Imminent threats get higher benefit so the auction assigns point effectors
-    to the closest leakers first. TTI < 5s gets 3x, TTI < 10s gets 2x, and
-    everything else gets 1x. Unknown TTI (None) returns 1x.
+    to the closest leakers first. TTI < 5s gets 3x, TTI < 10s gets 2x,
+    TTI < 15s gets 1.5x, and everything else gets 1x. The 15s band catches
+    threats about to become imminent and ensures the point layer engages them
+    before they cross into terminal range unchallenged.
     """
     if tti is None:
         return 1.0
@@ -313,6 +315,8 @@ def _tti_urgency(tti: Optional[float]) -> float:
         return 3.0
     if tti < 10.0:
         return 2.0
+    if tti < 15.0:
+        return 1.5
     return 1.0
 
 
@@ -338,7 +342,7 @@ class LayeredAllocator(Allocator):
         attacker_cost_ref: float = 500.0,
         min_kinetic_confidence: float = 0.4,
         ledger: Optional[CostLedger] = None,
-        cost_ratio_ceiling: float = 0.15,
+        cost_ratio_ceiling: float = 0.10,
     ) -> None:
         self._resolve_position = resolve_position
         self._cost_weight = cost_weight
@@ -388,6 +392,7 @@ class LayeredAllocator(Allocator):
         """
         engagements: List[Engagement] = []
         order = sorted(defenders, key=self._cost_per_kill)
+        live_count = sum(1 for t in threats if t.id not in engaged)
         for defender in order:
             initial_cap = defender.capacity
             shots = initial_cap
@@ -395,8 +400,11 @@ class LayeredAllocator(Allocator):
                 aim, covered = self._best_aim(defender, threats, positions, engaged)
                 if aim is None or not covered:
                     break
-                # Save ammo: skip sparse shots when capacity is running low
-                if shots < initial_cap * 0.5 and len(covered) < 3:
+                # Dynamic minimum coverage: under extreme saturation (600+
+                # live threats), fire at pairs. Otherwise require at least 3
+                # to justify an area shot and conserve ammo.
+                min_cov = 2 if live_count > 600 else 3
+                if shots < initial_cap * 0.5 and len(covered) < min_cov:
                     break
                 for tid in covered:
                     engaged.add(tid)
@@ -432,6 +440,7 @@ class LayeredAllocator(Allocator):
             if t.id not in engaged
             and self._in_range(defender, positions[t.id])
             and not (expensive and t.intent is SwarmIntent.DECOY)
+            and not (expensive and t.confidence < 0.3)
         ]
         if not live:
             return None, []
@@ -520,13 +529,21 @@ class LayeredAllocator(Allocator):
         benefit and are deprioritized versus real attacks. An urgency multiplier
         boosts threats with low time-to-impact so the auction prioritizes the
         most imminent leakers over distant ones.
+
+        Capacity conservation: when a point effector has few rounds left
+        (capacity <= 2), only engage threats with TTI < 8s. This saves the
+        last rounds for truly imminent leakers rather than spending them on
+        distant threats that may never arrive.
         """
         row: List[float] = []
         cost_penalty = self._cost_weight * defender.unit_cost
+        conserve = defender.capacity <= 2
         for threat in threats:
             if not self._in_range(defender, positions[threat.id]):
                 row.append(-math.inf)
             elif not self._worth_spending(defender, threat):
+                row.append(-math.inf)
+            elif conserve and (threat.time_to_impact_s is None or threat.time_to_impact_s > 8.0):
                 row.append(-math.inf)
             else:
                 scale = _INTENT_VALUE_SCALE.get(threat.intent, 1.0)

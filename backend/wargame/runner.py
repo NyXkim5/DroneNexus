@@ -36,9 +36,16 @@ from csontology import (
     Vec3,
 )
 from defense import LayeredAllocator
+from defense.swarm_counter import (
+    DefenderDrone,
+    HostileTrack,
+    InterceptOrder,
+    SwarmCounterPlanner,
+)
 from sensors.base import SensorSource
 from sensors.sim_source import SimSensorSource
 import threat as threat_module
+from threat.predictor import ThreatPredictor
 
 from vision.detector import SimDetector
 from vision.feed_source import SimFeedSource
@@ -160,6 +167,34 @@ def _default_camera_model() -> CameraModel:
     )
 
 
+def _serialize_predictions(predictions: Optional[List] = None) -> List[dict]:
+    """Convert ThreatPrediction objects to JSON-ready dicts."""
+    if not predictions:
+        return []
+    result: List[dict] = []
+    for p in predictions:
+        result.append({
+            "track_id": p.track_id,
+            "likely_target": p.likely_target,
+            "impact_probability": round(p.impact_probability, 4),
+            "eta_s": round(p.estimated_time_to_target, 2),
+        })
+    return result
+
+
+def _serialize_intercept_order(order: InterceptOrder) -> dict:
+    """Convert an InterceptOrder to a JSON-ready dict with lat/lon."""
+    from csontology import enu_to_latlon
+    lat, lon, _ = enu_to_latlon(*order.intercept_point)
+    return {
+        "defender_id": order.defender_id,
+        "target_id": order.target_id,
+        "intercept_lat": lat,
+        "intercept_lon": lon,
+        "eta_s": order.eta_s,
+    }
+
+
 class WargameRunner:
     """Drives one counter-swarm wargame from a Scenario to completion."""
 
@@ -219,6 +254,10 @@ class WargameRunner:
         self._visual_correlator: Optional[VisualCorrelator] = None
         self._rf_visual_linker: Optional[RFVisualLinker] = None
         self._roe_engine = ROEEngine()
+        self._predictor = ThreatPredictor()
+        self._swarm_counter = SwarmCounterPlanner(
+            defended_site=self._world.site.position,
+        )
 
         if scenario.target_scenario:
             from vision.scenarios import load_target_scenario
@@ -310,6 +349,15 @@ class WargameRunner:
         self._classify_hostiles()
         self._feed_heatmap(detections, tracks)
         threats = threat_module.assess(tracks, self._world.site, t)
+        predictions = self._predictor.predict(
+            tracks, [self._world.site], horizon_s=30,
+        )
+        corridors = self._predictor.detect_corridors(
+            tracks, [self._world.site],
+        )
+        early_warnings = self._predictor.get_early_warnings(
+            predictions, corridors,
+        )
         cascade_results = []
         engagement_order = None
         visual_targets = []
@@ -326,6 +374,7 @@ class WargameRunner:
                 visual_targets, tracks, t,
             )
         engagements = self._engage(threats, t)
+        intercept_orders = self._plan_swarm_counter(threats, tracks)
         roe_evaluations = self._run_roe_evaluations(engagements, threats, tracks, t)
         self._audit_tick(t, engagements, threats, tracks)
         self._queue_events(engagements, threats, tracks)
@@ -335,6 +384,7 @@ class WargameRunner:
             tracks, threats, engagements, cascade_results,
             engagement_order, visual_targets, heatmap_data,
             visual_correlations, roe_evaluations,
+            predictions, early_warnings, intercept_orders,
         )
 
     def _queue_events(
@@ -633,6 +683,44 @@ class WargameRunner:
             results.append(_roe_evaluation_to_dict(evaluation))
         return results
 
+    def _plan_swarm_counter(
+        self,
+        threats: List[Threat],
+        tracks: List[Track],
+    ) -> List[dict]:
+        """Run advisory swarm-counter intercept planning.
+
+        Converts current threats and ready defenders into the lightweight
+        types the SwarmCounterPlanner expects, runs the plan, and serializes
+        the resulting InterceptOrders. This is advisory only and does not
+        replace the primary allocator.
+        """
+        if not threats:
+            return []
+        track_map = {t.id: t for t in tracks}
+        hostiles: List[HostileTrack] = []
+        for threat in threats:
+            track = track_map.get(threat.track_id) if threat.track_id else None
+            if track is None:
+                continue
+            hostiles.append(HostileTrack(
+                id=threat.id,
+                position=track.position,
+                velocity=track.velocity,
+            ))
+        ready = [
+            d for d in self._world.defenders
+            if d.status is DefenderStatus.READY
+        ]
+        defender_drones: List[DefenderDrone] = [
+            DefenderDrone(id=d.id, position=d.position)
+            for d in ready
+        ]
+        if not hostiles or not defender_drones:
+            return []
+        orders = self._swarm_counter.plan(hostiles, defender_drones)
+        return [_serialize_intercept_order(o) for o in orders]
+
     def _build_frame(
         self,
         tracks: List[Track],
@@ -644,6 +732,9 @@ class WargameRunner:
         heatmap_data: Optional[dict] = None,
         visual_correlations: Optional[List[dict]] = None,
         roe_evaluations: Optional[List[dict]] = None,
+        predictions: Optional[List] = None,
+        early_warnings: Optional[List[str]] = None,
+        intercept_orders: Optional[List[dict]] = None,
     ) -> Frame:
         """Compute metrics and bundle a renderable Frame for this tick."""
         metrics = self._compute_metrics(tracks)
@@ -664,6 +755,9 @@ class WargameRunner:
             engagements=engagements,
             visual_correlations=visual_correlations or [],
             roe_evaluations=roe_evaluations or [],
+            predictions=_serialize_predictions(predictions),
+            early_warnings=early_warnings or [],
+            intercept_orders=intercept_orders or [],
         )
 
     def _compute_metrics(self, tracks: List[Track]) -> Metrics:
